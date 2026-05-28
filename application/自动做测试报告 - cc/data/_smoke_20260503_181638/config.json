@@ -1,0 +1,17 @@
+{
+  "customer": "",
+  "line_id": "",
+  "bandwidth": "",
+  "engineer": "",
+  "test_date": "2026-05-03",
+  "ce_host": "192.0.2.1",
+  "ce_port": 2707,
+  "ce_user": "smoke",
+  "main_ip": "192.0.2.10",
+  "backup_ip": "192.0.2.11",
+  "local_site": "www.baidu.com",
+  "accel_site": "www.google.com",
+  "product_type": "er",
+  "ce_ping_interval_i": "0.01",
+  "ce_ping_interval_m": "1"
+}

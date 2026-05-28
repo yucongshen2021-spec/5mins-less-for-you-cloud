@@ -1,0 +1,254 @@
+/* DESIGN.md tokens */
+:root {
+  --primary: #f54e00;
+  --primary-active: #d04200;
+  --ink: #26251e;
+  --body: #5a5852;
+  --muted: #807d72;
+  --muted-soft: #a09c92;
+  --hairline: #e6e5e0;
+  --hairline-soft: #efeee8;
+  --hairline-strong: #cfcdc4;
+  --canvas: #f7f7f4;
+  --canvas-soft: #fafaf7;
+  --surface: #ffffff;
+  --surface-strong: #e6e5e0;
+  --on-primary: #ffffff;
+  --success: #1f8a65;
+  --error: #cf2d56;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px 24px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 14px 0 0;
+}
+.header-left h1 {
+  font-family: 'DM Serif Display', Georgia, 'Times New Roman', serif;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+  color: var(--ink);
+}
+.subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.warn-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--error);
+}
+
+/* Product bar */
+.product-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 8px;
+  font-size: 13px;
+  color: var(--body);
+  flex-wrap: wrap;
+}
+.product-label { font-weight: 500; color: var(--ink); }
+.radio-inline { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--ink); }
+.interval-label { margin-left: 8px; color: var(--muted); }
+.input-sm { width: 60px; padding: 6px 8px; border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: 13px; color: var(--ink); }
+.input-sm:disabled { opacity: 0.4; }
+
+/* Main grid */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+.col-left, .col-right { display: flex; flex-direction: column; gap: 8px; }
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px 14px;
+  opacity: 0; transform: translateY(10px);
+  animation: cardIn .4s ease forwards;
+  transition: box-shadow .15s;
+}
+.card:nth-child(1) { animation-delay: 0s; }
+.card:nth-child(2) { animation-delay: .08s; }
+.card:nth-child(3) { animation-delay: .16s; }
+.card-soft { background: var(--canvas-soft); }
+.card-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+@keyframes cardIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+.card-title-soft { color: var(--ink); }
+.card-log {
+  background: var(--canvas-soft);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+}
+
+/* Field rows */
+.field-row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.field-row label {
+  font-size: 13px;
+  color: var(--body);
+  text-align: right;
+}
+.field-row input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+.field-row input:focus {
+  border-color: var(--primary);
+}
+
+/* Preset */
+.preset-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.preset-group label {
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Log */
+.log-area {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  min-height: 260px;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0 0;
+}
+.actions-left { display: flex; gap: 8px; align-items: center; }
+.status-text { font-size: 13px; color: var(--muted); }
+
+/* Buttons */
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 18px;
+  height: 40px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: background .15s, transform .1s;
+}
+.btn-primary:hover { background: var(--primary-active); }
+.btn-primary:active { transform: scale(.97); }
+.btn-primary:disabled { opacity: 0.4; cursor: default; transform: none; }
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-md);
+  padding: 9px 17px;
+  height: 40px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: background .15s, transform .1s;
+}
+.btn-secondary:hover { background: var(--canvas-soft); }
+.btn-secondary:active { transform: scale(.97); }
+.btn-secondary:disabled { opacity: 0.4; cursor: default; transform: none; }
+.btn-sm { padding: 6px 14px; height: 32px; font-size: 13px; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--ink);
+  color: var(--canvas);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  z-index: 999;
+}
+.toast a { color: #fff; text-decoration: underline; }
+.hidden { display: none; }
+
+/* Log tag colors */
+.log-ts { color: var(--muted); }
+.log-ok { color: var(--ok); }
+.log-warn { color: #b8860b; }
+.log-err { color: var(--error); }
+.log-cmd { color: #2563eb; }

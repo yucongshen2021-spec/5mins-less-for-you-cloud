@@ -1,0 +1,17 @@
+{
+  "customer": "",
+  "line_id": "usgcheck",
+  "bandwidth": "",
+  "engineer": "",
+  "test_date": "2026-05-08",
+  "ce_host": "192.0.2.1",
+  "ce_port": 2707,
+  "ce_user": "u",
+  "main_ip": "10.22.60.121",
+  "backup_ip": "10.22.60.122",
+  "local_site": "www.baidu.com",
+  "accel_site": "www.google.com",
+  "product_type": "usg",
+  "ce_ping_interval_i": "0.01",
+  "ce_ping_interval_m": "1"
+}

@@ -1,0 +1,2188 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Epoch FastIP 5.0 配置生成工具 v1.0
+
+  VyOS set 语法（vs 4.0 Epoch 语法）。
+  数据头格式与 4.0 完全一致，仅输出模板不同。
+  5.0 特有参数（ssh_port、snmp_community、ntp、dns 等）全部硬编码，
+  不暴露给用户。
+"""
+
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import re, ipaddress
+
+try:
+    import field_coverage
+except ImportError:
+    field_coverage = None  # type: ignore
+
+try:
+    from field_coverage import inject_er_netpanel_init_aliases
+except ImportError:
+    def inject_er_netpanel_init_aliases(_d: dict) -> None:  # type: ignore[misc]
+        pass
+
+try:
+    from user_activity_log import log_generate_config
+except ImportError:
+    def log_generate_config(**_kwargs):  # type: ignore[misc]
+        pass
+
+# =====================================================================
+# 公共工具（fallback，独立运行时使用）
+# =====================================================================
+try:
+    _get  # 已由 all_in_one_v2 注入
+except NameError:
+    def _get(pattern, block, flags=re.IGNORECASE | re.MULTILINE):
+        m = re.search(pattern, block, flags)
+        return m.group(1).strip() if m else ""
+
+    def wanip_hosts(cidr):
+        try:
+            hosts = list(ipaddress.ip_network(cidr.strip(), strict=False).hosts())
+            if len(hosts) >= 2:
+                return str(hosts[0]), str(hosts[1])
+        except (ValueError, ipaddress.AddressValueError):
+            pass
+        return "", ""
+
+    def _parse_inner_nets(raw):
+        """解析多行/逗号分隔的内网段，返回合法 CIDR 列表。"""
+        nets = []
+        for token in re.split(r'[\n,，\s]+', raw or ""):
+            s = token.strip()
+            if not s:
+                continue
+            try:
+                nets.append(str(ipaddress.ip_network(s, strict=False)))
+            except (ValueError, ipaddress.AddressValueError):
+                pass
+        return nets
+
+# =====================================================================
+# 网络格式校验
+# =====================================================================
+def _validate_cidr(value, name="CIDR"):
+    """校验 CIDR（如 192.168.1.0/24）。返回 (True, None) 或 (False, 错误说明)。"""
+    if not value or not value.strip():
+        return True, None
+    s = value.strip()
+    try:
+        net = ipaddress.ip_network(s, strict=False)
+    except ValueError as e:
+        return False, f"{name}「{s}」格式错误：{e}"
+    try:
+        plen = net.prefixlen
+    except Exception:
+        plen = -1
+    if plen < 0 or plen > 32:
+        return False, f"{name}「{s}」掩码长度须为 0～32，当前无效（如 /33 等）"
+    return True, None
+
+
+def _validate_ip(value, name="IP"):
+    """校验单个 IPv4 地址（如 192.168.1.1）。返回 (True, None) 或 (False, 错误说明)。"""
+    if not value or not value.strip():
+        return True, None
+    s = value.strip()
+    try:
+        ipaddress.ip_address(s)
+    except ValueError as e:
+        return False, f"{name}「{s}」格式错误：{e}（每段须 0～255）"
+    return True, None
+
+
+def _validate_inner_nets(raw):
+    """校验内网段多行输入。返回 (合法 CIDR 列表, 错误列表 [(输入片段, 说明), ...])。"""
+    nets = []
+    errors = []
+    for token in re.split(r'[\n,，\s]+', raw or ""):
+        s = token.strip()
+        if not s:
+            continue
+        try:
+            net = ipaddress.ip_network(s, strict=False)
+            if net.prefixlen < 0 or net.prefixlen > 32:
+                errors.append((s, "掩码长度须为 0～32"))
+            else:
+                nets.append(str(net))
+        except ValueError as e:
+            errors.append((s, str(e)))
+    return nets, errors
+
+
+def _nets_needing_return(base_cidr, inner_nets):
+    """返回不在 base_cidr 网段内的 inner_nets（需要回程路由）。"""
+    if not base_cidr:
+        return list(inner_nets)
+    try:
+        base = ipaddress.ip_network(str(base_cidr).strip(), strict=False)
+    except (ValueError, ipaddress.AddressValueError):
+        return list(inner_nets)
+    res = []
+    for s in inner_nets:
+        try:
+            net = ipaddress.ip_network(s, strict=False)
+            if net != base:
+                res.append(s)
+        except (ValueError, ipaddress.AddressValueError):
+            res.append(s)
+    return res
+
+
+# =====================================================================
+# 隧道名称标准化 & 工具函数
+# =====================================================================
+def _normalize_vtun(raw):
+    if not raw:
+        return ""
+    raw = str(raw).strip()
+    s = raw.lower()
+    if s.startswith("vtun"):
+        return s
+    m = re.match(r"tunnel\s*0\s*/\s*0\s*/\s*(\d+)", s)
+    if m:
+        return f"vtun{m.group(1)}"
+    if s.startswith("tun"):
+        return f"v{s}"
+    m = re.search(r"(\d+)$", raw)
+    if m:
+        return f"vtun{m.group(1)}"
+    return s
+
+
+def _vtun_port(tunnel_id):
+    if not tunnel_id:
+        return ""
+    s = str(tunnel_id).strip().lower()
+    port = s[4:] if s.startswith("vtun") else (s[3:] if s.startswith("tun") else s)
+    m = re.match(r"(\d+)", port)
+    return m.group(1) if m else ""
+
+
+def normalize_tun(raw):
+    """标准化 GRE 隧道名称（保留 tun 前缀，与 _normalize_vtun 不同）。"""
+    if not raw:
+        return ""
+    raw = str(raw).strip()
+    s = raw.lower()
+    m = re.match(r"tunnel\s*0\s*/\s*0\s*/\s*(\d+)", s)
+    if m:
+        return f"tun{m.group(1)}"
+    m = re.match(r"tunnel(\d+)$", s)
+    if m:
+        return f"tun{m.group(1)}"
+    if s.startswith("vtun"):
+        return s[1:]
+    if s.startswith("tun"):
+        return s
+    m = re.search(r"(\d+)$", raw)
+    if m:
+        return f"tun{m.group(1)}"
+    return s
+
+
+def _us_sub_role(sub_text):
+    """识别 US 数据头子块角色（三重冗余：PE 名称 / 隧道前缀 / 特殊字段）。"""
+    pe = _get(r'^\s*PE\s*[：:]\s*(.+?)$', sub_text).lower()
+    tun = _get(r'^\s*(?:Tunnel|TUNNEL)\s*[：:]\s*(\S+)', sub_text).lower()
+    if re.search(r'海外出口ip', sub_text, re.IGNORECASE):
+        return 'gre2'
+    if re.search(r'acvpn|ipsecvpn|ipsecgw', pe):
+        return 'openvpn'
+    if re.search(r'natpe', pe):
+        return 'gre2'
+    if re.search(r'(?:^|[-_])upe', pe):
+        return 'gre1'
+    if tun.startswith('vtun'):
+        return 'openvpn'
+    if re.match(r'tunnel|^tun\d', tun):
+        return 'gre_unknown'
+    return None
+
+
+def parse_epoch_us(text):
+    """解析 US 数据头（LineID 格式，三层隧道）。
+
+    返回 dict，键名与 4.0 模块兼容。
+    """
+    result = {k: "" for k in [
+        "main_acvpn_gre_pe", "main_acvpn_gre_tun", "main_acvpn_gre_wanip",
+        "main_acvpn_gre_pe_ip", "main_acvpn_gre_ce_ip", "main_acvpn_gre_remote",
+        "main_acvpn_vtun_pe", "main_acvpn_vtun_id", "main_acvpn_vtun_port",
+        "main_acvpn_vtun_local", "main_acvpn_vtun_remote", "main_acvpn_vtun_docking",
+        "bk_acvpn_gre_pe", "bk_acvpn_gre_tun", "bk_acvpn_gre_wanip",
+        "bk_acvpn_gre_pe_ip", "bk_acvpn_gre_ce_ip", "bk_acvpn_gre_remote",
+        "bk_acvpn_vtun_pe", "bk_acvpn_vtun_id", "bk_acvpn_vtun_port",
+        "bk_acvpn_vtun_local", "bk_acvpn_vtun_remote", "bk_acvpn_vtun_docking",
+        "main_us_pe", "main_us_tun", "main_us_wanip",
+        "main_us_pe_ip", "main_us_gre_ce_ip", "main_us_pe_docking",
+        "main_us_nat_ip", "main_us_bgp1", "main_us_bgp2",
+        "bk_us_pe", "bk_us_tun", "bk_us_wanip",
+        "bk_us_pe_ip", "bk_us_gre_ce_ip", "bk_us_pe_docking",
+        "bk_us_nat_ip", "bk_us_bgp1", "bk_us_bgp2",
+        "ce_docking", "fw_options_block", "us_bgp_routes", "hostname",
+        "return_routes_block",
+    ]}
+    result["main_us_nat_ips"] = []
+    result["bk_us_nat_ips"] = []
+    all_gre2_subs = []
+
+    blocks = re.split(r'(?=LineID\s*[:：])', text, flags=re.IGNORECASE)
+    for block in blocks:
+        if not re.search(r'LineID', block, re.IGNORECASE):
+            continue
+        line_id = _get(r'LineID\s*[:：]\s*(\S+)', block)
+        if not line_id:
+            continue
+        last = line_id[-1]
+        try:
+            is_main = int(last) % 2 == 1
+        except Exception:
+            is_main = True
+        px = "main" if is_main else "bk"
+
+        lines = block.splitlines()
+        pe_line_idx = [
+            i for i, l in enumerate(lines)
+            if re.match(r'^\s*PE\s*[:：]\s*\S', l)
+            and not re.match(r'^\s*PE\s*(?:对接|AS|Docking)', l, re.IGNORECASE)
+        ]
+        sub_blocks = []
+        for i, start in enumerate(pe_line_idx):
+            end = pe_line_idx[i + 1] if i + 1 < len(pe_line_idx) else len(lines)
+            sub_blocks.append("\n".join(lines[start:end]))
+        if not pe_line_idx and re.search(r'海外出口ip', block, re.IGNORECASE):
+            sub_blocks = [block]
+
+        identified, unknown_gres = {}, []
+        for sub in sub_blocks:
+            role = _us_sub_role(sub)
+            if role == 'gre_unknown':
+                unknown_gres.append(sub)
+            elif role == 'gre2':
+                all_gre2_subs.append(sub)
+            elif role in ('openvpn', 'gre1'):
+                if role not in identified:
+                    identified[role] = sub
+        for sub in unknown_gres:
+            if 'gre1' not in identified:
+                identified['gre1'] = sub
+                break
+
+        if 'gre1' in identified:
+            sub = identified['gre1']
+            result[f"{px}_acvpn_gre_pe"] = _get(r'^\s*PE\s*[:：]\s*(.+?)$', sub)
+            tun_raw = _get(r'^\s*(?:Tunnel|TUNNEL)\s*[:：]\s*(\S+)', sub)
+            result[f"{px}_acvpn_gre_tun"] = normalize_tun(tun_raw)
+            wanip = _get(r'^\s*wanip\s*[:：]\s*([\d./]+)', sub)
+            result[f"{px}_acvpn_gre_wanip"] = wanip
+            pe_ip, ce_ip = wanip_hosts(wanip)
+            result[f"{px}_acvpn_gre_pe_ip"] = pe_ip
+            result[f"{px}_acvpn_gre_ce_ip"] = ce_ip
+            result[f"{px}_acvpn_gre_remote"] = _get(r'PE\s*对接\s*[:：]\s*([\d.]+)', sub)
+            ce_dock = _get(r'CE\s*对接\s*[:：]+\s*([\d.]+)', sub)
+            if ce_dock:
+                result[f"{px}_acvpn_vtun_local"] = ce_dock
+
+        if 'openvpn' in identified:
+            sub = identified['openvpn']
+            result[f"{px}_acvpn_vtun_pe"] = _get(r'^\s*PE\s*[:：]\s*(.+?)$', sub)
+            vtun_raw = _get(r'^\s*(?:Tunnel|TUNNEL)\s*[:：]\s*(\S+)', sub)
+            vtun_id = _normalize_vtun(vtun_raw)
+            result[f"{px}_acvpn_vtun_id"] = vtun_id
+            result[f"{px}_acvpn_vtun_port"] = _vtun_port(vtun_id)
+            vtun_wanip = _get(r'^\s*wanip\s*[:：]\s*([\d./]+)', sub)
+            pe_ip2, _ = wanip_hosts(vtun_wanip)
+            result[f"{px}_acvpn_vtun_remote"] = pe_ip2
+            result[f"{px}_acvpn_vtun_docking"] = _get(r'PE\s*对接\s*[:：]\s*([\d.]+)', sub)
+            ce_dock_vtun = _get(r'CE\s*对接\s*[:：]+\s*([\d.]+)', sub)
+            if ce_dock_vtun and not result.get(f"{px}_acvpn_vtun_local"):
+                result[f"{px}_acvpn_vtun_local"] = ce_dock_vtun
+
+    def _fill_gre2(sub, px):
+        result[f"{px}_us_pe"] = _get(r'^\s*PE\s*[:：]\s*(.+?)$', sub)
+        tun_raw = _get(r'^\s*(?:TUNNEL|Tunnel)\s*[:：]\s*(\S+)', sub)
+        result[f"{px}_us_tun"] = normalize_tun(tun_raw)
+        wanip = _get(r'^\s*WANIP\s*[:：]\s*([\d./]+)', sub)
+        result[f"{px}_us_wanip"] = wanip
+        pe_ip, ce_ip = wanip_hosts(wanip)
+        result[f"{px}_us_pe_ip"] = pe_ip
+        result[f"{px}_us_gre_ce_ip"] = ce_ip
+        result[f"{px}_us_pe_docking"] = _get(r'PE\s*(?:[Dd]ocking|对接)\s*[:：]+\s*([\d.]+)', sub)
+        ce_dock = _get(r'CE\s*(?:[Dd]ocking|对接)\s*[:：]+\s*([\d.]+)', sub)
+        if px == "main" and ce_dock:
+            result["ce_docking"] = ce_dock
+        bgp_raw = _get(r'BGPSERVER\s*IP\s*[:：]\s*(.+)', sub)
+        bgps = [ip.strip() for ip in re.split(r'[,，\s]+', bgp_raw)
+                if re.match(r'^\d+\.\d+', ip.strip())]
+        result[f"{px}_us_bgp1"] = bgps[0] if bgps else ""
+        result[f"{px}_us_bgp2"] = bgps[1] if len(bgps) > 1 else ""
+        oversea_m = re.search(
+            r'海外出口ip\s*[:：]\s*(.*?)(?=\n[^\d\s]|\Z)',
+            sub, re.IGNORECASE | re.DOTALL
+        )
+        nat_ips = []
+        if oversea_m:
+            blob = oversea_m.group(1)
+            pairs = re.findall(
+                r'(\d{1,3}(?:\.\d{1,3}){3})\s*[-–—~]\s*(\d{1,3}(?:\.\d{1,3}){3})',
+                blob
+            )
+            if pairs:
+                nat_ips = [p[0] for p in pairs]
+            else:
+                nat_ips = re.findall(r'\d{1,3}(?:\.\d{1,3}){3}', blob)
+            seen = set()
+            nat_ips = [ip for ip in nat_ips if not (ip in seen or seen.add(ip))]
+        result[f"{px}_us_nat_ips"] = nat_ips
+        if nat_ips:
+            result[f"{px}_us_nat_ip"] = nat_ips[0]
+
+    if len(all_gre2_subs) >= 1:
+        _fill_gre2(all_gre2_subs[0], "main")
+    if len(all_gre2_subs) >= 2:
+        _fill_gre2(all_gre2_subs[1], "bk")
+    return result
+
+
+# =====================================================================
+# 默认值（与 4.0 模块相同，可视化编辑器会写入 globals）
+# =====================================================================
+DEFAULT_WAN_CIDR   = "192.168.1.10/24"
+DEFAULT_WAN_GW     = "192.168.1.1"
+DEFAULT_LAN_CIDR   = "192.168.5.1/24"
+DEFAULT_INNER_NETS = "192.168.0.0/16"
+DEFAULT_WAN_ETH    = "0"
+DEFAULT_LAN_ETH    = "5"
+DEFAULT_WAN_DHCP   = False
+DEFAULT_LAN_DHCP   = True
+DEFAULT_LAN_GW     = DEFAULT_LAN_CIDR.split("/", 1)[0].strip() if DEFAULT_LAN_CIDR else ""
+DEFAULT_GEN_RETURN_ROUTE = False
+# HK 页签默认（与非 HK 相同；all_in_one 按场景分别持久化）
+HK_DEFAULT_WAN_CIDR   = DEFAULT_WAN_CIDR
+HK_DEFAULT_WAN_GW     = DEFAULT_WAN_GW
+HK_DEFAULT_LAN_CIDR   = DEFAULT_LAN_CIDR
+HK_DEFAULT_INNER_NETS = DEFAULT_INNER_NETS
+HK_DEFAULT_WAN_ETH    = DEFAULT_WAN_ETH
+HK_DEFAULT_LAN_ETH    = DEFAULT_LAN_ETH
+HK_DEFAULT_WAN_DHCP   = DEFAULT_WAN_DHCP
+HK_DEFAULT_LAN_DHCP   = DEFAULT_LAN_DHCP
+HK_DEFAULT_LAN_GW     = DEFAULT_LAN_GW
+HK_DEFAULT_GEN_RETURN_ROUTE = False
+# =====================================================================
+# 5.0 硬编码参数（不暴露给用户）
+# =====================================================================
+_EPOCH5_PKI_SECRET_KEY  = "bc128dc962ec1c5956a642eb25b10d959e790198c6de25499ba6509cf3e2fd3a1f5334ef62335dd1f159f12614c77d6a889796c5bc237daccab9d625f8ec59f37f4fcca623ef92039a890d4b5de872741cb7ef76f2b1d7f007ee027e57113d4f351a17e4ed101f6104073bfebc840daf50fe3186e7684ab114777c19f2d1c017c426d01dcb1d28ec16b667d9abbf5061925f41b0d09a282b237668f8537cc9e1db2677d56ff740f82fa9ed370b5ca4a8f6408893e8cd15fd908eafe15599aea0cd42d72be9175d63776190ca0ffd4c04e1ac42d0ff91aeaf2c7f2ec06f813d615b9731ebe9a00ef4ebb74e92d23019e5d4c80805afe6e66b14f3066e134cc859"
+_EPOCH5_DNS_GLOBAL1     = "8.8.4.4"
+_EPOCH5_DNS_GLOBAL2     = "8.8.8.8"
+_EPOCH5_JUMPBOX_IP      = "192.168.55.250"
+
+
+# =====================================================================
+# 5.0 HK 模板（VyOS set 语法）
+# =====================================================================
+TEMPLATE_EPOCH5_HK = """\
+# ==========================================================
+# Epoch 5.0 HK 出口配置  Hostname: {hostname}
+# 主线  PE:{main_pe}  TUNNEL:{main_tunnel}(port:{main_tunnel_port})
+#       WANIP:{main_wanip}  PE侧:{main_wanip_remote}  CE侧:{main_wanip_local}
+#       Docking:{main_docking}  HKIP:{hkip}  CELOIP:{ce_loip}
+#       BGP: {main_bgp1}, {main_bgp2}
+# 备线  PE:{bk_pe}  TUNNEL:{bk_tunnel}(port:{bk_tunnel_port})
+#       WANIP:{bk_wanip}  PE侧:{bk_wanip_remote}  CE侧:{bk_wanip_local}
+#       Docking:{bk_docking}  BGP: {bk_bgp1}, {bk_bgp2}
+# ==========================================================
+
+# 防火墙白名单网络组
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.0.0/16'
+set firewall group network-group GROUP-FNET-Whitelist network '172.16.0.0/12'
+set firewall group network-group GROUP-FNET-Whitelist network '10.0.0.0/8'
+set firewall group network-group GROUP-FNET-Whitelist network '100.64.0.0/10'
+set firewall group network-group GROUP-FNET-Whitelist network '224.0.0.0/4'
+set firewall group network-group GROUP-FNET-Whitelist network '127.0.0.0/8'
+set firewall group network-group GROUP-FNET-Whitelist network '43.229.117.226/32'
+set firewall group network-group GROUP-FNET-Whitelist network '43.229.119.251/32'
+set firewall group network-group GROUP-FNET-Whitelist network '120.76.31.146/32'
+set firewall group network-group GROUP-FNET-Whitelist network '202.104.174.178/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.112.236.97/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.112.238.8/29'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.99/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.100/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.101/32'
+
+# 防火墙本机防护
+set firewall ipv4 input filter default-action 'accept'
+set firewall ipv4 input filter rule 100 action 'jump'
+set firewall ipv4 input filter rule 100 jump-target 'WAN2LOCAL'
+set firewall ipv4 name WAN2LOCAL default-action 'drop'
+set firewall ipv4 name WAN2LOCAL rule 1000 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1000 state 'established'
+set firewall ipv4 name WAN2LOCAL rule 1000 state 'related'
+set firewall ipv4 name WAN2LOCAL rule 1010 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1010 source group network-group 'GROUP-FNET-Whitelist'
+set firewall ipv4 name WAN2LOCAL rule 1210 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1210 protocol 'gre'
+set firewall ipv4 name WAN2LOCAL rule 1220 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1220 protocol 'ipip'
+set firewall ipv4 name WAN2LOCAL rule 1230 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1230 protocol 'esp'
+
+# 设备 hostname
+set system host-name '{hostname}'
+
+# SSH 端口
+set service ssh disable-host-validation
+set service ssh port '2707'
+
+# 登录账户
+set system login user bothwin authentication plaintext-password 'Tfe28@w%'
+
+# 基本配置
+set service snmp community both-win authorization 'ro'
+
+# NTP 配置
+set service ntp server 192.168.55.250
+set service ntp server 202.104.174.178
+set system time-zone 'Asia/Hong_Kong'
+
+# WAN 和 LAN 配置
+set interfaces ethernet {wan_if} description WAN1
+set interfaces ethernet {wan_if} address '{wan_cidr}'
+{lan_if_block}
+
+# BGP 更新源
+set interfaces dummy dum0 address '{ce_loip}/32'
+set interfaces dummy dum0 description 'bgp-update-source'
+
+# NOC 路由下来的 HKIP 假 IP
+set interfaces dummy dum1 address '{hkip}/32'
+set interfaces dummy dum1 description 'HKIP'
+
+# 隧道配置
+
+# OpenVPN 共享密钥
+{pki_block}
+
+# 主 OpenVPN
+set interfaces openvpn {main_tunnel} description '{main_pe_desc}'
+set interfaces openvpn {main_tunnel} local-address {main_wanip_local} subnet-mask '255.255.255.252'
+set interfaces openvpn {main_tunnel} mode 'site-to-site'
+set interfaces openvpn {main_tunnel} openvpn-option 'nobind'
+set interfaces openvpn {main_tunnel} openvpn-option 'tun-mtu 1500'
+set interfaces openvpn {main_tunnel} openvpn-option 'fragment 1300'
+set interfaces openvpn {main_tunnel} openvpn-option 'providers legacy default'
+set interfaces openvpn {main_tunnel} persistent-tunnel
+set interfaces openvpn {main_tunnel} protocol 'udp'
+set interfaces openvpn {main_tunnel} remote-address '{main_wanip_remote}'
+set interfaces openvpn {main_tunnel} remote-host '{main_docking}'
+set interfaces openvpn {main_tunnel} remote-port '{main_tunnel_port}'
+set interfaces openvpn {main_tunnel} shared-secret-key 'openvpn_secret'
+set protocols static route {main_docking}/32 next-hop '{wan_gw}'
+
+# 备 OpenVPN
+set interfaces openvpn {bk_tunnel} description '{bk_pe_desc}'
+set interfaces openvpn {bk_tunnel} local-address {bk_wanip_local} subnet-mask '255.255.255.252'
+set interfaces openvpn {bk_tunnel} mode 'site-to-site'
+set interfaces openvpn {bk_tunnel} openvpn-option 'nobind'
+set interfaces openvpn {bk_tunnel} openvpn-option 'tun-mtu 1500'
+set interfaces openvpn {bk_tunnel} openvpn-option 'fragment 1300'
+set interfaces openvpn {bk_tunnel} openvpn-option 'providers legacy default'
+set interfaces openvpn {bk_tunnel} persistent-tunnel
+set interfaces openvpn {bk_tunnel} protocol 'udp'
+set interfaces openvpn {bk_tunnel} remote-address '{bk_wanip_remote}'
+set interfaces openvpn {bk_tunnel} remote-host '{bk_docking}'
+set interfaces openvpn {bk_tunnel} remote-port '{bk_tunnel_port}'
+set interfaces openvpn {bk_tunnel} shared-secret-key 'openvpn_secret'
+{static_route_bk_docking}
+
+# DNS 劫持配置
+set nat destination rule 50 destination port '53'
+set nat destination rule 50 inbound-interface name '{dns_hijack_if}'
+set nat destination rule 50 protocol 'tcp_udp'
+set nat destination rule 50 translation address '{lan_ip}'
+
+# NAT 配置
+{lan_net_block}
+set nat source rule 50 outbound-interface name '{wan_if}'
+set nat source rule 50 source group network-group 'LAN-NET'
+set nat source rule 50 translation address 'masquerade'
+set nat source rule 1000 outbound-interface name '{main_tunnel}'
+set nat source rule 1000 source group network-group 'LAN-NET'
+set nat source rule 1000 translation address '{hkip}'
+set nat source rule 2000 outbound-interface name '{bk_tunnel}'
+set nat source rule 2000 source group network-group 'LAN-NET'
+set nat source rule 2000 translation address '{hkip}'
+
+# DNS-NET 地址组（配合 DNS 进程使用）
+set firewall group address-group DNS-NET address {dns_ip1}
+set firewall group address-group DNS-NET address {dns_ip2}
+set nat source rule 5000 destination group address-group DNS-NET
+set nat source rule 5000 outbound-interface name '{main_tunnel}'
+set nat source rule 5000 translation address '{hkip}'
+set nat source rule 6000 destination group address-group DNS-NET
+set nat source rule 6000 outbound-interface name '{bk_tunnel}'
+set nat source rule 6000 translation address '{hkip}'
+
+# BGP Server 路由
+{bgp_server_routes_block}
+
+# BGP 配置
+set policy community-list 80 rule 10 action 'permit'
+set policy community-list 80 rule 10 description 'to_hk'
+set policy community-list 80 rule 10 regex '65000:9939'
+set policy community-list 81 rule 10 action 'permit'
+set policy community-list 81 rule 10 description 'to_ct'
+set policy community-list 81 rule 10 regex '65000:4134'
+set policy community-list 82 rule 10 action 'permit'
+set policy community-list 82 rule 10 description 'to_cnc'
+set policy community-list 82 rule 10 regex '65000:4837'
+set policy community-list 83 rule 10 action 'permit'
+set policy community-list 83 rule 10 description 'to_cn_other'
+set policy community-list 83 rule 10 regex '65000:9808'
+set policy community-list 85 rule 10 action 'permit'
+set policy community-list 85 rule 10 description 'to_deny'
+set policy community-list 85 rule 10 regex '65000:9807'
+set policy community-list 88 rule 10 action 'permit'
+set policy community-list 88 rule 10 description 'to_google'
+set policy community-list 88 rule 10 regex '65000:9008'
+set policy community-list 91 rule 10 action 'permit'
+set policy community-list 91 rule 10 description 'to_Microsoft'
+set policy community-list 91 rule 10 regex '65000:9009'
+
+set policy route-map bgp-from--RSVR rule 80 action 'permit'
+set policy route-map bgp-from--RSVR rule 80 match community community-list '80'
+set policy route-map bgp-from--RSVR rule 80 set ip-next-hop '{main_wanip_remote}'
+set policy route-map bgp-from--RSVR rule 80 set local-preference '200'
+set policy route-map bgp-from--RSVR rule 81 action 'permit'
+set policy route-map bgp-from--RSVR rule 81 match community community-list '81'
+set policy route-map bgp-from--RSVR rule 81 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR rule 81 set local-preference '200'
+set policy route-map bgp-from--RSVR rule 82 action 'permit'
+set policy route-map bgp-from--RSVR rule 82 match community community-list '82'
+set policy route-map bgp-from--RSVR rule 82 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR rule 82 set local-preference '200'
+set policy route-map bgp-from--RSVR rule 83 action 'permit'
+set policy route-map bgp-from--RSVR rule 83 match community community-list '83'
+set policy route-map bgp-from--RSVR rule 83 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR rule 83 set local-preference '200'
+set policy route-map bgp-from--RSVR2 rule 80 action 'permit'
+set policy route-map bgp-from--RSVR2 rule 80 match community community-list '80'
+set policy route-map bgp-from--RSVR2 rule 80 set ip-next-hop '{bk_wanip_remote}'
+set policy route-map bgp-from--RSVR2 rule 80 set local-preference '50'
+set policy route-map bgp-from--RSVR2 rule 81 action 'permit'
+set policy route-map bgp-from--RSVR2 rule 81 match community community-list '81'
+set policy route-map bgp-from--RSVR2 rule 81 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR2 rule 81 set local-preference '50'
+set policy route-map bgp-from--RSVR2 rule 82 action 'permit'
+set policy route-map bgp-from--RSVR2 rule 82 match community community-list '82'
+set policy route-map bgp-from--RSVR2 rule 82 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR2 rule 82 set local-preference '50'
+set policy route-map bgp-from--RSVR2 rule 83 action 'permit'
+set policy route-map bgp-from--RSVR2 rule 83 match community community-list '83'
+set policy route-map bgp-from--RSVR2 rule 83 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR2 rule 83 set local-preference '50'
+
+set policy route-map deny-any-out rule 1000 action 'deny'
+set policy route-map deny-any-out rule 1000 description 'to_bgpserver'
+
+set protocols bgp neighbor {main_bgp1} peer-group 'RSVR'
+set protocols bgp neighbor {main_bgp2} peer-group 'RSVR'
+set protocols bgp neighbor {bk_bgp1} peer-group 'RSVR2'
+set protocols bgp neighbor {bk_bgp2} peer-group 'RSVR2'
+set protocols bgp parameters router-id '{ce_loip}'
+set protocols bgp peer-group RSVR address-family ipv4-unicast route-map export 'deny-any-out'
+set protocols bgp peer-group RSVR address-family ipv4-unicast route-map import 'bgp-from--RSVR'
+set protocols bgp peer-group RSVR address-family ipv4-unicast soft-reconfiguration inbound
+set protocols bgp peer-group RSVR remote-as '65000'
+set protocols bgp peer-group RSVR update-source '{ce_loip}'
+set protocols bgp peer-group RSVR2 address-family ipv4-unicast route-map export 'deny-any-out'
+set protocols bgp peer-group RSVR2 address-family ipv4-unicast route-map import 'bgp-from--RSVR2'
+set protocols bgp peer-group RSVR2 address-family ipv4-unicast soft-reconfiguration inbound
+set protocols bgp peer-group RSVR2 remote-as '65000'
+set protocols bgp peer-group RSVR2 update-source '{ce_loip}'
+set protocols bgp system-as '65000'
+set protocols bgp timers holdtime '15'
+set protocols bgp timers keepalive '5'
+
+# 基本路由配置
+{default_route_block}
+
+# 主线监控
+set protocols static route 114.113.245.99/32 next-hop {main_wanip_remote}
+
+# 备线监控
+set protocols static route 114.113.245.100/32 next-hop {bk_wanip_remote}
+
+# 跳板机路由 & Track 配置
+{track_block}
+
+# 回程路由
+{return_routes_block}
+
+# DNS 配置
+set service file-sync task 1 local '/config/user-data/cn.txt'
+set service file-sync task 1 remote 'http://183.56.161.82:1909/f32x/domainlist/cn_domainlist.last'
+set service file-sync task 2 local '/config/user-data/oversea.txt'
+set service file-sync task 2 remote 'http://183.56.161.82:1909/f32x/domainlist/oversea_domainlist.last'
+
+set service dns forwarding allow-from '0.0.0.0/0'
+set service dns forwarding cache-size '10000'
+set service dns forwarding dnssec 'off'
+set service dns forwarding domain-list CN file '/config/user-data/cn.txt'
+set service dns forwarding domain-list CN name-server 223.5.5.5
+set service dns forwarding domain-list CN name-server 223.6.6.6
+set service dns forwarding domain-list CN recursion-desired
+set service dns forwarding domain-list HK file '/config/user-data/oversea.txt'
+set service dns forwarding domain-list HK name-server 8.8.4.4
+set service dns forwarding domain-list HK name-server 8.8.8.8
+set service dns forwarding domain-list HK recursion-desired
+set service dns forwarding listen-address '0.0.0.0'
+set service dns forwarding name-server 8.8.4.4
+set service dns forwarding name-server 8.8.8.8
+
+# DHCP 服务
+{dhcp_block}"""
+
+
+# =====================================================================
+# 占位模板（非 HK 变体待实现）
+# =====================================================================
+TEMPLATE_EPOCH5_US = """\
+# ==========================================================
+# Epoch 5.0 非香港出口配置  Hostname: {hostname}
+# 主ACVPN GRE  {main_acvpn_gre_tun}  PE:{main_acvpn_gre_pe}
+#   WANIP:{main_acvpn_gre_wanip}  PE侧:{main_acvpn_gre_pe_ip}  CE侧:{main_acvpn_gre_ce_ip}
+#   GRE remote:{main_acvpn_gre_remote}
+# 主ACVPN vtun  {main_acvpn_vtun_id}(port:{main_acvpn_vtun_port})  PE:{main_acvpn_vtun_pe}
+#   local:{main_acvpn_vtun_local}  remote:{main_acvpn_vtun_remote}  docking:{main_acvpn_vtun_docking}
+# 主非香港出口  {main_us_tun}  PE:{main_us_pe}
+#   WANIP:{main_us_wanip}  PE侧:{main_us_pe_ip}  CE侧:{main_us_gre_ce_ip}
+#   PE docking:{main_us_pe_docking}  NAT IP(FakeIP):{main_us_nat_ip_all}
+#   BGP: {main_us_bgp1}, {main_us_bgp2}
+# 备ACVPN GRE  {bk_acvpn_gre_tun}  PE:{bk_acvpn_gre_pe}
+#   WANIP:{bk_acvpn_gre_wanip}  PE侧:{bk_acvpn_gre_pe_ip}  CE侧:{bk_acvpn_gre_ce_ip}
+#   GRE remote:{bk_acvpn_gre_remote}
+# 备ACVPN vtun  {bk_acvpn_vtun_id}(port:{bk_acvpn_vtun_port})  PE:{bk_acvpn_vtun_pe}
+#   local:{bk_acvpn_vtun_local}  remote:{bk_acvpn_vtun_remote}  docking:{bk_acvpn_vtun_docking}
+# 备非香港出口  {bk_us_tun}  PE:{bk_us_pe}
+#   WANIP:{bk_us_wanip}  PE侧:{bk_us_pe_ip}  CE侧:{bk_us_gre_ce_ip}
+#   PE docking:{bk_us_pe_docking}  NAT IP(FakeIP):{bk_us_nat_ip_all}
+#   BGP: {bk_us_bgp1}, {bk_us_bgp2}
+# ------------------------------------------------------------------
+# BGP更新源(主): {main_us_nat_ip}  BGP更新源(备): {bk_us_nat_ip}
+# ==========================================================
+
+# 防火墙白名单网络组
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.0.0/16'
+set firewall group network-group GROUP-FNET-Whitelist network '172.16.0.0/12'
+set firewall group network-group GROUP-FNET-Whitelist network '10.0.0.0/8'
+set firewall group network-group GROUP-FNET-Whitelist network '100.64.0.0/10'
+set firewall group network-group GROUP-FNET-Whitelist network '224.0.0.0/4'
+set firewall group network-group GROUP-FNET-Whitelist network '127.0.0.0/8'
+set firewall group network-group GROUP-FNET-Whitelist network '43.229.117.226/32'
+set firewall group network-group GROUP-FNET-Whitelist network '43.229.119.251/32'
+set firewall group network-group GROUP-FNET-Whitelist network '120.76.31.146/32'
+set firewall group network-group GROUP-FNET-Whitelist network '202.104.174.178/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.112.236.97/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.112.238.8/29'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.99/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.100/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.101/32'
+
+# 防火墙本机防护
+set firewall ipv4 input filter default-action 'accept'
+set firewall ipv4 input filter rule 100 action 'jump'
+set firewall ipv4 input filter rule 100 jump-target 'WAN2LOCAL'
+set firewall ipv4 name WAN2LOCAL default-action 'drop'
+set firewall ipv4 name WAN2LOCAL rule 1000 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1000 state 'established'
+set firewall ipv4 name WAN2LOCAL rule 1000 state 'related'
+set firewall ipv4 name WAN2LOCAL rule 1010 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1010 source group network-group 'GROUP-FNET-Whitelist'
+set firewall ipv4 name WAN2LOCAL rule 1210 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1210 protocol 'gre'
+set firewall ipv4 name WAN2LOCAL rule 1220 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1220 protocol 'ipip'
+set firewall ipv4 name WAN2LOCAL rule 1230 action 'accept'
+set firewall ipv4 name WAN2LOCAL rule 1230 protocol 'esp'
+
+# 隧道 MSS 调整
+{fw_options_block}
+
+# 设备 hostname
+set system host-name '{hostname}'
+
+# SSH 端口
+set service ssh disable-host-validation
+set service ssh port '2707'
+
+# 登录账户
+set system login user bothwin authentication plaintext-password 'Tfe28@w%'
+
+# 基本配置
+set service snmp community both-win authorization 'ro'
+
+# NTP 配置
+set service ntp server 192.168.55.250
+set service ntp server 202.104.174.178
+set system time-zone 'Asia/Hong_Kong'
+
+# WAN 和 LAN 配置
+set interfaces ethernet {wan_if} description WAN1
+set interfaces ethernet {wan_if} address '{wan_cidr}'
+{lan_if_block}
+
+# Dummy 接口
+set interfaces dummy dum0 address '{ce_docking}/32'
+set interfaces dummy dum0 description 'CE Docking'
+set interfaces dummy dum100 address '{main_us_nat_ip}/32'
+set interfaces dummy dum100 description '{main_us_dum100_desc}'
+{extra_dum_main_block}
+set interfaces dummy dum200 address '{bk_us_nat_ip}/32'
+set interfaces dummy dum200 description '{bk_us_dum200_desc}'
+{extra_dum_bk_block}
+
+# 隧道配置
+
+# OpenVPN 共享密钥
+{pki_block}
+
+# 主 ACVPN OpenVPN
+set interfaces openvpn {main_acvpn_vtun_id} description 'MAIN {main_acvpn_vtun_pe} {main_acvpn_vtun_id}'
+set interfaces openvpn {main_acvpn_vtun_id} local-address {main_acvpn_vtun_local} subnet-mask '255.255.255.252'
+set interfaces openvpn {main_acvpn_vtun_id} mode 'site-to-site'
+set interfaces openvpn {main_acvpn_vtun_id} openvpn-option 'nobind'
+set interfaces openvpn {main_acvpn_vtun_id} openvpn-option 'tun-mtu 1500'
+set interfaces openvpn {main_acvpn_vtun_id} openvpn-option 'fragment 1300'
+set interfaces openvpn {main_acvpn_vtun_id} openvpn-option 'providers legacy default'
+set interfaces openvpn {main_acvpn_vtun_id} persistent-tunnel
+set interfaces openvpn {main_acvpn_vtun_id} protocol 'udp'
+set interfaces openvpn {main_acvpn_vtun_id} remote-address '{main_acvpn_vtun_remote}'
+set interfaces openvpn {main_acvpn_vtun_id} remote-host '{main_acvpn_vtun_docking}'
+set interfaces openvpn {main_acvpn_vtun_id} remote-port '{main_acvpn_vtun_port}'
+set interfaces openvpn {main_acvpn_vtun_id} shared-secret-key 'openvpn_secret'
+
+# 主 ACVPN GRE 隧道
+set interfaces tunnel {main_acvpn_gre_tun} address '{main_acvpn_gre_ce_ip}/30'
+set interfaces tunnel {main_acvpn_gre_tun} description 'MAIN {main_acvpn_gre_pe}'
+set interfaces tunnel {main_acvpn_gre_tun} encapsulation 'gre'
+set interfaces tunnel {main_acvpn_gre_tun} ip adjust-mss '1300'
+set interfaces tunnel {main_acvpn_gre_tun} mtu '1476'
+set interfaces tunnel {main_acvpn_gre_tun} parameters ip ttl '255'
+set interfaces tunnel {main_acvpn_gre_tun} remote '{main_acvpn_gre_remote}'
+set interfaces tunnel {main_acvpn_gre_tun} source-address '{main_acvpn_vtun_local}'
+
+# 主 US 隧道
+set interfaces tunnel {main_us_tun} address '{main_us_gre_ce_ip}/30'
+set interfaces tunnel {main_us_tun} description 'MAIN {main_us_pe}'
+set interfaces tunnel {main_us_tun} encapsulation 'gre'
+set interfaces tunnel {main_us_tun} ip adjust-mss '1300'
+set interfaces tunnel {main_us_tun} mtu '1452'
+set interfaces tunnel {main_us_tun} parameters ip ttl '255'
+set interfaces tunnel {main_us_tun} remote '{main_us_pe_docking}'
+set interfaces tunnel {main_us_tun} source-address '{ce_docking}'
+
+# 备 ACVPN OpenVPN
+set interfaces openvpn {bk_acvpn_vtun_id} description 'BK {bk_acvpn_vtun_pe} {bk_acvpn_vtun_id}'
+set interfaces openvpn {bk_acvpn_vtun_id} local-address {bk_acvpn_vtun_local} subnet-mask '255.255.255.252'
+set interfaces openvpn {bk_acvpn_vtun_id} mode 'site-to-site'
+set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option 'nobind'
+set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option 'tun-mtu 1500'
+set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option 'fragment 1300'
+set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option 'providers legacy default'
+set interfaces openvpn {bk_acvpn_vtun_id} persistent-tunnel
+set interfaces openvpn {bk_acvpn_vtun_id} protocol 'udp'
+set interfaces openvpn {bk_acvpn_vtun_id} remote-address '{bk_acvpn_vtun_remote}'
+set interfaces openvpn {bk_acvpn_vtun_id} remote-host '{bk_acvpn_vtun_docking}'
+set interfaces openvpn {bk_acvpn_vtun_id} remote-port '{bk_acvpn_vtun_port}'
+set interfaces openvpn {bk_acvpn_vtun_id} shared-secret-key 'openvpn_secret'
+
+# 备 ACVPN GRE 隧道
+set interfaces tunnel {bk_acvpn_gre_tun} address '{bk_acvpn_gre_ce_ip}/30'
+set interfaces tunnel {bk_acvpn_gre_tun} description 'BK {bk_acvpn_gre_pe}'
+set interfaces tunnel {bk_acvpn_gre_tun} encapsulation 'gre'
+set interfaces tunnel {bk_acvpn_gre_tun} ip adjust-mss '1300'
+set interfaces tunnel {bk_acvpn_gre_tun} mtu '1476'
+set interfaces tunnel {bk_acvpn_gre_tun} parameters ip ttl '255'
+set interfaces tunnel {bk_acvpn_gre_tun} remote '{bk_acvpn_gre_remote}'
+set interfaces tunnel {bk_acvpn_gre_tun} source-address '{bk_acvpn_vtun_local}'
+
+# 备 US 隧道
+set interfaces tunnel {bk_us_tun} address '{bk_us_gre_ce_ip}/30'
+set interfaces tunnel {bk_us_tun} description 'BK {bk_us_pe}'
+set interfaces tunnel {bk_us_tun} encapsulation 'gre'
+set interfaces tunnel {bk_us_tun} ip adjust-mss '1300'
+set interfaces tunnel {bk_us_tun} mtu '1452'
+set interfaces tunnel {bk_us_tun} parameters ip ttl '255'
+set interfaces tunnel {bk_us_tun} remote '{bk_us_pe_docking}'
+set interfaces tunnel {bk_us_tun} source-address '{ce_docking}'
+
+# NAT 配置
+{lan_net_block}
+set nat source rule 50 outbound-interface name '{wan_if}'
+set nat source rule 50 source group network-group 'LAN-NET'
+set nat source rule 50 translation address 'masquerade'
+{overseas_nat_block}
+
+# DNS-NET 地址组（配合 DNS 进程使用）
+set firewall group address-group DNS-NET address {dns_ip1}
+set firewall group address-group DNS-NET address {dns_ip2}
+set nat source rule 5000 destination group address-group DNS-NET
+set nat source rule 5000 outbound-interface name '{main_us_tun}'
+set nat source rule 5000 translation address '{main_us_nat_ip}'
+set nat source rule 6000 destination group address-group DNS-NET
+set nat source rule 6000 outbound-interface name '{bk_us_tun}'
+set nat source rule 6000 translation address '{bk_us_nat_ip}'
+
+# BGP Server 路由
+{us_bgp_routes}
+
+# BGP 配置
+set policy community-list 80 rule 10 action 'permit'
+set policy community-list 80 rule 10 description 'to_hk'
+set policy community-list 80 rule 10 regex '65000:9939'
+set policy community-list 81 rule 10 action 'permit'
+set policy community-list 81 rule 10 description 'to_ct'
+set policy community-list 81 rule 10 regex '65000:4134'
+set policy community-list 82 rule 10 action 'permit'
+set policy community-list 82 rule 10 description 'to_cnc'
+set policy community-list 82 rule 10 regex '65000:4837'
+set policy community-list 83 rule 10 action 'permit'
+set policy community-list 83 rule 10 description 'to_cn_other'
+set policy community-list 83 rule 10 regex '65000:9808'
+set policy community-list 85 rule 10 action 'permit'
+set policy community-list 85 rule 10 description 'to_deny'
+set policy community-list 85 rule 10 regex '65000:9807'
+set policy community-list 88 rule 10 action 'permit'
+set policy community-list 88 rule 10 description 'to_google'
+set policy community-list 88 rule 10 regex '65000:9008'
+set policy community-list 91 rule 10 action 'permit'
+set policy community-list 91 rule 10 description 'to_Microsoft'
+set policy community-list 91 rule 10 regex '65000:9009'
+
+set policy route-map bgp-from--RSVR rule 100 action 'permit'
+set policy route-map bgp-from--RSVR rule 100 description 'to_hk'
+set policy route-map bgp-from--RSVR rule 100 match community community-list '80'
+set policy route-map bgp-from--RSVR rule 100 set ip-next-hop '{main_us_pe_ip}'
+set policy route-map bgp-from--RSVR rule 100 set local-preference '200'
+set policy route-map bgp-from--RSVR rule 200 action 'permit'
+set policy route-map bgp-from--RSVR rule 200 description 'to_ct'
+set policy route-map bgp-from--RSVR rule 200 match community community-list '81'
+set policy route-map bgp-from--RSVR rule 200 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR rule 200 set local-preference '200'
+set policy route-map bgp-from--RSVR rule 300 action 'permit'
+set policy route-map bgp-from--RSVR rule 300 description 'to_cnc'
+set policy route-map bgp-from--RSVR rule 300 match community community-list '82'
+set policy route-map bgp-from--RSVR rule 300 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR rule 300 set local-preference '200'
+set policy route-map bgp-from--RSVR rule 400 action 'permit'
+set policy route-map bgp-from--RSVR rule 400 description 'to_cn_other'
+set policy route-map bgp-from--RSVR rule 400 match community community-list '83'
+set policy route-map bgp-from--RSVR rule 400 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR rule 400 set local-preference '200'
+set policy route-map bgp-from--RSVR2 rule 100 action 'permit'
+set policy route-map bgp-from--RSVR2 rule 100 description 'to_hk'
+set policy route-map bgp-from--RSVR2 rule 100 match community community-list '80'
+set policy route-map bgp-from--RSVR2 rule 100 set ip-next-hop '{bk_us_pe_ip}'
+set policy route-map bgp-from--RSVR2 rule 100 set local-preference '50'
+set policy route-map bgp-from--RSVR2 rule 200 action 'permit'
+set policy route-map bgp-from--RSVR2 rule 200 description 'to_ct'
+set policy route-map bgp-from--RSVR2 rule 200 match community community-list '81'
+set policy route-map bgp-from--RSVR2 rule 200 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR2 rule 200 set local-preference '50'
+set policy route-map bgp-from--RSVR2 rule 300 action 'permit'
+set policy route-map bgp-from--RSVR2 rule 300 description 'to_cnc'
+set policy route-map bgp-from--RSVR2 rule 300 match community community-list '82'
+set policy route-map bgp-from--RSVR2 rule 300 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR2 rule 300 set local-preference '50'
+set policy route-map bgp-from--RSVR2 rule 400 action 'permit'
+set policy route-map bgp-from--RSVR2 rule 400 description 'to_cn_other'
+set policy route-map bgp-from--RSVR2 rule 400 match community community-list '83'
+set policy route-map bgp-from--RSVR2 rule 400 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR2 rule 400 set local-preference '50'
+
+set policy route-map deny-any-out rule 1000 action 'deny'
+set policy route-map deny-any-out rule 1000 description 'to_bgpserver'
+
+set protocols bgp neighbor {main_us_bgp1} peer-group 'RSVR'
+set protocols bgp neighbor {main_us_bgp2} peer-group 'RSVR'
+set protocols bgp neighbor {bk_us_bgp1} peer-group 'RSVR2'
+set protocols bgp neighbor {bk_us_bgp2} peer-group 'RSVR2'
+set protocols bgp parameters router-id '{main_us_nat_ip}'
+set protocols bgp peer-group RSVR address-family ipv4-unicast route-map export 'deny-any-out'
+set protocols bgp peer-group RSVR address-family ipv4-unicast route-map import 'bgp-from--RSVR'
+set protocols bgp peer-group RSVR address-family ipv4-unicast soft-reconfiguration inbound
+set protocols bgp peer-group RSVR remote-as '65000'
+set protocols bgp peer-group RSVR update-source '{main_us_nat_ip}'
+set protocols bgp peer-group RSVR2 address-family ipv4-unicast route-map export 'deny-any-out'
+set protocols bgp peer-group RSVR2 address-family ipv4-unicast route-map import 'bgp-from--RSVR2'
+set protocols bgp peer-group RSVR2 address-family ipv4-unicast soft-reconfiguration inbound
+set protocols bgp peer-group RSVR2 remote-as '65000'
+set protocols bgp peer-group RSVR2 update-source '{bk_us_nat_ip}'
+set protocols bgp system-as '65000'
+set protocols bgp timers holdtime '15'
+set protocols bgp timers keepalive '5'
+
+# 基本路由配置
+{default_route_block}
+
+# 主线监控
+set protocols static route 114.113.245.99/32 next-hop {main_acvpn_gre_pe_ip}
+
+# 备线监控
+set protocols static route 114.113.245.100/32 next-hop {bk_acvpn_gre_pe_ip}
+
+# 跳板机路由 & Track 配置（failover2 替代 track）
+set protocols failover2 track tomain source-address '{main_acvpn_gre_ce_ip}'
+set protocols failover2 track tomain target '{main_acvpn_gre_pe_ip}'
+set protocols failover2 track tomain type 'icmp'
+set protocols failover2 route 192.168.55.250/32 next-hop {main_acvpn_gre_pe_ip} track 'tomain'
+set protocols static route 192.168.55.250/32 next-hop {bk_acvpn_gre_pe_ip} distance '10'
+
+# 静态路由（隧道路由）
+set protocols static route {main_acvpn_vtun_docking}/32 next-hop 1.1.1.1
+set protocols static route {bk_acvpn_vtun_docking}/32 next-hop 1.1.1.1
+set protocols static route {main_us_pe_docking}/32 next-hop {main_acvpn_gre_pe_ip}
+set protocols static route {bk_us_pe_docking}/32 next-hop {bk_acvpn_gre_pe_ip}
+set protocols static route {main_acvpn_gre_remote}/32 next-hop {main_acvpn_vtun_remote}
+set protocols static route {bk_acvpn_gre_remote}/32 next-hop {bk_acvpn_vtun_remote}
+
+# 本地策略路由（US 出口源地址分流）
+set policy local-route rule 1001 set table '101'
+set policy local-route rule 1001 source address '{main_us_gre_ce_ip}'
+set protocols static table 101 route 0.0.0.0/0 next-hop {main_us_pe_ip}
+set policy local-route rule 1002 set table '102'
+set policy local-route rule 1002 source address '{bk_us_gre_ce_ip}'
+set protocols static table 102 route 0.0.0.0/0 next-hop {bk_us_pe_ip}
+
+# 回程路由
+{return_routes_block}
+
+# DNS 配置
+set service file-sync task 1 local '/config/user-data/cn.txt'
+set service file-sync task 1 remote 'http://183.56.161.82:1909/f32x/domainlist/cn_domainlist.last'
+set service file-sync task 2 local '/config/user-data/oversea.txt'
+set service file-sync task 2 remote 'http://183.56.161.82:1909/f32x/domainlist/oversea_domainlist.last'
+
+set service dns forwarding allow-from '0.0.0.0/0'
+set service dns forwarding cache-size '10000'
+set service dns forwarding dnssec 'off'
+set service dns forwarding domain-list CN file '/config/user-data/cn.txt'
+set service dns forwarding domain-list CN name-server 223.5.5.5
+set service dns forwarding domain-list CN name-server 223.6.6.6
+set service dns forwarding domain-list CN recursion-desired
+set service dns forwarding domain-list HK file '/config/user-data/oversea.txt'
+set service dns forwarding domain-list HK name-server 8.8.4.4
+set service dns forwarding domain-list HK name-server 8.8.8.8
+set service dns forwarding domain-list HK recursion-desired
+set service dns forwarding listen-address '0.0.0.0'
+set service dns forwarding name-server 8.8.4.4
+set service dns forwarding name-server 8.8.8.8
+
+# DHCP 服务
+{dhcp_block}"""
+
+TEMPLATE_EPOCH5_FLINK = (
+    "# [5.0 ER 飞连 — 开发中]\n"
+    "# 模板待实现\n"
+)
+
+TEMPLATE_EPOCH5_NEW_EXIT = """\
+set interfaces dummy dum{ER_NE_MAIN_DUM_START} address '{main_dum_first_ip}/32'
+set interfaces dummy dum{ER_NE_MAIN_DUM_START} description 'USIP-Main:{main_dum_first_ip}-{main_dum_first_remote}'
+{ER_NE_MAIN_DUM_BLOCK}
+set interfaces tunnel {main_tun} address '{main_tun_addr}'
+set interfaces tunnel {main_tun} description 'main-{main_pe}-{main_tun_num}'
+set interfaces tunnel {main_tun} encapsulation 'gre'
+set interfaces tunnel {main_tun} ip adjust-mss '{main_mss}'
+set interfaces tunnel {main_tun} mtu '{main_mtu}'
+set interfaces tunnel {main_tun} remote '{main_pe_docking}'
+set interfaces tunnel {main_tun} source-address '{main_ce_docking}'
+{ER_NE_BK_BLOCK}
+set protocols static route {main_pe_docking}/32 next-hop {ER_NE_MAIN_PE_NH_DEFAULT}
+{ER_NE_NAT_HEADER_BLOCK}{ER_NE_NAT_BLOCK}{ER_NE_FNET_BLOCK}"""
+
+TEMPLATE_EPOCH5_FLINK = """\
+set protocols failover2 track tomain source-address '{ER_FL_FAILOVER_SRC}'
+set protocols failover2 track tomain target '{ER_FL_MAIN_NH_DEFAULT}'
+set protocols failover2 track tomain type 'icmp'
+
+set protocols failover2 route {route1} next-hop {ER_FL_MAIN_NH_DEFAULT} track 'tomain'
+set protocols failover2 route {route2} next-hop {ER_FL_MAIN_NH_DEFAULT} track 'tomain'
+set protocols failover2 route {route3} next-hop {ER_FL_MAIN_NH_DEFAULT} track 'tomain'
+
+set protocols static route {route1} next-hop {ER_FL_BACKUP_NH_DEFAULT} distance 10
+set protocols static route {route2} next-hop {ER_FL_BACKUP_NH_DEFAULT} distance 10
+set protocols static route {route3} next-hop {ER_FL_BACKUP_NH_DEFAULT} distance 10
+
+set firewall group network-group LAN-NET network {route1}
+set firewall group network-group LAN-NET network {route2}
+set firewall group network-group LAN-NET network {route3}"""
+
+TEMPLATE_EPOCH5_DOMAIN_SPLIT = (
+    "# [5.0 ER 域名分流 — 开发中]\n"
+    "# 模板待实现\n"
+)
+
+
+# =====================================================================
+# 5.0 新增出口 — 解析器（数据头格式与 4.0 完全一致）
+# =====================================================================
+
+def _er_ne_nat_source_normalized(raw: str):
+    s = (raw or "").strip()
+    if not s:
+        return None
+    try:
+        return str(ipaddress.ip_network(s, strict=False))
+    except ValueError:
+        return None
+
+
+def _parse_oversea_pairs_5(raw_blob: str):
+    pairs = re.findall(
+        r"(\d{1,3}(?:\.\d{1,3}){3})\s*[-–—~]\s*(\d{1,3}(?:\.\d{1,3}){3})",
+        raw_blob or "",
+    )
+    if pairs:
+        return pairs
+    ips = re.findall(r"\d{1,3}(?:\.\d{1,3}){3}", raw_blob or "")
+    return [(ip, ip) for ip in ips]
+
+
+def parse_epoch5_new_exit_blocks(raw_text: str):
+    """解析 5.0 新增出口数据头，返回 ({"main":{}, "bk":{}}, err_msg_or_none)。
+    支持单线输入——仅 1 个 LineID block 时视为主线。"""
+
+    blocks = [b.strip() for b in re.split(r"(?=LineID\s*[:：])", raw_text or "", flags=re.IGNORECASE) if b.strip()]
+    if not blocks:
+        return None, "未找到任何 LineID 数据块"
+
+    parsed = {}
+    for block in blocks:
+        line_id = _get(r"LineID\s*[:：]\s*(\S+)", block)
+        if not line_id:
+            continue
+        if len(blocks) == 1:
+            key = "main"
+        else:
+            try:
+                key = "main" if int(line_id[-1]) % 2 == 1 else "bk"
+            except Exception:
+                key = "main"
+
+        wanip = _get(r"WANIP\s*[:：]\s*([\d./]+)", block)
+        tun = normalize_tun(_get(r"TUNNEL\s*[:：]\s*(\S+)", block))
+        pe = _get(r"^\s*PE\s*[:：]\s*(.+?)$", block)
+        pe_docking = _get(r"PE\s*[Dd]ocking\s*[:：]+\s*([\d.]+)", block)
+        ce_docking = _get(r"CE\s*[Dd]ocking\s*[:：]+\s*([\d.]+)", block)
+        oversea_blob_m = re.search(
+            r"海外出口ip\s*[:：]\s*(.*?)(?=\nLineID\s*[:：]|\Z)",
+            block, re.IGNORECASE | re.DOTALL,
+        )
+        oversea_blob = oversea_blob_m.group(1) if oversea_blob_m else ""
+        oversea_pairs = _parse_oversea_pairs_5(oversea_blob)
+
+        if not (wanip and tun and pe and pe_docking and ce_docking):
+            return None, f"{line_id} 数据不完整，请检查 WANIP/TUNNEL/PE/PE Docking/CE Docking"
+        pe_ip, ce_ip = wanip_hosts(wanip)
+        if not ce_ip:
+            return None, f"{line_id} WANIP 无法解析：{wanip}"
+        if not oversea_pairs:
+            return None, f"{line_id} 未解析到海外出口ip"
+
+        parsed[key] = {
+            "line_id": line_id,
+            "pe": pe.strip(),
+            "tun": tun,
+            "tun_addr": f"{ce_ip}/30",
+            "pe_docking": pe_docking,
+            "ce_docking": ce_docking,
+            "oversea_pairs": oversea_pairs,
+        }
+
+    if "main" not in parsed:
+        return None, "未解析到主线数据（LineID 尾号为奇或仅提供单条数据时视为主线）"
+    return parsed, None
+
+
+def _build_epoch5_ne_dum_block(parsed: dict, init_cfg: dict) -> str:
+    """生成 5.0 新增出口 dummy 接口块（海外出口 IP LoopBack）。"""
+    m = parsed.get("main") or {}
+    b = parsed.get("bk") or {}
+    m_pairs = list(m.get("oversea_pairs") or [])
+    b_pairs = list(b.get("oversea_pairs") or [])
+    md = int(init_cfg.get("main_dum_start", 300))
+    bd = int(init_cfg.get("bk_dum_start", 400))
+
+    lines = []
+    for i, (left, right) in enumerate(m_pairs):
+        if i == 0:
+            continue  # first IP is handled inline in template
+        lines.extend([
+            f"set interfaces dummy dum{md + i} address '{left.strip()}/32'",
+            f"set interfaces dummy dum{md + i} description 'USIP-Main:{left.strip()}-{right.strip()}'",
+        ])
+
+    bk_block_lines = []
+    for i, (left, right) in enumerate(b_pairs):
+        bk_block_lines.extend([
+            f"set interfaces dummy dum{bd + i} address '{left.strip()}/32'",
+            f"set interfaces dummy dum{bd + i} description 'USIP-BK:{left.strip()}-{right.strip()}'",
+        ])
+
+    if bk_block_lines:
+        lines.append("")
+        lines.extend(bk_block_lines)
+    return "\n".join(lines)
+
+
+def _epoch5_ne_nat_group_name(init_cfg: dict) -> str:
+    return str(init_cfg.get("nat_group_name", "")).strip()
+
+
+def _epoch5_ne_resolved_fnet_tunnel(parsed: dict, init_cfg: dict) -> str:
+    tunnel = str(init_cfg.get("fnet_exit_tunnel", "")).strip()
+    m = parsed.get("main") or {}
+    main_tun = str(m.get("tun") or "").strip()
+    if tunnel in ("", "tun"):
+        return main_tun
+    return tunnel
+
+
+def _build_epoch5_ne_nat_block(parsed: dict, init_cfg: dict) -> str:
+    """生成 5.0 新增出口 NAT 规则（set nat source rule 格式）。"""
+    src = _er_ne_nat_source_normalized(init_cfg.get("nat_source_cidr", ""))
+    if not src:
+        return ""
+
+    nat_group = _epoch5_ne_nat_group_name(init_cfg)
+    if not nat_group:
+        return ""
+
+    mr = str(init_cfg.get("main_nat_rule", "")).strip()
+    br = str(init_cfg.get("bk_nat_rule", "")).strip()
+    if not mr.isdigit() or not br.isdigit():
+        return ""
+
+    im = int(mr); ib = int(br)
+    m = parsed.get("main") or {}
+    b = parsed.get("bk") or {}
+    m_pairs = list(m.get("oversea_pairs") or [])
+    b_pairs = list(b.get("oversea_pairs") or [])
+    if not m_pairs:
+        return ""
+
+    mt = (m.get("tun") or "").strip()
+    bt = (b.get("tun") or "").strip() if b else ""
+    lines = [
+        f"set firewall group network-group {nat_group} network '{src}'",
+        "",
+    ]
+    for i, (left, _right) in enumerate(m_pairs):
+        tr = (left or "").strip()
+        if not tr:
+            return ""
+        rid = im + i
+        lines.extend([
+            f"set nat source rule {rid} outbound-interface name '{mt}'",
+            f"set nat source rule {rid} source group network-group '{nat_group}'",
+            f"set nat source rule {rid} translation address '{tr}'",
+            "",
+        ])
+    if b_pairs and bt:
+        for i, (left, _right) in enumerate(b_pairs):
+            tr = (left or "").strip()
+            if not tr:
+                return ""
+            rid = ib + i
+            lines.extend([
+                f"set nat source rule {rid} outbound-interface name '{bt}'",
+                f"set nat source rule {rid} source group network-group '{nat_group}'",
+                f"set nat source rule {rid} translation address '{tr}'",
+                "",
+            ])
+    return "\n".join(lines).rstrip()
+
+
+def _build_epoch5_ne_nat_header_block(parsed: dict, init_cfg: dict) -> str:
+    """NAT 规则数量说明块。"""
+    src = _er_ne_nat_source_normalized(init_cfg.get("nat_source_cidr", ""))
+    if not src:
+        return ""
+    m = parsed.get("main") or {}
+    b = parsed.get("bk") or {}
+    m_pairs = list(m.get("oversea_pairs") or [])
+    b_pairs = list(b.get("oversea_pairs") or [])
+    mr = str(init_cfg.get("main_nat_rule", "")).strip()
+    br = str(init_cfg.get("bk_nat_rule", "")).strip()
+    if not mr.isdigit() or not br.isdigit():
+        return ""
+    nat_group = _epoch5_ne_nat_group_name(init_cfg)
+    if not nat_group:
+        return ""
+    nm, nb = len(m_pairs), len(b_pairs)
+    return f"# {nat_group} 源网段: {src}\n# NAT rule: 主线自 {mr} 起共 {nm} 条；备线自 {br} 起共 {nb} 条\n"
+
+
+def _build_epoch5_ne_fnet_block(parsed: dict, init_cfg: dict) -> str:
+    """5.0 新增出口 FNET whitelist。双线时要求 100.100 初始化参数齐全。"""
+    if "bk" not in parsed or not parsed.get("bk"):
+        return ""
+    probe = str(init_cfg.get("fnet_probe", "")).strip()
+    tunnel = _epoch5_ne_resolved_fnet_tunnel(parsed, init_cfg)
+    nat_rule = str(init_cfg.get("fnet_nat_rule", "")).strip()
+    if not (probe and tunnel and nat_rule and nat_rule.isdigit()):
+        return ""
+
+    m = parsed.get("main")
+    main_left = (list(m.get("oversea_pairs") or [])[0][0] if m else "").strip()
+    if not main_left:
+        return ""
+
+    main_nh = str(init_cfg.get("main_pe_next_hop", "")).strip()
+    failover_src = _derive_epoch5_failover_source_from_main_next_hop(main_nh)
+    probe_net = str(ipaddress.ip_network(f"{probe}/24", strict=False))
+    lines = [
+        "",
+        f"set firewall group network-group GROUP-FNET-Whitelist network '{probe_net}'",
+        "",
+        f"set protocols failover2 track tooutbound1 source-address '{failover_src}'",
+        f"set protocols failover2 track tooutbound1 target '{main_nh}'",
+        "set protocols failover2 track tooutbound1 type 'icmp'",
+        f"set protocols failover2 route {probe_net} next-hop {main_nh} track 'tooutbound1'",
+        "",
+        f"set nat source rule {nat_rule} outbound-interface name '{tunnel}'",
+        f"set nat source rule {nat_rule} destination address {probe}",
+        f"set nat source rule {nat_rule} translation address '{main_left}'",
+    ]
+    return "\n".join(lines)
+
+
+def epoch5_new_exit_nat_rule_span_error(parsed: dict, init_cfg: dict) -> str | None:
+    """Validate 5.0 new-exit NAT rule ranges and the 100.100 NAT rule."""
+    if "bk" not in parsed or not parsed.get("bk"):
+        return None
+
+    ranges = []
+    if _er_ne_nat_source_normalized(init_cfg.get("nat_source_cidr", "")):
+        mr = str(init_cfg.get("main_nat_rule", "")).strip()
+        br = str(init_cfg.get("bk_nat_rule", "")).strip()
+        if mr.isdigit() and br.isdigit():
+            im, ib = int(mr), int(br)
+            nm = len(list((parsed.get("main") or {}).get("oversea_pairs") or []))
+            nb = len(list((parsed.get("bk") or {}).get("oversea_pairs") or []))
+            if nm > 0:
+                ranges.append(("主线", im, im + nm - 1))
+            if nb > 0:
+                ranges.append(("备线", ib, ib + nb - 1))
+
+    fnet_probe = str(init_cfg.get("fnet_probe", "")).strip()
+    fnet_tunnel = _epoch5_ne_resolved_fnet_tunnel(parsed, init_cfg)
+    fnet_nat_rule = str(init_cfg.get("fnet_nat_rule", "")).strip()
+    if not fnet_probe:
+        return "100.100 探测 IP 必须初始化"
+    if not fnet_tunnel:
+        return "100.100 NAT 出口 Tunnel 未初始化，且数据头未解析到主线 TUNNEL"
+    if not fnet_nat_rule:
+        return "100.100 NAT Rule 号必须初始化"
+    if not fnet_nat_rule.isdigit():
+        return "100.100 NAT Rule 号必须是数字"
+    ranges.append(("100.100", int(fnet_nat_rule), int(fnet_nat_rule)))
+
+    for name, start, end in ranges:
+        if start < 1 or end > 999999:
+            return f"{name} NAT rule 超出 1～999999：[{start},{end}]"
+
+    for i, (left_name, left_start, left_end) in enumerate(ranges):
+        for right_name, right_start, right_end in ranges[i + 1:]:
+            if not (left_end < right_start or right_end < left_start):
+                return (
+                    f"NAT rule 区间重叠：{left_name} [{left_start},{left_end}]，"
+                    f"{right_name} [{right_start},{right_end}]，请调整 rule 号"
+                )
+    return None
+
+
+def build_epoch5_new_exit_format_dict(parsed: dict, init_cfg: dict) -> dict:
+    """组装 5.0 新增出口 TEMPLATE_EPOCH5_NEW_EXIT.format(**d) 所需的 dict。"""
+    m = parsed.get("main", {})
+    b = parsed.get("bk", {})
+    has_bk = bool(b)
+
+    m_pairs = list(m.get("oversea_pairs") or [])
+    b_pairs = list(b.get("oversea_pairs") or [])
+
+    md = int(init_cfg.get("main_dum_start", 300))
+    bd = int(init_cfg.get("bk_dum_start", 400))
+    main_mtu = "1400"
+    bk_mtu = "1400"
+    main_mss = "1300"
+    bk_mss = "1300"
+
+    main_first_left = (m_pairs[0][0] if m_pairs else "").strip()
+    main_first_right = (m_pairs[0][1] if m_pairs else "").strip()
+    bk_first_left = (b_pairs[0][0] if b_pairs else "").strip() if has_bk else ""
+    bk_first_right = (b_pairs[0][1] if b_pairs else "").strip() if has_bk else ""
+
+    main_tun = (m.get("tun") or "").strip()
+    main_tun_num = main_tun.replace("tun", "") if main_tun.startswith("tun") else main_tun
+    bk_tun = (b.get("tun") or "").strip() if has_bk else ""
+    bk_tun_num = bk_tun.replace("tun", "") if bk_tun.startswith("tun") else bk_tun
+
+    bk_block = ""
+    if has_bk:
+        bk_block = f"""set interfaces tunnel {bk_tun} address '{b.get("tun_addr", "")}'
+set interfaces tunnel {bk_tun} description 'back-{b.get("pe", "")}-{bk_tun_num}'
+set interfaces tunnel {bk_tun} encapsulation 'gre'
+set interfaces tunnel {bk_tun} ip adjust-mss '{bk_mss}'
+set interfaces tunnel {bk_tun} mtu '{bk_mtu}'
+set interfaces tunnel {bk_tun} remote '{b.get("pe_docking", "")}'
+set interfaces tunnel {bk_tun} source-address '{b.get("ce_docking", "")}'
+set protocols static route {b.get("pe_docking", "")}/32 next-hop {init_cfg.get('bk_pe_next_hop', '192.168.1.2')}
+"""
+
+    return {
+        "ER_NE_MAIN_PE_NH_DEFAULT": str(init_cfg.get("main_pe_next_hop", "192.168.1.1")),
+        "ER_NE_MAIN_DUM_START": str(md),
+        "main_tun": main_tun,
+        "main_tun_addr": m.get("tun_addr", ""),
+        "main_pe": m.get("pe", ""),
+        "main_tun_num": main_tun_num,
+        "main_mtu": main_mtu,
+        "main_mss": main_mss,
+        "main_pe_docking": m.get("pe_docking", ""),
+        "main_ce_docking": m.get("ce_docking", ""),
+        "main_dum_first_ip": main_first_left,
+        "main_dum_first_remote": main_first_right,
+        "bk_dum_first_ip": bk_first_left,
+        "bk_dum_first_remote": bk_first_right,
+        "ER_NE_MAIN_DUM_BLOCK": _build_epoch5_ne_dum_block(parsed, init_cfg),
+        "ER_NE_BK_BLOCK": bk_block,
+        "ER_NE_NAT_HEADER_BLOCK": _build_epoch5_ne_nat_header_block(parsed, init_cfg),
+        "ER_NE_NAT_BLOCK": _build_epoch5_ne_nat_block(parsed, init_cfg),
+        "ER_NE_FNET_BLOCK": _build_epoch5_ne_fnet_block(parsed, init_cfg),
+    }
+
+
+# =====================================================================
+# 5.0 飞连 — 解析器 + builder（数据头格式与 4.0 一致）
+# =====================================================================
+
+def parse_epoch5_flink_headers(raw_text: str):
+    """解析 5.0 飞连数据头，返回 ([(name, cidr), ...], err_msg_or_none)。
+    格式: PE：szd-vupe6  FPE：F-ShenZhen4  预留IP：100.94.10.216/29"""
+    import ipaddress as _ipaddress
+    routes = []
+    for ln in (raw_text or "").splitlines():
+        line = ln.strip()
+        if not line:
+            continue
+        pe_m = re.search(r"PE[：:]\s*(\S+)", line)
+        fpe_m = re.search(r"FPE[：:]\s*(\S+)", line)
+        ip_m = re.search(r"预留IP[：:]\s*(\S+)", line)
+        if ip_m:
+            cidr = ip_m.group(1)
+            pe_val = pe_m.group(1) if pe_m else ""
+            fpe_val = fpe_m.group(1) if fpe_m else ""
+            name = f"{pe_val} / {fpe_val}".strip(" /") or "预留IP"
+        elif ":" in line or "：" in line:
+            name, cidr = re.split(r"[：:]", line, 1)
+            name = name.strip() or "预留IP"
+            cidr = cidr.strip()
+        else:
+            name = "预留IP"
+            cidr = line
+        if not cidr:
+            return [], f"数据头格式错误：{line}"
+        if "/" not in cidr:
+            return [], f"CIDR 缺少掩码：{cidr}"
+        try:
+            cidr_norm = str(_ipaddress.ip_network(cidr, strict=False))
+        except ValueError as e:
+            return [], f"CIDR 非法：{cidr} ({e})"
+        routes.append((name, cidr_norm))
+    if not routes:
+        return [], "请先填写飞连数据头（至少 1 行）"
+    return routes, None
+
+
+def _derive_epoch5_failover_source_from_main_next_hop(main_nh: str) -> str:
+    """主下一跳为 /30 奇数位，failover source 使用同 /30 偶数位。"""
+    try:
+        ip = ipaddress.ip_address(str(main_nh).strip())
+    except ValueError as e:
+        raise ValueError(f"主回程下一跳必须是合法 IPv4 地址：{main_nh}") from e
+    net = ipaddress.ip_network(f"{ip}/30", strict=False)
+    hosts = list(net.hosts())
+    if len(hosts) != 2 or ip != hosts[0]:
+        raise ValueError(f"主回程下一跳必须是 /30 的奇数位地址：{main_nh}")
+    return str(hosts[1])
+
+
+def _build_epoch5_flink_format_dict(routes, main_nh: str, backup_nh: str) -> dict:
+    cidrs = [cidr for _name, cidr in routes]
+    names = [name for name, _cidr in routes]
+    while len(cidrs) < 3:
+        cidrs.append("0.0.0.0/32")
+        names.append("")
+    failover_src = _derive_epoch5_failover_source_from_main_next_hop(main_nh)
+    return {
+        "ER_FL_FAILOVER_SRC": failover_src,
+        "ER_FL_MAIN_NH_DEFAULT": main_nh,
+        "ER_FL_BACKUP_NH_DEFAULT": backup_nh,
+        "route1": cidrs[0], "name1": names[0],
+        "route2": cidrs[1], "name2": names[1],
+        "route3": cidrs[2], "name3": names[2],
+    }
+
+
+def build_epoch5_flink_config(routes, main_nh: str, backup_nh: str):
+    """按 5.0 VyOS failover2 语法生成飞连配置。"""
+    failover_src = _derive_epoch5_failover_source_from_main_next_hop(main_nh)
+    lines = [
+        f"set protocols failover2 track tomain source-address '{failover_src}'",
+        f"set protocols failover2 track tomain target '{main_nh}'",
+        "set protocols failover2 track tomain type 'icmp'",
+        "",
+    ]
+    for _name, cidr in routes:
+        lines.append(f"set protocols failover2 route {cidr} next-hop {main_nh} track 'tomain'")
+    lines.append("")
+    for _name, cidr in routes:
+        lines.append(f"set protocols static route {cidr} next-hop {backup_nh} distance 10")
+    lines.append("")
+    for _name, cidr in routes:
+        lines.append(f"set firewall group network-group LAN-NET network {cidr}")
+    return "\n".join(lines)
+
+
+# 5.0 新增出口 初始化参数默认值
+ER5_NE_MAIN_PE_NH_DEFAULT = "10.1.1.1"
+ER5_NE_BK_PE_NH_DEFAULT = "10.2.1.1"
+ER5_NE_MAIN_DUM_DEFAULT = "300"
+ER5_NE_BK_DUM_DEFAULT = "400"
+ER5_NE_MAIN_NAT_RULE_DEFAULT = "1001"
+ER5_NE_BK_NAT_RULE_DEFAULT = "2001"
+ER5_NE_NAT_GROUP_DEFAULT = "LAN-NET1"
+ER5_NE_NAT_SOURCE_CIDR_DEFAULT = "192.168.0.0/24"
+ER5_NE_FNET_PROBE_DEFAULT = "100.100.100.1"
+ER5_NE_FNET_EXIT_TUNNEL_DEFAULT = "tun"
+ER5_NE_FNET_NAT_RULE_DEFAULT = ""
+
+# 5.0 飞连 初始化参数默认值
+ER5_FL_MAIN_NH_DEFAULT = "10.1.1.1"
+ER5_FL_BACKUP_NH_DEFAULT = "10.2.1.1"
+
+# 5.0 新增出口 示例数据
+ER5_NEW_EXIT_EXAMPLE = (
+    "LineID:609430B5\n"
+    "PE： lax1-natpe7\n"
+    "WANIP: 10.22.113.36/30\n"
+    "TUNNEL: tun2209\n"
+    "PE Docking：192.168.215.12\n"
+    "CE Docking：: 10.22.242.223\n"
+    "BGPSERVER IP：103.252.19.25,43.229.117.226\n"
+    "海外出口ip：\n"
+    "10.60.52.46-8.3.6.111\n"
+    "\n"
+    "LineID:609430B6\n"
+    "PE： sjc1-natpe3\n"
+    "WANIP: 10.22.115.28/30\n"
+    "TUNNEL: tun1080\n"
+    "PE Docking：10.33.54.118\n"
+    "CE Docking：: 10.22.242.223\n"
+    "BGPSERVER IP：103.252.19.99,43.229.119.251\n"
+    "海外出口ip：\n"
+    "10.60.79.99-172.16.212.58\n"
+)
+
+# 5.0 飞连 示例数据
+ER5_FLINK_EXAMPLE = (
+    "PE：szd-vupe6  FPE：F-ShenZhen4  预留IP：100.94.10.216/29\n"
+    "PE：bja-vupe6  FPE：F-BeiJing4  预留IP：100.93.10.216/29\n"
+    "PE：sha-vupe6  FPE：F-ShangHai4  预留IP：100.92.10.216/29\n"
+)
+
+
+# =====================================================================
+# 解析器 — HK（与 4.0 完全相同的数据头格式）
+# =====================================================================
+def parse_epoch5_hk_headers(raw_text):
+    """解析 5.0 HK 数据头，提取 MAIN/BACKUP 字段。
+   数据头格式与 4.0 完全一致。
+   返回 dict，键名与 4.0 兼容 + 5.0 新增字段。"""
+    result = {k: "" for k in [
+        "main_pe", "main_tunnel", "main_tunnel_port",
+        "main_wanip", "main_wanip_remote", "main_wanip_local",
+        "main_docking", "ce_loip", "hkip",
+        "main_bgp1", "main_bgp2",
+        "bk_pe", "bk_tunnel", "bk_tunnel_port",
+        "bk_wanip", "bk_wanip_remote", "bk_wanip_local",
+        "bk_docking", "bk_bgp1", "bk_bgp2",
+        "hostname", "return_routes_block",
+    ]}
+    result["hkip_nat_list"] = []
+
+    blocks = re.split(
+        r'(?=(?:MAIN|BACKUP|主|备)\s*\n|(?:MAIN|BACKUP)\s*[：:])',
+        raw_text, flags=re.IGNORECASE
+    )
+
+    def parse_one(block, prefix):
+        pe = _get(r'(?:主PE|PE)\s*[：:]\s*(.+)', block)
+        if pe:
+            result[f"{prefix}_pe"] = pe.strip()
+        tun_raw = _get(r'TUNNEL\s*[：:]\s*(\S+)', block)
+        if tun_raw:
+            tun = _normalize_vtun(tun_raw)
+            result[f"{prefix}_tunnel"] = tun
+            result[f"{prefix}_tunnel_port"] = _vtun_port(tun)
+        wanip = _get(r'WANIP\s*[：:]\s*([\d./]+)', block)
+        if wanip:
+            result[f"{prefix}_wanip"] = wanip
+            pe_ip, ce_ip = wanip_hosts(wanip)
+            result[f"{prefix}_wanip_remote"] = pe_ip
+            result[f"{prefix}_wanip_local"] = ce_ip
+        docking = _get(r'Docking\s*[：:]\s*([\d.]+)', block)
+        if docking:
+            result[f"{prefix}_docking"] = docking
+        loip = _get(r'CE\s*LOIP\s*[：:]\s*([\d.]+)', block)
+        if loip:
+            result["ce_loip"] = loip
+        hkip_m = re.search(
+            r'HKIP\s*[：:]\s*(.*?)(?=\n[A-Za-z一-鿿]|\Z)',
+            block, re.IGNORECASE | re.DOTALL
+        )
+        if hkip_m:
+            hkip_raw = hkip_m.group(1)
+            pairs = re.findall(
+                r'(\d{1,3}(?:\.\d{1,3}){3})\s*(?:-->|-)\s*\d{1,3}(?:\.\d{1,3}){3}',
+                hkip_raw
+            )
+            nat_ips = pairs if pairs else re.findall(
+                r'\d{1,3}(?:\.\d{1,3}){3}', hkip_raw
+            )
+            if nat_ips:
+                result["hkip"] = nat_ips[0]
+                result["hkip_nat_list"] = nat_ips
+        bgp_raw = _get(r'BGPSERVER\s*IP\s*[：:]\s*(.+)', block)
+        if bgp_raw:
+            bgps = [
+                ip.strip() for ip in re.split(r'[,，\s]+', bgp_raw)
+                if re.match(r'^\d+\.\d+', ip.strip())
+            ]
+            result[f"{prefix}_bgp1"] = bgps[0] if len(bgps) > 0 else ""
+            result[f"{prefix}_bgp2"] = bgps[1] if len(bgps) > 1 else ""
+
+    for block in blocks:
+        bu = block.strip()
+        if re.match(r'(MAIN|主)', bu, re.IGNORECASE):
+            parse_one(bu, "main")
+        elif re.match(r'(BACKUP|备)', bu, re.IGNORECASE):
+            parse_one(bu, "bk")
+
+    return result
+
+
+def _extract_lineid(text):
+    m = re.search(r'lineid\s*[：:]\s*(\S+)', text, re.IGNORECASE)
+    return m.group(1).strip() if m else ""
+
+
+# =====================================================================
+# Builder — HK（5.0 VyOS 语法输出）
+# =====================================================================
+def build_epoch5_hk_format_dict(hdr_text):
+    """组装与 TEMPLATE_EPOCH5_HK.format(**d) 相同的 dict。
+    成功返回 (d, None)；失败返回 (None, (kind, payload))。
+    kind: "parse" — 数据头解析/校验失败
+    """
+    g = globals()
+
+    # ── 1. 解析数据头 ──
+    raw = hdr_text.strip()
+    if not raw:
+        return None, ("parse", "请输入业务数据（MAIN/BACKUP 数据头）")
+    d = parse_epoch5_hk_headers(raw)
+
+    # ── 2. 读取网络参数（仅 4.0 兼容字段，从 globals() 读取）──
+    wan_eth = str(g.get("DEFAULT_WAN_ETH", "0")).strip() or "0"
+    lan_eth = str(g.get("DEFAULT_LAN_ETH", "5")).strip() or "5"
+    wan_cidr = str(g.get("DEFAULT_WAN_CIDR", "")).strip()
+    lan_cidr = str(g.get("DEFAULT_LAN_CIDR", "")).strip()
+    wan_gw = str(g.get("DEFAULT_WAN_GW", "")).strip()
+    wan_dhcp = bool(g.get("DEFAULT_WAN_DHCP", False))
+    lan_dhcp = bool(g.get("DEFAULT_LAN_DHCP", True))
+    bypass = bool(g.get("DEFAULT_BYPASS", False))
+    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "")).strip()
+
+    # ── 3. 校验必要字段 ──
+    if not d.get("main_pe") and not d.get("main_wanip"):
+        return None, ("parse", "未找到主线 PE/WANIP 信息，请检查数据头格式")
+
+    # ── 4. 设置基本信息 ──
+    hn = d.get("hostname", "").strip()
+    if not hn:
+        hn = _extract_lineid(raw) or "请填写Hostname"
+    d["hostname"] = hn if hn else "请填写Hostname"
+
+    d["wan_if"] = f"eth{wan_eth}" if not wan_eth.startswith("eth") else wan_eth
+    d["lan_if"] = f"eth{lan_eth}" if not lan_eth.startswith("eth") else lan_eth
+    d["wan_cidr"] = wan_cidr
+    d["lan_cidr"] = lan_cidr
+    d["wan_gw"] = wan_gw
+
+    # 从 CIDR 提取纯 IP
+    lan_ip = ""
+    if lan_cidr:
+        try:
+            lan_ip = str(ipaddress.ip_interface(lan_cidr.strip()).ip)
+        except Exception:
+            lan_ip = lan_cidr.split("/")[0].strip()
+    d["lan_ip"] = lan_ip
+
+    # LAN 接口配置（旁挂模式下跳过）
+    if bypass:
+        d["lan_if_block"] = "# 旁挂模式 — 跳过 LAN 接口配置"
+    else:
+        d["lan_if_block"] = (
+            f"set interfaces ethernet {d['lan_if']} description LAN\n"
+            f"set interfaces ethernet {d['lan_if']} address '{d['lan_cidr']}'"
+        )
+
+    # DNS 劫持使用的接口（旁挂时用 WAN 口）
+    d["dns_hijack_if"] = d["wan_if"] if bypass else d["lan_if"]
+
+    # PE 描述（用于 OpenVPN description）
+    d["main_pe_desc"] = (
+        (d.get("main_pe") or "") + " " + (d.get("main_tunnel") or "")
+    ).strip()
+    d["bk_pe_desc"] = (
+        "to " + (d.get("bk_pe") or "") + " " + (d.get("bk_tunnel") or "")
+    ).strip()
+
+    # ── 5. 生成 {lan_net_block} ──
+    inner_nets = _parse_inner_nets(inner_nets_raw)
+    d["inner_nets"] = inner_nets
+    d["lan_net_block"] = "\n".join(
+        f"set firewall group network-group LAN-NET network '{net}'"
+        for net in inner_nets
+    )
+
+    # ── 7. 生成 {default_route_block} ──
+    if wan_dhcp:
+        d["default_route_block"] = (
+            "# WAN DHCP 模式 — 不生成默认静态路由"
+        )
+    else:
+        d["default_route_block"] = (
+            f"set protocols static route 0.0.0.0/0 next-hop '{wan_gw}' distance '220'\n"
+            f"set protocols static route 1.1.1.1/32 next-hop '{wan_gw}'"
+        )
+
+    # ── 8. 生成 {pki_block} ──
+    if _EPOCH5_PKI_SECRET_KEY:
+        d["pki_block"] = (
+            f"set pki openvpn shared-secret openvpn_secret key '{_EPOCH5_PKI_SECRET_KEY}'\n"
+            f"run import pki openvpn shared-secret openvpn_secret file /opt/pki/openvpn.secret"
+        )
+    else:
+        d["pki_block"] = (
+            "# PKI secret key 未配置\n"
+            "# run import pki openvpn shared-secret openvpn_secret file /opt/pki/openvpn.secret"
+        )
+
+    # ── 9. 生成 {static_route_bk_docking} ──
+    bk_docking = d.get("bk_docking", "")
+    if bk_docking:
+        d["static_route_bk_docking"] = (
+            f"set protocols static route {bk_docking}/32 next-hop '{wan_gw}'"
+        )
+    else:
+        d["static_route_bk_docking"] = (
+            "# 备线 Docking 未配置 — 无对应静态路由"
+        )
+
+    # ── 10. 生成 {track_block} ──
+    main_local = d.get("main_wanip_local", "")
+    main_remote = d.get("main_wanip_remote", "")
+    bk_remote = d.get("bk_wanip_remote", "")
+
+    if main_local and main_remote:
+        lines = []
+        lines.append(
+            f"set protocols failover2 track tomain source-address '{main_local}'"
+        )
+        lines.append(
+            f"set protocols failover2 track tomain target '{main_remote}'"
+        )
+        lines.append(
+            f"set protocols failover2 track tomain type 'icmp'"
+        )
+        lines.append(
+            f"set protocols failover2 route {_EPOCH5_JUMPBOX_IP}/32 "
+            f"next-hop {main_remote} track 'tomain'"
+        )
+        # 次优跳板机路由（走备线）
+        lines.append(
+            f"set protocols static route {_EPOCH5_JUMPBOX_IP}/32 "
+            f"next-hop {bk_remote} distance '10'"
+        )
+        d["track_block"] = "\n".join(lines)
+    else:
+        d["track_block"] = (
+            "# Track 未配置 — 缺少主线 WANIP 信息"
+        )
+
+    # ── 10b. 生成 {return_routes_block} ──
+    gen_rr = bool(g.get("DEFAULT_GEN_RETURN_ROUTE", False))
+    if gen_rr:
+        rr_lines = []
+        base_cidr = wan_cidr if bypass else lan_cidr
+        gw = wan_gw if bypass else (str(g.get("DEFAULT_LAN_GW", "")).strip() or (lan_cidr.split("/")[0] if lan_cidr else ""))
+        outside = _nets_needing_return(base_cidr, inner_nets)
+        for net in outside:
+            rr_lines.append(f"set protocols static route {net} next-hop {gw}")
+        d["return_routes_block"] = "\n".join(rr_lines) if rr_lines else ""
+    else:
+        d["return_routes_block"] = ""
+
+    # ── 11. 生成 {dhcp_block} ──
+    if lan_dhcp and lan_cidr and lan_ip and not bypass:
+        try:
+            net = ipaddress.ip_network(lan_cidr.strip(), strict=False)
+            prefix = net.prefixlen
+            network_addr = str(net.network_address)
+            hosts = list(net.hosts())
+            if hosts:
+                d_start = str(hosts[min(9, len(hosts) - 1)])
+                d_stop = str(hosts[min(199, len(hosts) - 1)])
+            else:
+                d_start = d_stop = ""
+            prefix_id = str(prefix)
+
+            d["dhcp_block"] = (
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} option default-router '{lan_ip}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} option name-server '{lan_ip}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} range Lan1_range start '{d_start}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} range Lan1_range stop '{d_stop}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} subnet-id '{prefix_id}'"
+            )
+        except Exception:
+            d["dhcp_block"] = (
+                "# DHCP 服务器未配置 — LAN CIDR 解析失败"
+            )
+    else:
+        d["dhcp_block"] = (
+            "# DHCP 服务器未启用"
+        )
+
+    # ── 12. 生成 {bgp_server_routes_block} ──
+    bgp_routes = []
+    # BGP 服务器路由（主/备分别走对应 next-hop）
+    for bgp in [d.get("main_bgp1"), d.get("main_bgp2")]:
+        if bgp:
+            bgp_routes.append(
+                f"set protocols static route {bgp}/32 next-hop {main_remote}"
+            )
+    for bgp in [d.get("bk_bgp1"), d.get("bk_bgp2")]:
+        if bgp:
+            bgp_routes.append(
+                f"set protocols static route {bgp}/32 next-hop {bk_remote}"
+            )
+    # 黑洞保护
+    for bgp in [
+        d.get("main_bgp1"), d.get("main_bgp2"),
+        d.get("bk_bgp1"), d.get("bk_bgp2"),
+    ]:
+        if bgp:
+            bgp_routes.append(
+                f"set protocols static route {bgp}/32 blackhole distance 10"
+            )
+    d["bgp_server_routes_block"] = "\n".join(bgp_routes)
+
+    # ── 13. 硬编码 DNS-NET 地址组 IP ──
+    d["dns_ip1"] = _EPOCH5_DNS_GLOBAL2  # 8.8.8.8
+    d["dns_ip2"] = _EPOCH5_DNS_GLOBAL1  # 8.8.4.4
+
+    return d, None
+
+
+# =====================================================================
+# 占位 Builder（非 HK 变体）
+# =====================================================================
+def build_epoch5_us_format_dict(hdr_text):
+    """组装与 TEMPLATE_EPOCH5_US.format(**d) 相同的 dict。
+
+    成功返回 (d, None)；失败返回 (None, (kind, payload))。
+    kind: "parse" — 数据头解析/校验失败, "natmiss" — 海外出口 IP 缺失, "network" — 网络参数校验失败。
+    """
+    g = globals()
+
+    # ── 0. 校验网络参数 ──
+    wan_cidr = str(g.get("DEFAULT_WAN_CIDR", "")).strip()
+    wan_gw = str(g.get("DEFAULT_WAN_GW", "")).strip()
+    lan_cidr = str(g.get("DEFAULT_LAN_CIDR", "")).strip()
+    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "")).strip()
+
+    ok_wan, msg_wan = _validate_cidr(wan_cidr, "WAN IP")
+    ok_lan, msg_lan = _validate_cidr(lan_cidr, "LAN IP")
+    ok_gw, msg_gw = _validate_ip(wan_gw, "WAN 网关")
+    _, inner_errors = _validate_inner_nets(inner_nets_raw)
+    errs = []
+    if not ok_wan:
+        errs.append(msg_wan)
+    if not ok_lan:
+        errs.append(msg_lan)
+    if not ok_gw:
+        errs.append(msg_gw)
+    for frag, reason in inner_errors:
+        errs.append(f"内网段「{frag}」不符合网络标准：{reason}")
+    if errs:
+        return None, ("network", errs)
+
+    # ── 1. 解析数据头 ──
+    raw = hdr_text.strip()
+    if not raw:
+        return None, ("parse", "请输入业务数据（LineID 数据头）")
+    d = parse_epoch_us(raw)
+
+    # ── 2. 读取网络参数 ──
+    wan_eth = str(g.get("DEFAULT_WAN_ETH", "0")).strip() or "0"
+    lan_eth = str(g.get("DEFAULT_LAN_ETH", "5")).strip() or "5"
+    wan_dhcp = bool(g.get("DEFAULT_WAN_DHCP", False))
+    lan_dhcp = bool(g.get("DEFAULT_LAN_DHCP", True))
+    bypass = bool(g.get("DEFAULT_BYPASS", False))
+
+    # ── 3. 校验必要字段 ──
+    if not d.get("main_us_pe") and not d.get("main_acvpn_gre_pe"):
+        return None, ("parse", "未找到主线 PE 信息，请检查数据头格式")
+
+    main_nat_ips = list(d.get("main_us_nat_ips", []) or [])
+    bk_nat_ips = list(d.get("bk_us_nat_ips", []) or [])
+    if not main_nat_ips and not bk_nat_ips:
+        miss = []
+        if not main_nat_ips:
+            miss.append("主线海外出口ip")
+        if not bk_nat_ips:
+            miss.append("备线海外出口ip")
+        return None, ("natmiss", miss)
+
+    # 截断超量 IP
+    if len(main_nat_ips) > 9:
+        main_nat_ips = main_nat_ips[:9]
+    if len(bk_nat_ips) > 10:
+        bk_nat_ips = bk_nat_ips[:10]
+
+    d["main_us_nat_ips"] = main_nat_ips
+    d["bk_us_nat_ips"] = bk_nat_ips
+    d["main_us_nat_ip"] = main_nat_ips[0] if main_nat_ips else d.get("main_us_nat_ip", "")
+    d["bk_us_nat_ip"] = bk_nat_ips[0] if bk_nat_ips else d.get("bk_us_nat_ip", "")
+    d["main_us_nat_ip_all"] = ", ".join(main_nat_ips) if main_nat_ips else d.get("main_us_nat_ip", "")
+    d["bk_us_nat_ip_all"] = ", ".join(bk_nat_ips) if bk_nat_ips else d.get("bk_us_nat_ip", "")
+    d["main_us_dum100_desc"] = "MAIN_OUTIP" if len(main_nat_ips) <= 1 else "MAIN_OUTIP_01"
+    d["bk_us_dum200_desc"] = "BK_OUTIP" if len(bk_nat_ips) <= 1 else "BK_OUTIP_01"
+
+    # ── 4. 设置基本信息 ──
+    hn = d.get("hostname", "").strip()
+    if not hn:
+        hn = _extract_lineid(raw) or "请填写Hostname"
+    d["hostname"] = hn if hn else "请填写Hostname"
+
+    d["wan_if"] = f"eth{wan_eth}" if not wan_eth.startswith("eth") else wan_eth
+    d["lan_if"] = f"eth{lan_eth}" if not lan_eth.startswith("eth") else lan_eth
+    d["wan_cidr"] = wan_cidr
+    d["lan_cidr"] = lan_cidr
+    d["wan_gw"] = wan_gw
+
+    # 从 CIDR 提取纯 IP
+    lan_ip = ""
+    if lan_cidr:
+        try:
+            lan_ip = str(ipaddress.ip_interface(lan_cidr.strip()).ip)
+        except Exception:
+            lan_ip = lan_cidr.split("/")[0].strip()
+    d["lan_ip"] = lan_ip
+
+    # ── 5. LAN 接口配置（旁挂模式下跳过）──
+    if bypass:
+        d["lan_if_block"] = "# 旁挂模式 — 跳过 LAN 接口配置"
+    else:
+        d["lan_if_block"] = (
+            f"set interfaces ethernet {d['lan_if']} description LAN\n"
+            f"set interfaces ethernet {d['lan_if']} address '{d['lan_cidr']}'"
+        )
+
+    # ── 6. 生成 {fw_options_block} ──
+    fw_lines = [
+        f"set firewall options interface {t} adjust-mss '1300'"
+        for t in [
+            d.get("main_acvpn_vtun_id", ""), d.get("bk_acvpn_vtun_id", ""),
+            d.get("main_acvpn_gre_tun", ""), d.get("bk_acvpn_gre_tun", ""),
+            d.get("main_us_tun", ""), d.get("bk_us_tun", ""),
+        ]
+        if t
+    ]
+    d["fw_options_block"] = "\n".join(fw_lines) if fw_lines else ""
+
+    # ── 8. 生成 {extra_dum_main_block} / {extra_dum_bk_block} ──
+    extra_main_lines = []
+    for idx, ip in enumerate(main_nat_ips[1:], start=2):
+        dum = 99 + idx
+        desc = "MAIN_OUTIP" if len(main_nat_ips) <= 1 else f"MAIN_OUTIP_{idx:02d}"
+        extra_main_lines.append(f"set interfaces dummy dum{dum} address '{ip}/32'")
+        extra_main_lines.append(f"set interfaces dummy dum{dum} description '{desc}'")
+    d["extra_dum_main_block"] = "\n".join(extra_main_lines)
+
+    extra_bk_lines = []
+    for idx, ip in enumerate(bk_nat_ips[1:], start=2):
+        dum = 199 + idx
+        desc = "BK_OUTIP" if len(bk_nat_ips) <= 1 else f"BK_OUTIP_{idx:02d}"
+        extra_bk_lines.append(f"set interfaces dummy dum{dum} address '{ip}/32'")
+        extra_bk_lines.append(f"set interfaces dummy dum{dum} description '{desc}'")
+    d["extra_dum_bk_block"] = "\n".join(extra_bk_lines)
+
+    # ── 9. 生成 {overseas_nat_block} ──
+    overseas_lines = [
+        f"set nat source rule 100 outbound-interface name '{d['main_us_tun']}'",
+        f"set nat source rule 100 source group network-group 'LAN-NET'",
+        f"set nat source rule 100 translation address '{d['main_us_nat_ip']}'",
+        f"set nat source rule 200 outbound-interface name '{d['bk_us_tun']}'",
+        f"set nat source rule 200 source group network-group 'LAN-NET'",
+        f"set nat source rule 200 translation address '{d['bk_us_nat_ip']}'",
+    ]
+    d["overseas_nat_block"] = "\n".join(overseas_lines)
+
+    # ── 10. 生成 {us_bgp_routes} ──
+    bgp_lines = []
+    main_peip = d.get("main_us_pe_ip", "")
+    bk_peip = d.get("bk_us_pe_ip", "")
+    for bgp in [d.get("main_us_bgp1", ""), d.get("main_us_bgp2", "")]:
+        if bgp:
+            bgp_lines.append(
+                f"set protocols static route {bgp}/32 blackhole distance '10'"
+            )
+            bgp_lines.append(
+                f"set protocols static route {bgp}/32 next-hop {main_peip}"
+            )
+    for bgp in [d.get("bk_us_bgp1", ""), d.get("bk_us_bgp2", "")]:
+        if bgp:
+            bgp_lines.append(
+                f"set protocols static route {bgp}/32 blackhole distance '10'"
+            )
+            bgp_lines.append(
+                f"set protocols static route {bgp}/32 next-hop {bk_peip}"
+            )
+    d["us_bgp_routes"] = "\n".join(bgp_lines)
+
+    # ── 11. 生成 {default_route_block} ──
+    if wan_dhcp:
+        d["default_route_block"] = (
+            "# WAN DHCP 模式 — 不生成默认静态路由"
+        )
+    else:
+        d["default_route_block"] = (
+            f"set protocols static route 0.0.0.0/0 next-hop '{wan_gw}' distance '220'\n"
+            f"set protocols static route 1.1.1.1/32 next-hop '{wan_gw}'"
+        )
+
+    # ── 12. 生成 {pki_block} ──
+    if _EPOCH5_PKI_SECRET_KEY:
+        d["pki_block"] = (
+            f"set pki openvpn shared-secret openvpn_secret key '{_EPOCH5_PKI_SECRET_KEY}'\n"
+            f"run import pki openvpn shared-secret openvpn_secret file /opt/pki/openvpn.secret"
+        )
+    else:
+        d["pki_block"] = (
+            "# PKI secret key 未配置\n"
+            "# run import pki openvpn shared-secret openvpn_secret file /opt/pki/openvpn.secret"
+        )
+
+    # ── 13. 生成 {dhcp_block} ──
+    if lan_dhcp and lan_cidr and lan_ip and not bypass:
+        try:
+            net = ipaddress.ip_network(lan_cidr.strip(), strict=False)
+            prefix = net.prefixlen
+            network_addr = str(net.network_address)
+            hosts = list(net.hosts())
+            if hosts:
+                d_start = str(hosts[min(9, len(hosts) - 1)])
+                d_stop = str(hosts[min(199, len(hosts) - 1)])
+            else:
+                d_start = d_stop = ""
+            prefix_id = str(prefix)
+
+            d["dhcp_block"] = (
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} option default-router '{lan_ip}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} option name-server '{lan_ip}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} range Lan1_range start '{d_start}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} range Lan1_range stop '{d_stop}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {network_addr}/{prefix} subnet-id '{prefix_id}'"
+            )
+        except Exception:
+            d["dhcp_block"] = (
+                "# DHCP 服务器未配置 — LAN CIDR 解析失败"
+            )
+    else:
+        d["dhcp_block"] = (
+            "# DHCP 服务器未启用"
+        )
+
+    # ── 14. 生成 {lan_net_block} ──
+    d["lan_net_block"] = (
+        "set firewall group network-group LAN-NET network '10.0.0.0/8'\n"
+        "set firewall group network-group LAN-NET network '172.16.0.0/12'\n"
+        "set firewall group network-group LAN-NET network '192.168.0.0/16'"
+    )
+
+    # ── 14b. 生成 {return_routes_block} ──
+    gen_rr = bool(g.get("DEFAULT_GEN_RETURN_ROUTE", False))
+    if gen_rr:
+        rr_lines = []
+        base_cidr = wan_cidr if bypass else lan_cidr
+        gw = wan_gw if bypass else (str(g.get("DEFAULT_LAN_GW", "")).strip() or (lan_cidr.split("/")[0] if lan_cidr else ""))
+        inner_nets = _parse_inner_nets(inner_nets_raw)
+        outside = _nets_needing_return(base_cidr, inner_nets)
+        for net in outside:
+            rr_lines.append(f"set protocols static route {net} next-hop {gw}")
+        d["return_routes_block"] = "\n".join(rr_lines) if rr_lines else ""
+    else:
+        d["return_routes_block"] = ""
+
+    # ── 15. 硬编码 DNS-NET 地址组 IP ──
+    d["dns_ip1"] = _EPOCH5_DNS_GLOBAL2  # 8.8.8.8
+    d["dns_ip2"] = _EPOCH5_DNS_GLOBAL1  # 8.8.4.4
+
+    return d, None
+
+
+def build_epoch5_flink_format_dict(hdr_text):
+    routes, err = parse_epoch5_flink_headers(hdr_text)
+    if err:
+        return None, ("parse", err)
+    d = _build_epoch5_flink_format_dict(
+        routes,
+        str(globals().get("ER5_FL_MAIN_NH_DEFAULT", "10.1.1.1")),
+        str(globals().get("ER5_FL_BACKUP_NH_DEFAULT", "10.2.1.1")),
+    )
+    return d, None
+
+
+# build_epoch5_new_exit_format_dict(parsed, init_cfg) → dict (defined above, same name)
+
+
+def build_epoch5_domain_split_format_dict(hdr_text):
+    return None, ("tpl", "5.0 ER 域名分流模板尚未实现")
+
+
+# =====================================================================
+# 示例数据
+# =====================================================================
+US5_EXAMPLE = (
+    "LineID:603642Ar1\n"
+    "PE:szd-upe5\n"
+    "Tunnel:Tunnel0/0/1165\n"
+    "wanip:10.55.14.64/30\n"
+    "PE 对接:192.168.247.17\n"
+    "CE 对接:10.23.0.122\n"
+    "PE:szd-acvpnpe2\n"
+    "Tunnel:vtun17953\n"
+    "wanip:10.23.0.120/30\n"
+    "PE 对接:183.63.68.171\n"
+    "\n"
+    "LineID:603642Ar2\n"
+    "PE:szc-upe2\n"
+    "Tunnel:Tunnel0/0/1998\n"
+    "wanip:10.40.209.220/30\n"
+    "PE 对接:192.168.251.100\n"
+    "CE 对接:10.30.167.202\n"
+    "PE:szc-acvpnpe2\n"
+    "Tunnel:vtun50057\n"
+    "wanip:10.30.167.200/30\n"
+    "PE 对接:121.12.128.254\n"
+    "\n"
+    "LineID:603642Ar3\n"
+    "PE：szd-natflr2\n"
+    "WANIP:10.40.25.188/30\n"
+    "TUNNEL:tun100\n"
+    "PE Docking：121.12.81.3\n"
+    "CE Docking：10.20.186.2\n"
+    "BGPSERVER IP：10.10.99.168,10.10.99.169\n"
+    "海外出口ip：103.48.141.157\n"
+    "\n"
+    "LineID:603642Ar4\n"
+    "PE：szc-natbk10\n"
+    "WANIP:10.41.25.188/30\n"
+    "TUNNEL:tun200\n"
+    "PE Docking：120.133.129.72\n"
+    "CE Docking：10.25.186.3\n"
+    "BGPSERVER IP：10.10.99.198,10.10.99.199\n"
+    "海外出口ip：103.48.141.158\n"
+)
+
+HK5_EXAMPLE = (
+    "MAIN\n"
+    "lineid: 603642Ar3\n"
+    "主PE： szd-natflr2\n"
+    "WANIP: 10.40.25.188/30\n"
+    "TUNNEL: vtun40826\n"
+    "Docking：121.12.81.3\n"
+    "CE LOIP: 10.20.186.235\n"
+    "HKIP：10.60.241.250 --> 103.48.141.157\n"
+    "BGPSERVER IP： 10.10.99.168,10.10.99.169\n"
+    "\n"
+    "BACKUP\n"
+    "PE：szc-natbk10\n"
+    "WANIP: 10.41.25.188/30\n"
+    "TUNNEL: vtun50826\n"
+    "Docking： 120.133.129.72\n"
+    "CE LOIP: 10.20.186.235\n"
+    "HKIP：10.60.241.250 --> 103.48.141.157\n"
+    "BGPSERVER IP：10.10.99.198,10.10.99.199\n"
+)
+
+
+# =====================================================================
+# 可视化合并函数（供 all_in_one_v2 调用）
+# =====================================================================
+def _visual_merge_er5_init(variant: str, updates: dict) -> None:
+    """all_in_one：将可视化编辑器的持久化值写入本模块 globals()。
+    variant: "hk" | "us" | "flink" | "new_exit" | "domain_split"
+    updates: { "DEFAULT_WAN_CIDR": "...", "DEFAULT_WAN_ETH": "...", ... }
+    """
+    g = globals()
+    _BOOL_KEYS = frozenset({
+        "DEFAULT_WAN_DHCP", "DEFAULT_LAN_DHCP", "DEFAULT_GEN_RETURN_ROUTE", "DEFAULT_BYPASS",
+    })
+
+    def _pb(val) -> bool:
+        s = str(val).strip().lower()
+        return s in ("1", "true", "yes", "on", "开")
+
+    def _dest(k: str) -> str:
+        if variant == "hk" and k.startswith("DEFAULT_"):
+            return "HK_" + k
+        return k
+
+    for k, v in updates.items():
+        dk = _dest(k)
+        if dk not in g:
+            continue
+        if k in _BOOL_KEYS:
+            g[dk] = _pb(v)
+        else:
+            g[dk] = str(v).strip()

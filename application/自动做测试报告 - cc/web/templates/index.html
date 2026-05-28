@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FASTIP 自动测试报告</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="header">
+    <div class="header-left">
+      <h1>FASTIP 自动测试报告</h1>
+      <p class="subtitle">执行过程和结果实时显示在下方日志区</p>
+    </div>
+    <div class="header-right">
+      <span class="warn-badge">⚠ 请补充带宽测试和主备切换截图</span>
+    </div>
+  </header>
+
+  <div class="product-bar">
+    <label class="product-label">产品：</label>
+    <label class="radio-inline"><input type="radio" name="product_type" value="er" checked onchange="syncProduct()"> ER FASTIP</label>
+    <label class="radio-inline"><input type="radio" name="product_type" value="usg" onchange="syncProduct()"> USG FASTIP</label>
+    <label class="interval-label">CE ping -i（ER）：</label>
+    <input type="text" id="ce_ping_interval_i" value="0.01" class="input-sm">
+    <label class="interval-label">CE ping -m（USG）：</label>
+    <input type="text" id="ce_ping_interval_m" value="1" class="input-sm" disabled>
+  </div>
+
+  <div class="main-grid">
+    <div class="col-left">
+      <div class="card">
+        <h2 class="card-title">客户与测试信息</h2>
+        <div class="field-row"><label>客户名称</label><input type="text" id="customer"></div>
+        <div class="field-row"><label>CID</label><input type="text" id="line_id"></div>
+        <div class="field-row"><label>带宽</label><input type="text" id="bandwidth"></div>
+        <div class="field-row"><label>测试工程师</label><input type="text" id="engineer"></div>
+        <div class="field-row"><label>测试日期</label><input type="text" id="test_date" value="{{ today }}"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">CE 连接信息</h2>
+        <div class="field-row"><label>CE SSH IP</label><input type="text" id="ce_host"></div>
+        <div class="field-row"><label>CE端口</label><input type="text" id="ce_port" value="2707"></div>
+        <div class="field-row"><label>CE用户名</label><input type="text" id="ce_user" value="bothwin"></div>
+        <div class="field-row"><label>CE密码</label><input type="password" id="ce_password" value="Tfe28@w%"></div>
+      </div>
+
+      <div class="card card-soft">
+        <h2 class="card-title card-title-soft">CE 密码预设（可选保存）</h2>
+        <div class="preset-group">
+          <label><input type="radio" name="preset" value="bothwin_tfe" checked onchange="applyPreset()"> bothwin/Tfe</label>
+          <label><input type="radio" name="preset" value="admin_tfe" onchange="applyPreset()"> admin/Tfe</label>
+          <label><input type="radio" name="preset" value="bothwin_dotx12" onchange="applyPreset()"> bothwin/.x12</label>
+          <label><input type="radio" name="preset" value="custom" onchange="applyPreset()"> aaa（自定义）</label>
+        </div>
+        <div class="field-row"><label>aaa 用户名</label><input type="text" id="aaa_user"></div>
+        <div class="field-row"><label>aaa 密码</label><input type="password" id="aaa_password"></div>
+        <button class="btn-secondary" onclick="savePreset()">保存密码</button>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="card">
+        <h2 class="card-title">IP / 站点信息</h2>
+        <div class="field-row"><label>主线对端IP</label><input type="text" id="main_ip"></div>
+        <div class="field-row"><label>备线IP</label><input type="text" id="backup_ip"></div>
+        <div class="field-row"><label>本地站点</label><input type="text" id="local_site" value="www.baidu.com"></div>
+        <div class="field-row"><label>加速站点</label><input type="text" id="accel_site" value="www.google.com"></div>
+      </div>
+
+      <div class="card card-log">
+        <h2 class="card-title card-title-soft">执行日志</h2>
+        <pre id="log-output" class="log-area"> </pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <div class="actions-left">
+      <button id="run-btn" class="btn-primary" onclick="runReport()">开始生成报告</button>
+      <button id="stop-btn" class="btn-secondary" onclick="stopReport()" disabled>中断</button>
+      <button class="btn-secondary" onclick="clearLog()">清空日志</button>
+    </div>
+    <span id="status" class="status-text">就绪</span>
+  </div>
+</div>
+
+<div id="download-toast" class="toast hidden">
+  <span id="download-link-text"></span>
+  <button class="btn-primary btn-sm" onclick="closeToast()">×</button>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

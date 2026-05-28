@@ -1,0 +1,66 @@
+# =================================================================
+# 帮你节省 5 分钟 — .gitignore
+# 原则：仓库只保留源码 + 文档 + 变动记录，二进制 / 缓存 / 运行产物全部排除
+# =================================================================
+
+# ---- Python 缓存 ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ---- 打包产物 ----
+build/
+dist/
+*.egg-info/
+*.spec.bak
+
+# ---- 可执行二进制（全部忽略，靠 PyInstaller 本地重新打包）----
+*.exe
+*.dll
+*.bin
+
+# ---- 测试 / 工具缓存 ----
+.pytest_cache/
+.playwright-mcp/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ---- 运行日志（保留 .md 变动记录）----
+*.log
+
+# ---- 浏览器自带二进制 ----
+chromium/
+**/chromium/
+
+# ---- 测试运行产物 ----
+**/test/**/results/
+**/test/**/logs/
+application/test/**/results/
+
+# ---- IDE / 系统 ----
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 临时文件 ----
+*.tmp
+*.bak
+*.orig
+*~
+
+# ---- 个人 / 本地配置（如有则忽略，避免误传秘钥）----
+.env
+.env.local
+*.local.json
+secrets.json
+credentials.json

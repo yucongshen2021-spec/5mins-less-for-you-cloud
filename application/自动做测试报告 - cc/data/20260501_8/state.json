@@ -1,0 +1,44 @@
+{
+  "tasks": {
+    "01_ce_main_small": {
+      "status": "done",
+      "exit": 0,
+      "duration_s": 6
+    },
+    "02_ce_main_large": {
+      "status": "done",
+      "exit": 0,
+      "duration_s": 5
+    },
+    "03_ce_backup_small": {
+      "status": "done",
+      "exit": 0,
+      "duration_s": 6
+    },
+    "04_ce_backup_large": {
+      "status": "done",
+      "exit": 0,
+      "duration_s": 6
+    },
+    "06_ping": {
+      "status": "done",
+      "exit": 0,
+      "duration_s": 102
+    },
+    "06_tracert": {
+      "status": "done",
+      "exit": 0,
+      "duration_s": 17
+    },
+    "07_ping": {
+      "status": "done",
+      "exit": 0,
+      "duration_s": 102
+    },
+    "07_tracert": {
+      "status": "done",
+      "exit": 0,
+      "duration_s": 3
+    }
+  }
+}

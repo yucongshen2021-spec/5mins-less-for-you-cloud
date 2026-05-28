@@ -1,0 +1,168 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Network Tools — Shared Base Stylesheet
+   All sub-applications should link this file for visual consistency.
+
+   Design system: Cursor Editorial (DESIGN.md)
+   Typography:   DM Serif Display (headings) / DM Sans (body) / JetBrains Mono (code)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════ Google Fonts ═══════════ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ═══════════ Design Tokens ═══════════ */
+:root {
+  /* Brand */
+  --primary: #f54e00;
+  --primary-active: #d04200;
+
+  /* Ink */
+  --ink: #26251e;
+  --body: #5a5852;
+  --muted: #807d72;
+  --muted-soft: #a09c92;
+
+  /* Surface */
+  --canvas: #f7f7f4;
+  --canvas-soft: #fafaf7;
+  --surface: #ffffff;
+  --surface-strong: #e6e5e0;
+
+  /* Hairline */
+  --hairline: #e6e5e0;
+  --hairline-soft: #efeee8;
+  --hairline-strong: #cfcdc4;
+
+  /* Semantic */
+  --success: #1f8a65;
+  --error: #cf2d56;
+  --on-primary: #ffffff;
+
+  /* Radius */
+  --rounded-xs: 4px;
+  --rounded-sm: 6px;
+  --rounded-md: 8px;
+  --rounded-lg: 12px;
+  --rounded-xl: 16px;
+  --rounded-pill: 9999px;
+
+  /* Spacing (4px base) */
+  --spacing-xxs: 4px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-base: 16px;
+  --spacing-md: 20px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  --spacing-section: 80px;
+}
+
+/* ═══════════ Reset ═══════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { background: var(--canvas); }
+
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  font-size: 15px; line-height: 1.5; color: var(--body);
+  background: var(--canvas); -webkit-font-smoothing: antialiased;
+}
+
+/* ═══════════ Typography ═══════════ */
+.display, h1 {
+  font-family: 'DM Serif Display', Georgia, 'Times New Roman', serif;
+  font-weight: 400; letter-spacing: -0.3px; color: var(--ink);
+}
+code, pre, .mono {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px; line-height: 1.5;
+}
+
+/* ═══════════ Standard Button ═══════════ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+  border-radius: var(--rounded-md); cursor: pointer; border: none;
+  white-space: nowrap; transition: background .15s, transform .1s, opacity .15s;
+}
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+.btn-primary {
+  background: var(--primary); color: var(--on-primary);
+  height: 40px; padding: 10px 18px;
+}
+.btn-primary:hover { background: var(--primary-active); }
+
+.btn-secondary {
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--hairline-strong);
+  height: 40px; padding: 9px 17px;
+}
+.btn-secondary:hover { background: var(--canvas-soft); }
+
+.btn-ink {
+  background: var(--ink); color: var(--canvas);
+  height: 40px; padding: 10px 18px;
+}
+.btn-ink:hover { opacity: .85; }
+
+.btn-sm { height: 32px; padding: 6px 12px; font-size: 13px; }
+
+/* ═══════════ Standard Card ═══════════ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  padding: 28px;
+}
+
+/* ═══════════ Standard Input ═══════════ */
+.input {
+  font-family: 'DM Sans', sans-serif; font-size: 15px;
+  color: var(--ink); background: var(--canvas);
+  border: 1px solid var(--hairline-strong); border-radius: var(--rounded-md);
+  padding: 0 16px; height: 44px; outline: none;
+  transition: border-color .2s;
+}
+.input:focus { border-color: var(--primary); }
+
+.textarea {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px;
+  color: var(--ink); background: var(--surface);
+  border: 1px solid var(--hairline); border-radius: var(--rounded-md);
+  padding: 12px 16px; outline: none; resize: vertical;
+  transition: border-color .2s;
+}
+.textarea:focus { border-color: var(--primary); }
+
+/* ═══════════ Animations ═══════════ */
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { left: -40%; }
+  to   { left: 100%; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ringPulse {
+  0%, 100% { border-color: var(--hairline); transform: scale(1); }
+  50%      { border-color: var(--primary); transform: scale(1.05); }
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .3; transform: scale(.7); }
+}
+
+/* ═══════════ Responsive ═══════════ */
+@media (max-width: 640px) {
+  body { font-size: 14px; }
+  .card { padding: 20px; }
+}

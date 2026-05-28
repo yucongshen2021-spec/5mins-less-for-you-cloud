@@ -1,0 +1,3961 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ER/USG Config Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* DESIGN.md design tokens as CSS custom properties */
+  :root {
+    --primary: #f54e00;
+    --primary-active: #d04200;
+    --ink: #26251e;
+    --body: #5a5852;
+    --muted: #807d72;
+    --muted-soft: #a09c92;
+    --hairline: #e6e5e0;
+    --hairline-soft: #efeee8;
+    --hairline-strong: #cfcdc4;
+    --canvas: #f7f7f4;
+    --canvas-soft: #fafaf7;
+    --surface-card: #ffffff;
+    --surface-strong: #e6e5e0;
+    --on-primary: #ffffff;
+    --semantic-error: #cf2d56;
+    --semantic-success: #1f8a65;
+    --rounded-xs: 4px;
+    --rounded-sm: 6px;
+    --rounded-md: 8px;
+    --rounded-lg: 12px;
+    --rounded-xl: 16px;
+    --rounded-pill: 9999px;
+    --spacing-xs: 8px;
+    --spacing-sm: 12px;
+    --spacing-base: 16px;
+    --spacing-md: 20px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-xxl: 48px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', system-ui, -apple-system, 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.5;
+    background: var(--canvas);
+    color: var(--ink);
+    max-width: 100vw;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* SCENE TAB BAR (ER / USG) */
+  .scene-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface-card);
+    padding: 0 var(--spacing-lg);
+    height: 48px;
+    align-items: stretch;
+  }
+  .scene-tab {
+    padding: 0 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex;
+    align-items: center;
+  }
+  .scene-tab:hover { color: var(--ink); }
+  .scene-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  /* INPUT PANELS */
+  .input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-base);
+    padding: var(--spacing-base);
+  }
+  @media (max-width: 768px) {
+    .input-grid { grid-template-columns: 1fr; }
+  }
+  .panel-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.88px;
+    color: var(--muted);
+    margin-bottom: var(--spacing-xs);
+  }
+  .panel-textarea {
+    width: 100%;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    border: 1px solid var(--hairline);
+    border-radius: var(--rounded-md);
+    padding: 12px;
+    resize: vertical;
+    background: var(--surface-card);
+    color: var(--ink);
+    min-height: 200px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .panel-textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(245, 78, 0, 0.12);
+  }
+  .file-import-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
+  }
+  .file-import-label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* TOOLBAR */
+  .toolbar {
+    display: flex;
+    gap: var(--spacing-xs);
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-base);
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface-card);
+    flex-wrap: wrap;
+  }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    border-radius: var(--rounded-md);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn:focus-visible,
+  .scene-tab:focus-visible,
+  .result-tab:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: var(--on-primary);
+    border: none;
+    padding: 10px 18px;
+    height: 40px;
+  }
+  .btn-primary:hover { background: var(--primary-active); }
+  .btn-secondary {
+    background: var(--surface-card);
+    color: var(--ink);
+    border: 1px solid var(--hairline-strong);
+    padding: 9px 17px;
+    height: 40px;
+  }
+  .btn-secondary:hover { background: var(--canvas); }
+  .btn-ink {
+    background: var(--ink);
+    color: var(--canvas);
+    border: none;
+    padding: 10px 18px;
+    height: 40px;
+  }
+  .btn-ink:hover { opacity: 0.85; }
+  .btn-sm {
+    padding: 6px 12px;
+    height: 32px;
+    font-size: 13px;
+  }
+
+  /* CHECKBOX */
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--body);
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .checkbox-row input[type="checkbox"] {
+    accent-color: var(--primary);
+  }
+
+  /* RESULT TABS */
+  .result-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface-card);
+    padding: 0 var(--spacing-base);
+    height: 40px;
+    align-items: stretch;
+  }
+  .result-tab {
+    padding: 0 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .result-tab:hover { color: var(--ink); }
+  .result-tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+
+  /* RESULT PANELS */
+  .result-panel { padding: var(--spacing-base); }
+  .result-panel[hidden] { display: none; }
+  .result-panel:not([hidden]) {
+    opacity: 0; transform: translateY(10px);
+    animation: cardIn .35s ease forwards;
+  }
+  @keyframes cardIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* NAT TABLE */
+  .table-wrap { overflow-x: auto; }
+  .nat-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  .nat-table thead { position: sticky; top: 0; }
+  .nat-table th {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--hairline-strong);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.88px;
+    color: var(--muted);
+    background: var(--canvas-soft);
+    white-space: nowrap;
+  }
+  .nat-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--hairline);
+    vertical-align: top;
+  }
+  .nat-table tbody tr:hover { background: var(--canvas-soft); }
+
+  /* TOPOLOGY CANVAS */
+  .topo-toolbar {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: var(--spacing-sm) 0;
+  }
+  .topo-zoom-label {
+    font-size: 12px;
+    color: var(--muted);
+    min-width: 48px;
+    text-align: center;
+  }
+  .topo-container {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--hairline);
+    border-radius: var(--rounded-lg);
+    background: var(--surface-card);
+    cursor: grab;
+    height: 600px;
+  }
+  .topo-container:active { cursor: grabbing; }
+  .topo-container svg { display: block; width: 100%; height: 100%; }
+
+  /* SUMMARY PANELS */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-base);
+    margin-top: var(--spacing-base);
+  }
+  @media (max-width: 768px) {
+    .summary-grid { grid-template-columns: 1fr; }
+  }
+  .summary-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.88px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .summary-textarea {
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    border: 1px solid var(--hairline);
+    border-radius: var(--rounded-md);
+    padding: 10px;
+    resize: vertical;
+    background: var(--canvas-soft);
+    color: var(--ink);
+    min-height: 120px;
+  }
+
+  /* LEDGER & IP DIGEST */
+  .mono-panel {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: var(--rounded-md);
+    padding: var(--spacing-base);
+    max-height: 600px;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+  <!-- Scene Tabs -->
+  <div class="scene-tabs" id="sceneTabs">
+    <button class="scene-tab active" data-scene="er" id="tabEr">ER</button>
+    <button class="scene-tab" data-scene="usg" id="tabUsg">USG</button>
+  </div>
+
+  <!-- Page Title -->
+  <div style="background:var(--surface-card);border-bottom:1px solid var(--hairline);padding:var(--spacing-base) var(--spacing-lg);">
+    <h1 style="font-family:'DM Serif Display',Georgia,'Times New Roman',serif;font-size:24px;font-weight:400;color:var(--ink);letter-spacing:-0.3px;margin:0;">ER/USG 配置梳理工具</h1>
+    <p style="font-size:13px;color:var(--muted);margin:4px 0 0 0;">解析防火墙 NAT 规则，可视化网络拓扑关系</p>
+  </div>
+
+  <!-- Input Panels -->
+  <div class="input-grid">
+    <div>
+      <label class="panel-label" for="configText">配置脚本</label>
+      <textarea class="panel-textarea" id="configText" placeholder="请粘贴 VyOS / USG 配置脚本...&#10;&#10;示例:&#10;set nat source rule 10 source address '10.0.0.0/24'&#10;set nat source rule 10 outbound-interface 'tun100'&#10;set nat source rule 10 translation address '203.0.113.5'"></textarea>
+      <div class="file-import-row">
+        <input type="file" id="configFile" accept=".txt,.cfg,.conf,.log" style="font-size:12px;">
+        <span class="file-import-label">从文件导入</span>
+      </div>
+    </div>
+    <div>
+      <label class="panel-label" for="mappingText">假IP &#8594; 真IP 映射</label>
+      <textarea class="panel-textarea" id="mappingText" placeholder="请粘贴 IP 映射关系...&#10;&#10;支持格式:&#10;10.60.44.28-218.32.88.83&#10;10.60.18.22=150.116.112.236&#10;10.60.44.28:218.32.88.83&#10;10.60.44.28 -> 218.32.88.83&#10;&#10;用分号或换行分隔多条映射。"></textarea>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <button class="btn btn-primary" id="btnAnalyze">解析并梳理</button>
+    <button class="btn btn-secondary" id="btnExport">导出CSV</button>
+    <button class="btn btn-secondary" id="btnClear">清空</button>
+    <label class="checkbox-row">
+      <input type="checkbox" id="acceptRemark">
+      <span>接受备注启发式判断</span>
+    </label>
+  </div>
+
+  <!-- Result Tabs -->
+  <div class="result-tabs" id="resultTabs" role="tablist" aria-label="Results">
+    <button class="result-tab active" data-result="nat" id="tabNat" role="tab" aria-selected="true" aria-controls="natPanel">NAT表</button>
+    <button class="result-tab" data-result="topology" id="tabTopology" role="tab" aria-selected="false" aria-controls="topologyPanel">ER Topology</button>
+    <button class="result-tab" data-result="ledger" id="tabLedger" role="tab" aria-selected="false" aria-controls="ledgerPanel">解析备注</button>
+    <button class="result-tab" data-result="ipdigest" id="tabIpDigest" role="tab" aria-selected="false" aria-controls="ipDigestPanel">IP摘要</button>
+  </div>
+
+  <!-- NAT Table Panel -->
+  <div class="result-panel" id="natPanel" role="tabpanel" aria-labelledby="tabNat">
+    <div class="table-wrap">
+      <table class="nat-table" id="natTable">
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th>源IP/网段</th>
+            <th>出口接口</th>
+            <th>出口备注</th>
+            <th>假IP</th>
+            <th>真IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px;">暂无数据。请粘贴配置后点击"解析并梳理"。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Topology Panel -->
+  <div class="result-panel" id="topologyPanel" role="tabpanel" aria-labelledby="tabTopology" hidden>
+    <div class="topo-toolbar">
+      <button class="btn btn-sm btn-secondary" id="zoomIn" title="放大" aria-label="放大">+</button>
+      <button class="btn btn-sm btn-secondary" id="zoomOut" title="缩小" aria-label="缩小">&minus;</button>
+      <button class="btn btn-sm btn-secondary" id="zoomReset" title="重置缩放" aria-label="重置缩放">重置</button>
+      <span class="topo-zoom-label" id="zoomLabel">100%</span>
+    </div>
+    <div class="topo-container" id="topoContainer">
+      <svg id="topoSvg"></svg>
+    </div>
+    <div class="summary-grid">
+      <div>
+        <div class="summary-label">拓扑摘要</div>
+        <textarea class="summary-textarea" id="topoSummary" readonly placeholder="拓扑文本摘要将显示在这里..."></textarea>
+      </div>
+      <div>
+        <div class="summary-label">Mermaid导出</div>
+        <textarea class="summary-textarea" id="topoMermaid" readonly placeholder="Mermaid 图表代码将显示在这里..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ledger Panel -->
+  <div class="result-panel" id="ledgerPanel" role="tabpanel" aria-labelledby="tabLedger" hidden>
+    <pre class="mono-panel" id="ledgerText">暂无数据。请解析 ER 配置以查看解析备注账本。</pre>
+  </div>
+
+  <!-- IP Digest Panel -->
+  <div class="result-panel" id="ipDigestPanel" role="tabpanel" aria-labelledby="tabIpDigest" hidden>
+    <pre class="mono-panel" id="ipDigestText">暂无数据。请解析 ER 配置以查看 IP 摘要。</pre>
+  </div>
+
+  <script>
+  // ============================================================
+  // Application State
+  // ============================================================
+  const state = {
+    currentScene: 'er',
+    rows: [],
+    topology: null,
+  };
+
+  // ============================================================
+  // ER/USG Config Parsing Engine
+  // ============================================================
+  window.ERConfigParser = (function() {
+    'use strict';
+
+    var IP_PATTERN = /\b(?:\d{1,3}\.){3}\d{1,3}(?:\/\d{1,2})?\b/g;
+
+    function cleanValue(raw) {
+      var value = raw.trim();
+      // Strip all leading/trailing single quotes, then double quotes
+      value = value.replace(/^'+/, '').replace(/'+$/, '');
+      value = value.replace(/^"+/, '').replace(/"+$/, '');
+      return value;
+    }
+
+    function parseFakeRealMapping(mappingText) {
+      var mapping = {};
+      if (!mappingText) return mapping;
+
+      var normalized = mappingText.replace(/\r/g, '\n');
+      var segments = normalized.split(/[;\n；]+/);
+
+      for (var i = 0; i < segments.length; i++) {
+        var s = segments[i].trim();
+        if (!s) continue;
+
+        // Try separators: -> => = : ： - —
+        var sepMatch = s.match(/^(.+?)\s*(?:->|=>|=|:|：|-|—)\s*(.+)$/);
+        if (sepMatch) {
+          var left = sepMatch[1];
+          var right = sepMatch[2];
+          var leftIps = left.match(IP_PATTERN);
+          var rightIps = right.match(IP_PATTERN);
+          if (leftIps && rightIps) {
+            mapping[leftIps[0].split('/')[0]] = rightIps[0].split('/')[0];
+            continue;
+          }
+        }
+
+        // Fallback: extract all IPs
+        var ips = s.match(IP_PATTERN);
+        if (ips && ips.length >= 2) {
+          mapping[ips[0].split('/')[0]] = ips[1].split('/')[0];
+        }
+      }
+
+      return mapping;
+    }
+
+    function maskToPrefix(maskText) {
+      var mask = maskText.trim();
+      if (!mask) return null;
+
+      if (/^\d+$/.test(mask)) {
+        var n = parseInt(mask, 10);
+        if (0 <= n && n <= 32) return String(n);
+        return null;
+      }
+
+      var parts = mask.split('.');
+      if (parts.length !== 4) return null;
+
+      var bits = '';
+      for (var i = 0; i < 4; i++) {
+        var p = parts[i];
+        if (!/^\d+$/.test(p)) return null;
+        var num = parseInt(p, 10);
+        if (num < 0 || num > 255) return null;
+        bits += ('00000000' + num.toString(2)).slice(-8);
+      }
+
+      if (bits.indexOf('01') !== -1) return null;
+      var ones = 0;
+      for (var j = 0; j < bits.length; j++) {
+        if (bits[j] === '1') ones++;
+      }
+      return String(ones);
+    }
+
+    function parseERConfig(configText) {
+      var rules = {};
+      var dnatRules = {};
+      var ifaceDesc = {};
+
+      var natFieldRe = /^set\s+nat\s+source\s+rule\s+(\d+)\s+(source|destination)\s+address\s+'?([^'\s]+)'?$/i;
+      var natOutboundRe = /^set\s+nat\s+source\s+rule\s+(\d+)\s+outbound-interface\s+'?([^'\s]+)'?$/i;
+      var natTranslationRe = /^set\s+nat\s+source\s+rule\s+(\d+)\s+translation\s+address\s+'?([^'\s]+)'?$/i;
+      var dnatDstRe = /^set\s+nat\s+destination\s+rule\s+(\d+)\s+destination\s+address\s+'?([^'\s]+)'?$/i;
+      var dnatInRe = /^set\s+nat\s+destination\s+rule\s+(\d+)\s+inbound-interface\s+'?([^'\s]+)'?$/i;
+      var dnatTransRe = /^set\s+nat\s+destination\s+rule\s+(\d+)\s+translation\s+address\s+'?([^'\s]+)'?$/i;
+      var ifaceDescRe = /^set\s+interfaces\s+(?:tunnel|openvpn|dummy|ethernet)\s+([^\s]+)\s+description\s+'([^']+)'$/i;
+
+      function makeRule(ruleId) {
+        return { ruleId: ruleId, sourcePrefixes: [], destinationPrefixes: [], outboundInterface: null, translationAddress: null };
+      }
+      function makeDnatRule(ruleId) {
+        return { ruleId: ruleId, inboundInterface: null, destinationPrefixes: [], translationAddress: null };
+      }
+
+      var lines = configText.split(/\r?\n/);
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line || line.charAt(0) === '#') continue;
+
+        var m;
+
+        m = line.match(natFieldRe);
+        if (m) {
+          var ruleId = m[1], direction = m[2], addr = cleanValue(m[3]);
+          if (!rules[ruleId]) rules[ruleId] = makeRule(ruleId);
+          if (direction.toLowerCase() === 'source') {
+            rules[ruleId].sourcePrefixes.push(addr);
+          } else {
+            rules[ruleId].destinationPrefixes.push(addr);
+          }
+          continue;
+        }
+
+        m = line.match(natOutboundRe);
+        if (m) {
+          ruleId = m[1]; var iface = cleanValue(m[2]);
+          if (!rules[ruleId]) rules[ruleId] = makeRule(ruleId);
+          rules[ruleId].outboundInterface = iface;
+          continue;
+        }
+
+        m = line.match(natTranslationRe);
+        if (m) {
+          ruleId = m[1]; var fakeIp = cleanValue(m[2]);
+          if (!rules[ruleId]) rules[ruleId] = makeRule(ruleId);
+          rules[ruleId].translationAddress = fakeIp;
+          continue;
+        }
+
+        m = line.match(ifaceDescRe);
+        if (m) {
+          ifaceDesc[cleanValue(m[1])] = cleanValue(m[2]);
+          continue;
+        }
+
+        m = line.match(dnatDstRe);
+        if (m) {
+          var rid = m[1], dst = cleanValue(m[2]);
+          if (!dnatRules[rid]) dnatRules[rid] = makeDnatRule(rid);
+          dnatRules[rid].destinationPrefixes.push(dst);
+          continue;
+        }
+
+        m = line.match(dnatInRe);
+        if (m) {
+          rid = m[1]; var dnatIface = cleanValue(m[2]);
+          if (!dnatRules[rid]) dnatRules[rid] = makeDnatRule(rid);
+          dnatRules[rid].inboundInterface = dnatIface;
+          continue;
+        }
+
+        m = line.match(dnatTransRe);
+        if (m) {
+          rid = m[1]; var dnatIp = cleanValue(m[2]);
+          if (!dnatRules[rid]) dnatRules[rid] = makeDnatRule(rid);
+          dnatRules[rid].translationAddress = dnatIp;
+          continue;
+        }
+      }
+
+      function sortByIntId(a, b) {
+        return parseInt(a.ruleId, 10) - parseInt(b.ruleId, 10);
+      }
+
+      var ruleList = [], dnatList = [];
+      for (var k in rules) { if (Object.prototype.hasOwnProperty.call(rules, k)) ruleList.push(rules[k]); }
+      for (var dk in dnatRules) { if (Object.prototype.hasOwnProperty.call(dnatRules, dk)) dnatList.push(dnatRules[dk]); }
+      ruleList.sort(sortByIntId);
+      dnatList.sort(sortByIntId);
+
+      return { rules: ruleList, dnatRules: dnatList, ifaceDesc: ifaceDesc };
+    }
+
+    function parseUSGConfig(configText) {
+      var addressSets = {};
+      var natAddressGroups = {};
+      var ifaceDesc = {};
+      var rules = [];
+
+      var currentAddressSet = null;
+      var currentNatGroup = null;
+      var currentInterface = null;
+      var currentRule = null;
+
+      var addressSetStartRe = /^ip\s+address-set\s+([^\s]+)\s+type\s+object$/i;
+      var addressEntryRe = /^address\s+\d+\s+([0-9.]+)\s+mask\s+([0-9.]+|\d+)$/i;
+      var natGroupStartRe = /^nat\s+address-group\s+([^\s]+)(?:\s+\d+)?$/i;
+      var natGroupSectionRe = /^section\s+\d+\s+([0-9.]+)\s+([0-9.]+)$/i;
+      var interfaceStartRe = /^interface\s+([^\s]+)$/i;
+      var interfaceDescRe = /^description\s+(.+)$/i;
+      var ruleNameRe = /^rule\s+name\s+(.+)$/i;
+      var egressRe = /^egress-interface\s+([^\s]+)$/i;
+      var srcAddrSetRe = /^source-address\s+address-set\s+([^\s]+)$/i;
+      var srcAddrDirectRe = /^source-address\s+([0-9.]+)\s+mask\s+([0-9.]+|\d+)$/i;
+      var srcAddrRangeRe = /^source-address\s+range\s+([0-9.]+)\s+([0-9.]+)$/i;
+      var actionGroupRe = /^action\s+source-nat\s+address-group\s+([^\s]+)(?:\s+.*)?$/i;
+      var actionEasyIpRe = /^action\s+source-nat\s+easy-ip$/i;
+      var actionNoNatRe = /^action\s+no-nat$/i;
+
+      var lines = configText.split(/\r?\n/);
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line || line.charAt(0) === '#') continue;
+
+        var m;
+
+        m = line.match(addressSetStartRe);
+        if (m) {
+          currentAddressSet = cleanValue(m[1]);
+          if (!addressSets[currentAddressSet]) addressSets[currentAddressSet] = [];
+          currentNatGroup = null;
+          continue;
+        }
+
+        m = line.match(addressEntryRe);
+        if (m && currentAddressSet) {
+          var ip = m[1], mask = m[2];
+          var prefix = maskToPrefix(mask);
+          if (prefix !== null) {
+            addressSets[currentAddressSet].push(ip + '/' + prefix);
+          }
+          continue;
+        }
+
+        m = line.match(natGroupStartRe);
+        if (m) {
+          currentNatGroup = cleanValue(m[1]);
+          if (!natAddressGroups[currentNatGroup]) natAddressGroups[currentNatGroup] = [];
+          currentAddressSet = null;
+          continue;
+        }
+
+        m = line.match(natGroupSectionRe);
+        if (m && currentNatGroup) {
+          var startIp = m[1], endIp = m[2];
+          natAddressGroups[currentNatGroup].push(startIp);
+          if (endIp !== startIp) {
+            natAddressGroups[currentNatGroup].push(endIp);
+          }
+          continue;
+        }
+
+        m = line.match(interfaceStartRe);
+        if (m) {
+          currentInterface = cleanValue(m[1]);
+          currentAddressSet = null;
+          currentNatGroup = null;
+          continue;
+        }
+
+        m = line.match(interfaceDescRe);
+        if (m && currentInterface) {
+          ifaceDesc[currentInterface] = cleanValue(m[1]);
+          continue;
+        }
+
+        m = line.match(ruleNameRe);
+        if (m) {
+          currentAddressSet = null;
+          currentNatGroup = null;
+          currentInterface = null;
+          currentRule = {
+            ruleName: cleanValue(m[1]),
+            egressInterface: null,
+            sourceAddressSet: null,
+            sourcePrefixes: [],
+            actionType: null,
+            actionAddressGroup: null
+          };
+          rules.push(currentRule);
+          continue;
+        }
+
+        if (!currentRule) continue;
+
+        m = line.match(egressRe);
+        if (m) { currentRule.egressInterface = cleanValue(m[1]); continue; }
+
+        m = line.match(srcAddrSetRe);
+        if (m) { currentRule.sourceAddressSet = cleanValue(m[1]); continue; }
+
+        m = line.match(srcAddrDirectRe);
+        if (m) {
+          ip = m[1]; mask = m[2];
+          prefix = maskToPrefix(mask);
+          if (prefix !== null) {
+            currentRule.sourcePrefixes.push(ip + '/' + prefix);
+          }
+          continue;
+        }
+
+        m = line.match(srcAddrRangeRe);
+        if (m) {
+          startIp = m[1]; endIp = m[2];
+          currentRule.sourcePrefixes.push(startIp + '-' + endIp);
+          continue;
+        }
+
+        m = line.match(actionGroupRe);
+        if (m) {
+          currentRule.actionType = 'source-nat-address-group';
+          currentRule.actionAddressGroup = cleanValue(m[1]);
+          continue;
+        }
+
+        if (actionEasyIpRe.test(line)) {
+          currentRule.actionType = 'source-nat-easy-ip';
+          continue;
+        }
+
+        if (actionNoNatRe.test(line)) {
+          currentRule.actionType = 'no-nat';
+          continue;
+        }
+      }
+
+      return {
+        rules: rules,
+        addressSets: addressSets,
+        natAddressGroups: natAddressGroups,
+        ifaceDesc: ifaceDesc
+      };
+    }
+
+    return {
+      parseFakeRealMapping: parseFakeRealMapping,
+      maskToPrefix: maskToPrefix,
+      cleanValue: cleanValue,
+      parseERConfig: parseERConfig,
+      parseUSGConfig: parseUSGConfig
+    };
+  })();
+
+  // ============================================================
+  // IP Address Utilities
+  // ============================================================
+  function ipToNum(ip) {
+    var parts = ip.split('.');
+    if (parts.length !== 4) return NaN;
+    return ((+parts[0] << 24) + (+parts[1] << 16) + (+parts[2] << 8) + (+parts[3])) >>> 0;
+  }
+  function numToIP(num) {
+    return [(num >>> 24) & 255, (num >>> 16) & 255, (num >>> 8) & 255, num & 255].join('.');
+  }
+  function hostIPFromPfxOrAddr(s) {
+    if (!s) return '';
+    var ip = String(s).split('/')[0].trim();
+    return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip) ? ip : '';
+  }
+  function localIPFromCIDR(cidr) {
+    if (!cidr) return '';
+    var parts = String(cidr).split('/');
+    var ip = parts[0].trim();
+    return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip) ? ip : '';
+  }
+  function prefixLenFromCIDR(cidr) {
+    var parts = String(cidr || '').split('/');
+    return parseInt(parts[1], 10) || 32;
+  }
+  function networkFromCIDR(cidr) {
+    var parts = String(cidr).split('/');
+    var ip = ipToNum(parts[0].trim());
+    if (isNaN(ip)) return { ip: 0, prefix: 32 };
+    var prefix = parseInt(parts[1], 10) || 32;
+    var mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
+    return { ip: (ip & mask) >>> 0, prefix: prefix };
+  }
+  function ipInCIDR(ipStr, cidrStr) {
+    try {
+      var ip = ipToNum(ipStr);
+      if (isNaN(ip)) return false;
+      var net = networkFromCIDR(cidrStr);
+      var mask = net.prefix === 0 ? 0 : (~0 << (32 - net.prefix)) >>> 0;
+      return (ip & mask) === (net.ip & mask);
+    } catch(e) { return false; }
+  }
+  function ipIsPrivate(ipStr) {
+    var ip = ipToNum(ipStr);
+    if (isNaN(ip)) return false;
+    if (ip >= ipToNum('10.0.0.0') && ip <= ipToNum('10.255.255.255')) return true;
+    if (ip >= ipToNum('172.16.0.0') && ip <= ipToNum('172.31.255.255')) return true;
+    if (ip >= ipToNum('192.168.0.0') && ip <= ipToNum('192.168.255.255')) return true;
+    return false;
+  }
+  function peerIPFromCIDR(cidr) {
+    if (!cidr) return '';
+    var parts = String(cidr).split('/');
+    var ipStr = parts[0].trim();
+    var ip = ipToNum(ipStr);
+    if (isNaN(ip)) return '';
+    var prefix = parseInt(parts[1], 10) || 32;
+    if (prefix === 31) return numToIP(ip ^ 1);
+    if (prefix === 30) {
+      var net = networkFromCIDR(cidr);
+      var host1 = net.ip + 1, host2 = net.ip + 2;
+      if (ip === host1) return numToIP(host2);
+      if (ip === host2) return numToIP(host1);
+      return '';
+    }
+    // General case: for point-to-point /31 or /30 style, compute the other endpoint
+    var net = networkFromCIDR(cidr);
+    var hosts = [];
+    for (var i = net.ip + 1; i < net.ip + (1 << (32 - prefix)) - 1; i++) {
+      hosts.push(i);
+    }
+    if (hosts.length === 2) {
+      if (ip === hosts[0]) return numToIP(hosts[1]);
+      if (ip === hosts[1]) return numToIP(hosts[0]);
+    }
+    return '';
+  }
+
+  // ============================================================
+  // Side Inference Helpers (FIX #2: word-boundary regex)
+  // ============================================================
+  var RE_BK = /\bBK[-_]/i;
+  var RE_BACKUP_WORD = /\bback(?:up)?\b/i;
+  var RE_PRI = /\bPRI(?:mary)?\b/i;
+  var RE_MAIN = /\bmain\b/i;
+
+  function lineRemarkIsBackup() {
+    var blob = '';
+    for (var i = 0; i < arguments.length; i++) {
+      if (arguments[i]) blob += ' ' + arguments[i];
+    }
+    if (!blob.trim()) return false;
+    return RE_BK.test(blob) || RE_BACKUP_WORD.test(blob) || /^bk[-_]/i.test(blob.trim());
+  }
+
+  function lineRemarkIsMain() {
+    var blob = '';
+    for (var i = 0; i < arguments.length; i++) {
+      if (arguments[i]) blob += ' ' + arguments[i];
+    }
+    if (!blob.trim()) return false;
+    return RE_PRI.test(blob) || RE_MAIN.test(blob) || blob.indexOf('主') !== -1;
+  }
+
+  function inferSide() {
+    var joined = '';
+    for (var i = 0; i < arguments.length; i++) {
+      if (arguments[i]) joined += ' ' + arguments[i];
+    }
+    if (lineRemarkIsBackup(joined)) return 'backup';
+    var jl = joined.toLowerCase();
+    if (/(backup|备|rsvr2|_b|bk)/i.test(jl)) return 'backup';
+    if (lineRemarkIsMain(joined)) return 'main';
+    if (/(main|主|_a|rsvr )/i.test(jl)) return 'main';
+    return 'unknown';
+  }
+
+  function canvasSideEvidence(description, ifaceExtraDesc, remote) {
+    return inferSide(description || '', ifaceExtraDesc || '', remote || '');
+  }
+
+  function remarkGRERoleFromDesc(description) {
+    var dl = (description || '').toLowerCase();
+    if (dl.indexOf('natpe') !== -1) return 'gre-overseas';
+    if (dl.indexOf('upe') !== -1) return 'gre-upe';
+    return '';
+  }
+
+  function nameHintSide(name) {
+    var s = (name || '').toLowerCase();
+    if (!s) return 'unknown';
+    if (/(rsvr2|backup|bk)/i.test(s)) return 'backup';
+    if (/(rsvr|main|pri)/i.test(s)) return 'main';
+    return 'unknown';
+  }
+
+  function peerGroupLaneHint(peerGroup) {
+    var pg = (peerGroup || '').toLowerCase();
+    if (pg && (pg.indexOf('rsvr2') !== -1 || pg.indexOf('backup') !== -1 || /2$/.test(pg))) return 'backup';
+    if (pg && pg.indexOf('rsvr') !== -1) return 'main';
+    return 'unknown';
+  }
+
+  // ============================================================
+  // Data Model (Task 4 start)
+  // ============================================================
+  function TunnelNode(name, kind) {
+    this.name = name; this.kind = kind; this.source = ''; this.remote = '';
+    this.address = ''; this.description = ''; this.inferred_role = 'unknown';
+    this.side = 'unknown'; this.canvas_side = 'unknown'; this.evidence = [];
+  }
+  function RouteEdge(dest, nh) {
+    this.destination = dest; this.next_hop = nh; this.route_table = 'main';
+    this.via_tunnel = ''; this.origin = 'unknown'; this.preference = '';
+    this.track_name = ''; this.evidence = '';
+  }
+  function BgpBinding(neighbor, peerGroup) {
+    this.neighbor = neighbor; this.peer_group = peerGroup || '';
+    this.update_source = ''; this.egress_hint = ''; this.remote_as = '';
+    this.export_prefix_list = ''; this.advertised_prefixes = [];
+    this.lane_side = ''; this.anchor_tunnel = ''; this.transport_tunnel = '';
+  }
+
+  // ============================================================
+  // NAT Table Output (Task 3)
+  // ============================================================
+  window.Analyzer = {
+    buildOutputRows: function(configText, mappingText) {
+      var cfg = ERConfigParser.parseERConfig(configText);
+      var mapping = ERConfigParser.parseFakeRealMapping(mappingText);
+      var rows = [];
+      var rules = cfg.rules;
+      var dnatRules = cfg.dnatRules || [];
+      var ifaceDesc = cfg.ifaceDesc || {};
+
+      for (var i = 0; i < rules.length; i++) {
+        var rule = rules[i];
+        var outbound = rule.outboundInterface || '(未指定)';
+        var egressRemark = ifaceDesc[outbound] || '(无备注)';
+        var fakeIp = (rule.translationAddress || '').split('/')[0];
+        if (fakeIp.toLowerCase() === 'masquerade') continue;
+        var realIp = mapping[fakeIp] || '';
+        var prefixes = rule.sourcePrefixes || [];
+        if (prefixes.length) {
+          for (var j = 0; j < prefixes.length; j++) {
+            rows.push({
+              rule: 'SNAT-' + rule.ruleId,
+              source_ip: prefixes[j],
+              egress_name: outbound,
+              egress_remark: egressRemark,
+              fake_ip: fakeIp || '(无)',
+              real_ip: realIp || '(未提供)'
+            });
+          }
+        } else if (rule.outboundInterface && fakeIp) {
+          rows.push({
+            rule: 'SNAT-' + rule.ruleId,
+            source_ip: '(配置未限定 source-address/network)',
+            egress_name: outbound,
+            egress_remark: egressRemark,
+            fake_ip: fakeIp || '(无)',
+            real_ip: realIp || '(未提供)'
+          });
+        }
+      }
+
+      for (var di = 0; di < dnatRules.length; di++) {
+        var dr = dnatRules[di];
+        var inbound = dr.inboundInterface || '(未指定)';
+        var remark = ifaceDesc[inbound] || '(无备注)';
+        var dstFakeIp = dr.destinationPrefixes.length ? dr.destinationPrefixes[0].split('/')[0] : '(无)';
+        var dstRealIp = (dr.translationAddress || '').split('/')[0] || '(无)';
+        var dstText = dr.destinationPrefixes.length ? dr.destinationPrefixes.join(',') : '(无)';
+        rows.push({
+          rule: 'DNAT-' + dr.ruleId,
+          source_ip: 'DST:' + dstText,
+          egress_name: inbound,
+          egress_remark: remark,
+          fake_ip: dstFakeIp,
+          real_ip: dstRealIp
+        });
+      }
+
+      return rows;
+    },
+
+    buildOutputRowsUSG: function(configText, mappingText) {
+      var parsed = ERConfigParser.parseUSGConfig(configText);
+      var mapping = ERConfigParser.parseFakeRealMapping(mappingText);
+      var rows = [];
+      var rules = parsed.rules || [];
+      var addressSets = parsed.addressSets || {};
+      var natAddressGroups = parsed.natAddressGroups || {};
+      var ifaceDesc = parsed.ifaceDesc || {};
+
+      for (var i = 0; i < rules.length; i++) {
+        var rule = rules[i];
+        if (!rule.actionType || rule.actionType === 'no-nat') continue;
+        if (rule.actionType === 'source-nat-easy-ip') continue;
+
+        var egress = rule.egressInterface || '(未指定)';
+        var egressRemark = ifaceDesc[egress] || '(无备注)';
+        var prefixes = (rule.sourcePrefixes || []).slice();
+        var asEntries = addressSets[rule.sourceAddressSet || ''] || [];
+        for (var a = 0; a < asEntries.length; a++) {
+          if (prefixes.indexOf(asEntries[a]) === -1) prefixes.push(asEntries[a]);
+        }
+        prefixes.sort();
+        if (!prefixes.length) continue;
+
+        var fakeIps = [];
+        if (rule.actionType === 'source-nat-address-group') {
+          var groupName = rule.actionAddressGroup || '';
+          fakeIps = natAddressGroups[groupName] || [];
+          if (!fakeIps.length) fakeIps = addressSets[groupName] || [];
+        }
+        if (!fakeIps.length) continue;
+
+        for (var p = 0; p < prefixes.length; p++) {
+          for (var f = 0; f < fakeIps.length; f++) {
+            var fakeKey = String(fakeIps[f]).split('/')[0].trim();
+            if (!fakeKey) fakeKey = '(未识别)';
+            var realIp = mapping[fakeKey] || '';
+            rows.push({
+              rule: rule.ruleName,
+              source_ip: prefixes[p],
+              egress_name: egress,
+              egress_remark: egressRemark,
+              fake_ip: fakeKey,
+              real_ip: realIp || '(未提供)'
+            });
+          }
+        }
+      }
+
+      return rows;
+    }
+  };
+
+  // ============================================================
+  // Topology Analysis Engine (Tasks 4 & 5 & 6)
+  // ============================================================
+  window.Topology = {
+    analyze: function(configText, acceptRemarkHeuristic) {
+      // -- Local state --
+      var tunnels = {};           // name -> TunnelNode
+      var routes = [];            // RouteEdge[]
+      var bgpByNeighbor = {};     // neighbor -> BgpBinding
+      var peerGroupUpdateSource = {};
+      var peerGroupRemoteAS = {};
+      var peerGroupExportPrefix = {};
+      var prefixListRules = {};   // plName -> { rid -> { prefix, action } }
+      var routeMapRuleMatch80 = {};   // (rm,rid) -> true
+      var routeMapRuleNextHop = {};   // (rm,rid) -> nh
+      var routeMapRuleCommRef = {};   // (rm,rid) -> commRef
+      var bgpNeighborInRouteMap = {};
+      var bgpPeerGroupInRouteMap = {};
+      var natOutbounds = [];
+      var natRuleOutbound = {};
+      var natRuleTranslation = {};
+      var natRuleSources = {};
+      var natRuleDescription = {};
+      var dnatRulePrefixes = {};
+      var dnatRuleCount = 0;
+      var openvpnLocalIPs = {};
+      var openvpnRemoteIPs = {};
+      var ifaceAddrBook = {};
+      var ifaceDescBook = {};
+      var staticRouteIndex = {};  // key(table,dest,nh) -> RouteEdge
+      var hostname = '本机';
+      var ipsecTunnelsByKey = {}; // key(peer,tid) -> { local_prefix, remote_prefix }
+
+      // -- Regex patterns (Task 4 Part C) --
+      var reTunnelDesc = /^set interfaces (openvpn|tunnel)\s+([^\s]+)\s+description\s+'([^']+)'/i;
+      // VyOS 早期版本用 source-address/remote-address，1.4+ 也接受 local-ip/remote-ip；两种语法都按"接口源 IP / 对端 IP"处理。
+      var reTunnelSource = /^set interfaces (openvpn|tunnel)\s+([^\s]+)\s+(?:source-address|local-ip)\s+'?([^'\s]+)'?/i;
+      var reTunnelRemote = /^set interfaces (openvpn|tunnel)\s+([^\s]+)\s+remote(?:-address|-ip)?\s+'?([^'\s]+)'?/i;
+      var reTunnelAddr = /^set interfaces (openvpn|tunnel)\s+([^\s]+)\s+address\s+'?([^'\s]+)'?/i;
+      var reOpenvpnLocal = /^set interfaces openvpn\s+([^\s]+)\s+local-address\s+([^\s]+)\s+subnet-mask\s+'?([^'\s]+)'?/i;
+      var reOpenvpnRemoteAddr = /^set interfaces openvpn\s+([^\s]+)\s+remote-address\s+'?([^'\s]+)'?/i;
+      var reVtiDesc = /^set interfaces vti\s+([^\s]+)\s+description\s+'([^']+)'/i;
+      var reVtiAddr = /^set interfaces vti\s+([^\s]+)\s+address\s+'?([^'\s]+)'?/i;
+      var reIpsecLocalPrefix = /^set vpn ipsec site-to-site peer\s+([^\s]+)\s+tunnel\s+(\d+)\s+local\s+prefix\s+'?([^'\s]+)'?/i;
+      var reIpsecRemotePrefix = /^set vpn ipsec site-to-site peer\s+([^\s]+)\s+tunnel\s+(\d+)\s+remote\s+prefix\s+'?([^'\s]+)'?/i;
+      var reIfaceAddr = /^set interfaces (ethernet|bridge|dummy|loopback)\s+([^\s]+)\s+address\s+'?([^'\s]+)'?/i;
+      var reIfaceDesc = /^set interfaces (ethernet|bridge|dummy|loopback)\s+([^\s]+)\s+description\s+'?([^']+)'?/i;
+      var reStatic = /^set protocols static route\s+([^\s]+)\s+next-hop\s+([^\s]+)/i;
+      var reStaticTable = /^set protocols static table\s+([^\s]+)\s+route\s+([^\s]+)\s+next-hop\s+([^\s]+)/i;
+      var reStaticPref = /^set protocols static route\s+([^\s]+)\s+next-hop\s+([^\s]+)\s+(?:distance|preference)\s+'?([^'\s]+)'?/i;
+      var reStaticTrack = /^set protocols static route\s+([^\s]+)\s+next-hop\s+([^\s]+)\s+track\s+'?([^'\s]+)'?/i;
+      var reStaticTablePref = /^set protocols static table\s+([^\s]+)\s+route\s+([^\s]+)\s+next-hop\s+([^\s]+)\s+(?:distance|preference)\s+'?([^'\s]+)'?/i;
+      var reStaticTableTrack = /^set protocols static table\s+([^\s]+)\s+route\s+([^\s]+)\s+next-hop\s+([^\s]+)\s+track\s+'?([^'\s]+)'?/i;
+      var reBgpNeighbor = /^set protocols bgp \d+ neighbor\s+([^\s]+)\s+peer-group\s+'?([^'\s]+)'?/i;
+      var reBgpUpdate = /^set protocols bgp \d+ peer-group\s+([^\s]+)\s+update-source\s+'?([^'\s]+)'?/i;
+      var reBgpNeighborRouteMap = /^set protocols bgp \d+ neighbor\s+([^\s]+)\s+route-map\s+(?:import|in)\s+'?([^'\s]+)'?/i;
+      var reBgpNeighborAFRouteMap = /^set protocols bgp \d+ neighbor\s+([^\s]+)\s+address-family\s+ipv4-unicast\s+route-map\s+(?:import|in)\s+'?([^'\s]+)'?/i;
+      var reBgpPeerGroupAFRouteMap = /^set protocols bgp \d+ peer-group\s+([^\s]+)\s+address-family\s+ipv4-unicast\s+route-map\s+(?:import|in)\s+'?([^'\s]+)'?/i;
+      var reBgpPeerGroupRemoteAS = /^set protocols bgp \d+ peer-group\s+([^\s]+)\s+remote-as\s+'?([^'\s]+)'?/i;
+      var reBgpPeerGroupAFPrefixExport = /^set protocols bgp \d+ peer-group\s+([^\s]+)\s+address-family\s+ipv4-unicast\s+prefix-list\s+export\s+'?([^'\s]+)'?/i;
+      var reBgpNbrRemoteAS = /^set protocols bgp \d+ neighbor\s+([^\s]+)\s+remote-as\s+'?([^'\s]+)'?/i;
+      var reBgpNbrUpdateSource = /^set protocols bgp \d+ neighbor\s+([^\s]+)\s+update-source\s+'?([^'\s]+)'?/i;
+      var reBgpNbrAFPrefixExport = /^set protocols bgp \d+ neighbor\s+([^\s]+)\s+address-family\s+ipv4-unicast\s+prefix-list\s+export\s+'?([^'\s]+)'?/i;
+      var reBgpNbrAFDefaultOriginate = /^set protocols bgp \d+ neighbor\s+([^\s]+)\s+address-family\s+ipv4-unicast\s+default-originate/i;
+      var reBgpNbrAFNetwork = /^set protocols bgp \d+ neighbor\s+([^\s]+)\s+address-family\s+ipv4-unicast\s+network\s+([^\s]+)/i;
+      var reBgpAFNetwork = /^set protocols bgp \d+ address-family\s+ipv4-unicast\s+network\s+([^\s]+)/i;
+      var reRmMatchCommunity = /^set policy route-map\s+([^\s]+)\s+rule\s+([^\s]+)\s+match\s+community\s+(.+)$/i;
+      var reRmSetNextHop = /^set policy route-map\s+([^\s]+)\s+rule\s+([^\s]+)\s+set\s+(?:ip-)?next-hop\s+'?([^'\s]+)'?/i;
+      var rePlPrefix = /^set policy prefix-list\s+([^\s]+)\s+rule\s+([^\s]+)\s+prefix\s+'?([^'\s]+)'?/i;
+      var rePlAction = /^set policy prefix-list\s+([^\s]+)\s+rule\s+([^\s]+)\s+action\s+'?([^'\s]+)'?/i;
+      var reNatDesc = /^set nat source rule\s+(\d+)\s+description\s+'?([^']+)'?/i;
+      var reNatOut = /^set nat source rule\s+(\d+)\s+outbound-interface\s+'?([^'\s]+)'?/i;
+      var reNatTrans = /^set nat source rule\s+(\d+)\s+translation address\s+'?([^'\s]+)'?/i;
+      var reNatSource = /^set nat source rule\s+(\d+)\s+source address\s+'?([^'\s]+)'?/i;
+      var reDnatRule = /^set nat destination rule\s+(\d+)\s+/i;
+      var reDnatDst = /^set nat destination rule\s+(\d+)\s+destination address\s+'?([^'\s]+)'?/i;
+      var reHostname = /^set system host-name\s+'?([^'\s]+)'?/i;
+
+      var cleanVal = ERConfigParser.cleanValue;
+      var mask2Prefix = ERConfigParser.maskToPrefix;
+
+      // -- Helper to get or create BGP binding --
+      function getBgp(nbr) {
+        var nk = cleanVal(nbr);
+        if (!bgpByNeighbor[nk]) bgpByNeighbor[nk] = new BgpBinding(nk, '');
+        return bgpByNeighbor[nk];
+      }
+
+      // -- Parse config lines --
+      var rawLines = configText.split(/\r?\n/);
+      var lineConsumed = {};
+
+      for (var li = 0; li < rawLines.length; li++) {
+        var line = rawLines[li].trim();
+        if (!line || line.charAt(0) === '#') continue;
+
+        var m;
+
+        m = line.match(reHostname);
+        if (m) { hostname = cleanVal(m[1]); lineConsumed[li] = 'system.host-name'; continue; }
+
+        m = line.match(reTunnelDesc);
+        if (m) {
+          var kind = m[1].toLowerCase(), tname = m[2], desc = m[3];
+          if (!tunnels[tname]) tunnels[tname] = new TunnelNode(tname, kind);
+          tunnels[tname].description = cleanVal(desc);
+          lineConsumed[li] = 'interfaces.tunnel_desc'; continue;
+        }
+        m = line.match(reTunnelSource);
+        if (m) {
+          kind = m[1].toLowerCase(); tname = m[2]; var src = cleanVal(m[3]);
+          if (!tunnels[tname]) tunnels[tname] = new TunnelNode(tname, kind);
+          tunnels[tname].source = src;
+          lineConsumed[li] = 'interfaces.tunnel_source'; continue;
+        }
+        m = line.match(reTunnelRemote);
+        if (m) {
+          kind = m[1].toLowerCase(); tname = m[2]; var remote = cleanVal(m[3]);
+          if (!tunnels[tname]) tunnels[tname] = new TunnelNode(tname, kind);
+          tunnels[tname].remote = remote;
+          if (kind === 'openvpn') openvpnRemoteIPs[tname] = remote;
+          lineConsumed[li] = 'interfaces.tunnel_remote'; continue;
+        }
+        m = line.match(reTunnelAddr);
+        if (m) {
+          kind = m[1].toLowerCase(); tname = m[2]; var addr = cleanVal(m[3]);
+          if (!tunnels[tname]) tunnels[tname] = new TunnelNode(tname, kind);
+          tunnels[tname].address = addr;
+          lineConsumed[li] = 'interfaces.tunnel_addr'; continue;
+        }
+        m = line.match(reOpenvpnLocal);
+        if (m) {
+          tname = m[1]; var ip = m[2], mask = m[3];
+          if (!tunnels[tname]) tunnels[tname] = new TunnelNode(tname, 'openvpn');
+          var prefix = mask2Prefix(cleanVal(mask));
+          tunnels[tname].address = cleanVal(ip) + (prefix ? '/' + prefix : '');
+          openvpnLocalIPs[tname] = cleanVal(ip);
+          lineConsumed[li] = 'interfaces.openvpn_local'; continue;
+        }
+        m = line.match(reOpenvpnRemoteAddr);
+        if (m) {
+          tname = m[1]; remote = cleanVal(m[2]);
+          openvpnRemoteIPs[tname] = remote;
+          if (!tunnels[tname]) tunnels[tname] = new TunnelNode(tname, 'openvpn');
+          tunnels[tname].remote = remote;
+          lineConsumed[li] = 'interfaces.openvpn_remote'; continue;
+        }
+        m = line.match(reVtiDesc);
+        if (m) {
+          tname = m[1]; desc = m[2];
+          if (!tunnels[tname]) tunnels[tname] = new TunnelNode(tname, 'vti');
+          tunnels[tname].description = cleanVal(desc);
+          lineConsumed[li] = 'interfaces.vti_desc'; continue;
+        }
+        m = line.match(reVtiAddr);
+        if (m) {
+          tname = m[1]; addr = cleanVal(m[2]);
+          if (!tunnels[tname]) tunnels[tname] = new TunnelNode(tname, 'vti');
+          tunnels[tname].address = addr;
+          lineConsumed[li] = 'interfaces.vti_addr'; continue;
+        }
+        m = line.match(reIpsecLocalPrefix);
+        if (m) {
+          var peer = cleanVal(m[1]), tid = cleanVal(m[2]), lpfx = cleanVal(m[3]);
+          var key = peer + '|' + tid;
+          if (!ipsecTunnelsByKey[key]) ipsecTunnelsByKey[key] = {};
+          ipsecTunnelsByKey[key].local_prefix = lpfx;
+          lineConsumed[li] = 'vpn.ipsec_local'; continue;
+        }
+        m = line.match(reIpsecRemotePrefix);
+        if (m) {
+          peer = cleanVal(m[1]); tid = cleanVal(m[2]); var rpfx = cleanVal(m[3]);
+          key = peer + '|' + tid;
+          if (!ipsecTunnelsByKey[key]) ipsecTunnelsByKey[key] = {};
+          ipsecTunnelsByKey[key].remote_prefix = rpfx;
+          lineConsumed[li] = 'vpn.ipsec_remote'; continue;
+        }
+        m = line.match(reIfaceAddr);
+        if (m) {
+          var ifname = cleanVal(m[2]); addr = cleanVal(m[3]);
+          if (!ifaceAddrBook[ifname]) ifaceAddrBook[ifname] = [];
+          ifaceAddrBook[ifname].push(addr);
+          lineConsumed[li] = 'interfaces.address'; continue;
+        }
+        m = line.match(reIfaceDesc);
+        if (m) {
+          ifname = cleanVal(m[2]); desc = cleanVal(m[3]);
+          ifaceDescBook[ifname] = desc;
+          lineConsumed[li] = 'interfaces.description'; continue;
+        }
+        m = line.match(reStaticTrack);
+        if (m) {
+          var dst = cleanVal(m[1]), nh = cleanVal(m[2]), tr = cleanVal(m[3]);
+          var r = new RouteEdge(dst, nh);
+          r.origin = 'static'; r.track_name = tr; r.evidence = line;
+          routes.push(r);
+          staticRouteIndex[r.route_table + '|' + r.destination + '|' + r.next_hop] = r;
+          lineConsumed[li] = 'static.route_track'; continue;
+        }
+        m = line.match(reStatic);
+        if (m) {
+          dst = cleanVal(m[1]); nh = cleanVal(m[2]);
+          r = new RouteEdge(dst, nh);
+          r.origin = 'static'; r.evidence = line;
+          routes.push(r);
+          staticRouteIndex[r.route_table + '|' + r.destination + '|' + r.next_hop] = r;
+          lineConsumed[li] = 'static.route'; continue;
+        }
+        m = line.match(reStaticTableTrack);
+        if (m) {
+          var table = cleanVal(m[1]); dst = cleanVal(m[2]); nh = cleanVal(m[3]); tr = cleanVal(m[4]);
+          r = new RouteEdge(dst, nh);
+          r.route_table = table; r.origin = 'static'; r.track_name = tr; r.evidence = line;
+          routes.push(r);
+          staticRouteIndex[r.route_table + '|' + r.destination + '|' + r.next_hop] = r;
+          lineConsumed[li] = 'static.table_route_track'; continue;
+        }
+        m = line.match(reStaticTable);
+        if (m) {
+          table = cleanVal(m[1]); dst = cleanVal(m[2]); nh = cleanVal(m[3]);
+          r = new RouteEdge(dst, nh);
+          r.route_table = table; r.origin = 'static'; r.evidence = line;
+          routes.push(r);
+          staticRouteIndex[r.route_table + '|' + r.destination + '|' + r.next_hop] = r;
+          lineConsumed[li] = 'static.table_route'; continue;
+        }
+        m = line.match(reStaticPref);
+        if (m) {
+          dst = cleanVal(m[1]); nh = cleanVal(m[2]); var pref = cleanVal(m[3]);
+          var sk = 'main|' + dst + '|' + nh;
+          if (staticRouteIndex[sk]) staticRouteIndex[sk].preference = pref;
+          lineConsumed[li] = 'static.route_pref'; continue;
+        }
+        m = line.match(reStaticTablePref);
+        if (m) {
+          table = cleanVal(m[1]); dst = cleanVal(m[2]); nh = cleanVal(m[3]); pref = cleanVal(m[4]);
+          sk = table + '|' + dst + '|' + nh;
+          if (staticRouteIndex[sk]) staticRouteIndex[sk].preference = pref;
+          lineConsumed[li] = 'static.table_route_pref'; continue;
+        }
+        m = line.match(rePlPrefix);
+        if (m) {
+          var pln = cleanVal(m[1]), rid = cleanVal(m[2]), pfx = cleanVal(m[3]);
+          if (!prefixListRules[pln]) prefixListRules[pln] = {};
+          if (!prefixListRules[pln][rid]) prefixListRules[pln][rid] = {};
+          prefixListRules[pln][rid].prefix = pfx;
+          lineConsumed[li] = 'policy.prefix-list'; continue;
+        }
+        m = line.match(rePlAction);
+        if (m) {
+          pln = cleanVal(m[1]); rid = cleanVal(m[2]); var act = cleanVal(m[3]);
+          if (!prefixListRules[pln]) prefixListRules[pln] = {};
+          if (!prefixListRules[pln][rid]) prefixListRules[pln][rid] = {};
+          prefixListRules[pln][rid].action = act;
+          lineConsumed[li] = 'policy.prefix-list'; continue;
+        }
+        m = line.match(reBgpNeighbor);
+        if (m) {
+          var nbr = m[1], pg = m[2];
+          getBgp(nbr).peer_group = cleanVal(pg);
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpUpdate);
+        if (m) {
+          pg = cleanVal(m[1]); src = cleanVal(m[2]);
+          peerGroupUpdateSource[pg] = src;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpNbrRemoteAS);
+        if (m) {
+          nbr = m[1]; var ra = cleanVal(m[2]);
+          getBgp(nbr).remote_as = ra;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpNbrUpdateSource);
+        if (m) {
+          nbr = m[1]; src = cleanVal(m[2]);
+          getBgp(nbr).update_source = src;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpNbrAFPrefixExport);
+        if (m) {
+          nbr = m[1]; pln = cleanVal(m[2]);
+          getBgp(nbr).export_prefix_list = pln;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpNeighborRouteMap);
+        if (m) {
+          nbr = cleanVal(m[1]); var rm = cleanVal(m[2]);
+          bgpNeighborInRouteMap[nbr] = rm;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpNeighborAFRouteMap);
+        if (m) {
+          nbr = cleanVal(m[1]); rm = cleanVal(m[2]);
+          bgpNeighborInRouteMap[nbr] = rm;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpPeerGroupAFRouteMap);
+        if (m) {
+          pg = cleanVal(m[1]); rm = cleanVal(m[2]);
+          bgpPeerGroupInRouteMap[pg] = rm;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpPeerGroupRemoteAS);
+        if (m) {
+          pg = cleanVal(m[1]); ra = cleanVal(m[2]);
+          peerGroupRemoteAS[pg] = ra;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpPeerGroupAFPrefixExport);
+        if (m) {
+          pg = cleanVal(m[1]); pln = cleanVal(m[2]);
+          peerGroupExportPrefix[pg] = pln;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reRmMatchCommunity);
+        if (m) {
+          rm = cleanVal(m[1]); rid = cleanVal(m[2]); var ctx = m[3];
+          var key2 = rm + '|' + rid;
+          if (/\b80\b/.test(ctx)) {
+            routeMapRuleMatch80[key2] = true;
+          } else {
+            var mref = ctx.match(/community-list\s+'?([^'\s]+)'?/i);
+            if (mref) {
+              routeMapRuleCommRef[key2] = cleanVal(mref[1]);
+            } else {
+              var partsCtx = ctx.split(/[\s,]+/).filter(function(x) { return x; });
+              if (partsCtx.length) routeMapRuleCommRef[key2] = partsCtx[partsCtx.length - 1];
+            }
+          }
+          lineConsumed[li] = 'policy.route-map'; continue;
+        }
+        m = line.match(reRmSetNextHop);
+        if (m) {
+          rm = cleanVal(m[1]); rid = cleanVal(m[2]); var nhop = cleanVal(m[3]);
+          routeMapRuleNextHop[rm + '|' + rid] = nhop;
+          lineConsumed[li] = 'policy.route-map'; continue;
+        }
+        m = line.match(reBgpNbrAFDefaultOriginate);
+        if (m) {
+          nbr = cleanVal(m[1]);
+          routes.push(new RouteEdge('0.0.0.0/0', nbr));
+          routes[routes.length - 1].origin = 'bgp-config';
+          routes[routes.length - 1].evidence = line;
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpNbrAFNetwork);
+        if (m) {
+          nbr = cleanVal(m[1]); var net = cleanVal(m[2]);
+          r = new RouteEdge(net, nbr);
+          r.origin = 'bgp-config'; r.evidence = line;
+          routes.push(r);
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reBgpAFNetwork);
+        if (m) {
+          net = cleanVal(m[1]);
+          r = new RouteEdge(net, '');
+          r.origin = 'bgp-config'; r.evidence = line;
+          routes.push(r);
+          lineConsumed[li] = 'protocols.bgp'; continue;
+        }
+        m = line.match(reNatDesc);
+        if (m) {
+          var drid = m[1]; var dval = cleanVal(m[2]);
+          natRuleDescription[drid] = dval;
+          lineConsumed[li] = 'nat.source'; continue;
+        }
+        m = line.match(reNatOut);
+        if (m) {
+          var nrid = m[1]; var outbound = cleanVal(m[2]);
+          natRuleOutbound[nrid] = outbound;
+          natOutbounds.push(outbound);
+          lineConsumed[li] = 'nat.source'; continue;
+        }
+        m = line.match(reNatTrans);
+        if (m) {
+          nrid = m[1]; var transIp = cleanVal(m[2]).split('/')[0];
+          natRuleTranslation[nrid] = transIp;
+          lineConsumed[li] = 'nat.source'; continue;
+        }
+        m = line.match(reNatSource);
+        if (m) {
+          nrid = m[1]; src = cleanVal(m[2]);
+          if (!natRuleSources[nrid]) natRuleSources[nrid] = [];
+          natRuleSources[nrid].push(src);
+          lineConsumed[li] = 'nat.source'; continue;
+        }
+        m = line.match(reDnatDst);
+        if (m) {
+          nrid = m[1]; pfx = cleanVal(m[2]);
+          if (!dnatRulePrefixes[nrid]) dnatRulePrefixes[nrid] = [];
+          dnatRulePrefixes[nrid].push(pfx);
+          lineConsumed[li] = 'nat.destination'; continue;
+        }
+        m = line.match(reDnatRule);
+        if (m) {
+          dnatRuleCount++;
+          lineConsumed[li] = 'nat.destination'; continue;
+        }
+
+        if (/^set /i.test(line)) lineConsumed[li] = 'unparsed_set';
+      }
+
+      // -- Post-parse: build bgp_bindings list --
+      var bgpBindings = [];
+      for (var bkey in bgpByNeighbor) {
+        if (Object.prototype.hasOwnProperty.call(bgpByNeighbor, bkey)) {
+          bgpBindings.push(bgpByNeighbor[bkey]);
+        }
+      }
+      bgpBindings.sort(function(a, b) { return a.neighbor.localeCompare(b.neighbor); });
+
+      // -- Build dev_ip_to_iface --
+      var devIPToIface = {};
+      for (var iname in ifaceAddrBook) {
+        if (!Object.prototype.hasOwnProperty.call(ifaceAddrBook, iname)) continue;
+        var addrs = ifaceAddrBook[iname];
+        for (var ai = 0; ai < addrs.length; ai++) {
+          var hip = hostIPFromPfxOrAddr(addrs[ai]);
+          if (hip) devIPToIface[hip] = iname;
+        }
+      }
+
+      // -- Collect prefix-list permits --
+      function collectPrefixListPermits(pln) {
+        var rules = prefixListRules[pln] || {};
+        var out = [];
+        var rids = Object.keys(rules).sort(function(a, b) {
+          var na = parseInt(a, 10), nb = parseInt(b, 10);
+          if (!isNaN(na) && !isNaN(nb)) return na - nb;
+          return a.localeCompare(b);
+        });
+        for (var ri = 0; ri < rids.length; ri++) {
+          var meta = rules[rids[ri]];
+          if ((meta.action || '').toLowerCase() !== 'permit') continue;
+          var pf = (meta.prefix || '').trim();
+          if (pf) out.push(pf);
+        }
+        return out;
+      }
+
+      // -- Fill BGP bindings from peer-group --
+      for (var bi = 0; bi < bgpBindings.length; bi++) {
+        var b = bgpBindings[bi];
+        if (!b.update_source && b.peer_group) b.update_source = peerGroupUpdateSource[b.peer_group] || '';
+        if (!b.remote_as && b.peer_group) {
+          var raPg = peerGroupRemoteAS[b.peer_group] || '';
+          if (raPg) b.remote_as = raPg;
+        }
+        if (!b.export_prefix_list && b.peer_group) {
+          var plPg = peerGroupExportPrefix[b.peer_group] || '';
+          if (plPg) b.export_prefix_list = plPg;
+        }
+        var en = (b.export_prefix_list || '').trim();
+        if (en) b.advertised_prefixes = collectPrefixListPermits(en);
+      }
+
+      // -- BGP anchor iface set --
+      var bgpAnchorIfaceSet = {};
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        var us0 = (bgpBindings[bi].update_source || '').trim();
+        if (us0 && devIPToIface[us0]) bgpAnchorIfaceSet[devIPToIface[us0]] = true;
+      }
+
+      // -- Second pass: community-list 80 resolution --
+      var fullText = rawLines.map(function(s) { return s.trim(); }).join('\n');
+      var commRefKeys = Object.keys(routeMapRuleCommRef);
+      for (var cr = 0; cr < commRefKeys.length; cr++) {
+        var crKey = commRefKeys[cr];
+        if (routeMapRuleMatch80[crKey]) continue;
+        var cref = routeMapRuleCommRef[crKey];
+        var re80Check = new RegExp('community-list\\s+\'?' + cref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\'?.*?\\b80\\b', 'i');
+        if (re80Check.test(fullText)) routeMapRuleMatch80[crKey] = true;
+      }
+
+      // -- IPsec local hosts --
+      var ipsecLocalHosts = {};
+      var ipsKeys = Object.keys(ipsecTunnelsByKey);
+      for (var ik = 0; ik < ipsKeys.length; ik++) {
+        var meta = ipsecTunnelsByKey[ipsKeys[ik]];
+        var lp = (meta.local_prefix || '').trim();
+        var hip2 = hostIPFromPfxOrAddr(lp);
+        if (hip2) ipsecLocalHosts[hip2] = true;
+      }
+
+      // -- Create tunnel nodes for IPsec-policy interfaces --
+      var IPSEC_TS_DESC_MARK = 'IPsec site-to-site local TS';
+      var inameKeys = Object.keys(ifaceAddrBook);
+      for (var ini = 0; ini < inameKeys.length; ini++) {
+        iname = inameKeys[ini];
+        addrs = ifaceAddrBook[iname];
+        var hasMatch = false;
+        for (ai = 0; ai < addrs.length; ai++) {
+          var hip3 = hostIPFromPfxOrAddr(addrs[ai]);
+          if (!hip3 || !ipsecLocalHosts[hip3]) continue;
+          hasMatch = true;
+          var extras = [];
+          var ikeys = Object.keys(ipsecTunnelsByKey).sort();
+          for (var iki = 0; iki < ikeys.length; iki++) {
+            var m2 = ipsecTunnelsByKey[ikeys[iki]];
+            var lp0 = (m2.local_prefix || '').trim();
+            if (!lp0 || hostIPFromPfxOrAddr(lp0) !== hip3) continue;
+            var rp = (m2.remote_prefix || '').trim();
+            var parts = ikeys[iki].split('|');
+            extras.push(parts[0] + ' tun' + parts[1] + ' L=' + lp0 + (rp ? ' R=' + rp : ''));
+            if (extras.length >= 8) break;
+          }
+          if (extras.length > 8) extras.push('...');
+          var descExtra = IPSEC_TS_DESC_MARK + ' ' + extras.join('; ');
+          var kindG = 'dummy';
+          if (iname.toLowerCase().indexOf('dum') !== -1) kindG = 'dummy';
+          else if (/^lo/i.test(iname)) kindG = 'loopback';
+          else kindG = 'ethernet';
+          var node = tunnels[iname];
+          if (!node) { node = new TunnelNode(iname, kindG); tunnels[iname] = node; }
+          if (!(node.address || '').trim()) node.address = hip3 + '/32';
+          var desc0 = (node.description || '').trim();
+          node.description = desc0 ? (desc0 + ' | ' + descExtra).substring(0, 500) : descExtra.substring(0, 500);
+        }
+        if (hasMatch) continue;
+      }
+
+      // -- Create tunnel nodes for BGP anchor interfaces --
+      var bgpAIKeys = Object.keys(bgpAnchorIfaceSet).sort();
+      for (var aik = 0; aik < bgpAIKeys.length; aik++) {
+        var ifn = bgpAIKeys[aik];
+        if (tunnels[ifn]) continue;
+        var aAddrs = ifaceAddrBook[ifn] || [];
+        if (!aAddrs.length) continue;
+        var matchAddr = cleanVal(aAddrs[0]);
+        for (bi = 0; bi < bgpBindings.length; bi++) {
+          var usBind = (bgpBindings[bi].update_source || '').trim();
+          if (usBind && devIPToIface[usBind] === ifn) {
+            for (ai = 0; ai < aAddrs.length; ai++) {
+              if (hostIPFromPfxOrAddr(cleanVal(aAddrs[ai])) === usBind) {
+                matchAddr = cleanVal(aAddrs[ai]); break;
+              }
+            }
+          }
+        }
+        kindG = 'loopback';
+        if (ifn.toLowerCase().indexOf('dum') !== -1) kindG = 'dummy';
+        else if (/^lo/i.test(ifn)) kindG = 'loopback';
+        else if (/^br/i.test(ifn)) kindG = 'bridge';
+        else kindG = 'ethernet';
+        tunnels[ifn] = new TunnelNode(ifn, kindG);
+        tunnels[ifn].address = matchAddr;
+        tunnels[ifn].description = ((ifaceDescBook[ifn] || '') + ' (BGP update-source)').trim();
+      }
+
+      // -- Transport underlay IPs --
+      var transportUnderlayIPs = {};
+      var tnKeys = Object.keys(tunnels);
+      for (var tk = 0; tk < tnKeys.length; tk++) {
+        var tn = tunnels[tnKeys[tk]];
+        if (tn.kind === 'openvpn' && tn.source) transportUnderlayIPs[tn.source] = true;
+      }
+      var ovlKeys = Object.keys(openvpnLocalIPs);
+      for (var olk = 0; olk < ovlKeys.length; olk++) { transportUnderlayIPs[openvpnLocalIPs[ovlKeys[olk]]] = true; }
+      var ilhKeys = Object.keys(ipsecLocalHosts);
+      for (var ilhk = 0; ilhk < ilhKeys.length; ilhk++) { transportUnderlayIPs[ilhKeys[ilhk]] = true; }
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        tn = tunnels[tnKeys[tk]];
+        if (tn.kind !== 'vti') continue;
+        var lip = localIPFromCIDR(tn.address);
+        if (lip) transportUnderlayIPs[lip] = true;
+      }
+
+      // === Role Inference (Task 5) ===
+      var ACCESS_TRANSPORT_ROLES = ['openvpn', 'ipsec-vti', 'ipsec-policy'];
+
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var node = tunnels[tnKeys[tk]];
+        var nameL = node.name.toLowerCase();
+        var descL = (node.description || '').toLowerCase();
+
+        if (node.kind === 'openvpn' || nameL.indexOf('vtun') === 0) {
+          node.inferred_role = 'openvpn';
+          node.side = inferSide(node.name, node.description, node.remote);
+          node.canvas_side = canvasSideEvidence(node.description, ifaceDescBook[node.name] || '', node.remote);
+          continue;
+        }
+        if (node.kind === 'vti') {
+          node.inferred_role = 'ipsec-vti';
+          node.side = inferSide(node.name, node.description, node.remote || node.address);
+          node.canvas_side = canvasSideEvidence(node.description, ifaceDescBook[node.name] || '', node.remote || node.address);
+          continue;
+        }
+        if ((node.kind === 'dummy' || node.kind === 'ethernet' || node.kind === 'loopback') &&
+            (node.description || '').indexOf(IPSEC_TS_DESC_MARK) !== -1) {
+          node.inferred_role = 'ipsec-policy';
+          node.side = inferSide(node.name, node.description, '');
+          node.canvas_side = canvasSideEvidence(node.description, ifaceDescBook[node.name] || '', '');
+          continue;
+        }
+        if (bgpAnchorIfaceSet[node.name] && (node.kind === 'loopback' || node.kind === 'ethernet' || node.kind === 'dummy' || node.kind === 'bridge')) {
+          node.inferred_role = 'local-iface';
+          node.side = inferSide(node.name, ifaceDescBook[node.name] || '', '');
+          node.canvas_side = canvasSideEvidence(ifaceDescBook[node.name] || '', '', '');
+          continue;
+        }
+        if (node.kind === 'tunnel') {
+          node.inferred_role = 'gre-unknown';
+          node.evidence = [];
+          node.side = inferSide(node.name, node.description, node.remote);
+          node.canvas_side = canvasSideEvidence(node.description, ifaceDescBook[node.name] || '', node.remote);
+        }
+      }
+
+      // -- Build tunnel_peer_ip_index --
+      var tunnelPeerIPIndex = {};
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var tn2 = tunnels[tnKeys[tk]];
+        var peer = peerIPFromCIDR(tn2.address);
+        if (peer) tunnelPeerIPIndex[peer] = tn2.name;
+        if (tn2.remote) tunnelPeerIPIndex[tn2.remote] = tn2.name;
+      }
+
+      // -- Route preference helper --
+      function routePref(r) {
+        return (r.preference && /^\d+$/.test(r.preference)) ? parseInt(r.preference, 10) : 100;
+      }
+
+      function routeContainsIP(r, ip) {
+        try {
+          return ipInCIDR(ip, r.destination);
+        } catch(e) { return false; }
+      }
+
+      // -- Next-hop resolution --
+      function resolveNextHopChain(ip, tableHint, depth, seen) {
+        depth = depth || 0; seen = seen || {};
+        if (depth >= 3) return { tunnel: '', chain: [ip], exceeded: true };
+        if (seen[ip]) return { tunnel: '', chain: [ip], exceeded: false };
+        seen[ip] = true;
+
+        if (tunnelPeerIPIndex[ip]) return { tunnel: tunnelPeerIPIndex[ip], chain: [ip], exceeded: false };
+
+        var cands = [];
+        for (var ri = 0; ri < routes.length; ri++) {
+          var rr = routes[ri];
+          if (rr.origin === 'bgp-config' || rr.destination === '0.0.0.0/0') continue;
+          if (routeContainsIP(rr, ip)) cands.push(rr);
+        }
+        if (!cands.length) return { tunnel: '', chain: [ip], exceeded: false };
+
+        cands.sort(function(a, b) {
+          var sa = a.route_table === tableHint ? 0 : (a.route_table === 'main' ? 1 : 2);
+          var sb = b.route_table === tableHint ? 0 : (b.route_table === 'main' ? 1 : 2);
+          if (sa !== sb) return sa - sb;
+          var pa = routePref(a), pb = routePref(b);
+          if (pa !== pb) return pa - pb;
+          return prefixLenFromCIDR(b.destination) - prefixLenFromCIDR(a.destination);
+        });
+
+        for (var ci = 0; ci < cands.length; ci++) {
+          var c = cands[ci];
+          if (tunnelPeerIPIndex[c.next_hop]) {
+            return { tunnel: tunnelPeerIPIndex[c.next_hop], chain: [ip, c.next_hop], exceeded: false };
+          }
+          var result = resolveNextHopChain(c.next_hop, c.route_table, depth + 1, JSON.parse(JSON.stringify(seen)));
+          if (result.tunnel) {
+            return { tunnel: result.tunnel, chain: [ip].concat(result.chain), exceeded: false };
+          }
+          if (result.exceeded) {
+            return { tunnel: '', chain: [ip].concat(result.chain), exceeded: true };
+          }
+        }
+        return { tunnel: '', chain: [ip], exceeded: false };
+      }
+
+      // -- Recursive via_tunnel resolution for routes --
+      var routeDepthExceeded = [];
+      for (ri = 0; ri < routes.length; ri++) {
+        var r0 = routes[ri];
+        if (r0.origin === 'bgp-config') continue;
+        if (tunnelPeerIPIndex[r0.next_hop]) {
+          r0.via_tunnel = tunnelPeerIPIndex[r0.next_hop];
+        } else if (r0.next_hop) {
+          var res = resolveNextHopChain(r0.next_hop, r0.route_table);
+          if (res.tunnel) {
+            r0.via_tunnel = res.tunnel;
+            r0.evidence = (r0.evidence || '') + ' | recursive:' + res.chain.join('->');
+          } else if (res.exceeded) {
+            routeDepthExceeded.push('table=' + r0.route_table + ' ' + r0.destination + ' via ' + res.chain.join('->'));
+          }
+        }
+      }
+
+      // -- Build access IP index --
+      function buildAccessIPToTunnelName(tuns, ovLocalIPs) {
+        var idx = {};
+        var tkeys = Object.keys(tuns);
+        for (var ti = 0; ti < tkeys.length; ti++) {
+          var n = tuns[tkeys[ti]];
+          if (n.kind === 'openvpn') {
+            var lip2 = (ovLocalIPs[n.name] || '').trim() || localIPFromCIDR(n.address);
+            if (lip2) idx[lip2] = n.name;
+          } else if (n.kind === 'vti') {
+            lip2 = localIPFromCIDR(n.address);
+            if (lip2) idx[lip2] = n.name;
+          } else if ((n.kind === 'dummy' || n.kind === 'ethernet' || n.kind === 'loopback') &&
+                     (n.description || '').indexOf(IPSEC_TS_DESC_MARK) !== -1) {
+            lip2 = localIPFromCIDR(n.address);
+            if (lip2) idx[lip2] = n.name;
+          }
+        }
+        return idx;
+      }
+
+      var accessIPIndex = buildAccessIPToTunnelName(tunnels, openvpnLocalIPs);
+      var ovpnRemoteSet = {};
+      var ovrKeys = Object.keys(openvpnRemoteIPs);
+      for (var ork = 0; ork < ovrKeys.length; ork++) { ovpnRemoteSet[openvpnRemoteIPs[ovrKeys[ork]]] = true; }
+
+      // -- Route-driven GRE-UPE inference --
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var node2 = tunnels[tnKeys[tk]];
+        if (node2.inferred_role !== 'gre-unknown' || !node2.remote) continue;
+        var src0 = (node2.source || '').trim();
+        var srcIsAccessLocal = !!(src0 && (accessIPIndex[src0] || transportUnderlayIPs[src0]));
+        // Only skip when there IS a source-address that is NOT access-local
+        // (could be overseas NATPE with public source). Allow route evidence
+        // when no source-address is configured at all.
+        if (!srcIsAccessLocal && src0) continue;
+        for (ri = 0; ri < routes.length; ri++) {
+          var rr2 = routes[ri];
+          if (rr2.destination.split('/')[0] === node2.remote && ovpnRemoteSet[rr2.next_hop]) {
+            node2.inferred_role = 'gre-upe';
+            node2.evidence.push('route(remote/32)->next-hop 命中 openvpn remote-address');
+            break;
+          }
+        }
+      }
+
+      // -- Source-address underlay binding -> gre-upe --
+      // 必须在 NAT outbound 判定之前：UPE 隧道可能同时被 NAT rule 作 outbound（如回程 SNAT），
+      // 若 NAT outbound 先把它误判为 gre-overseas，会让上下游链路全部错乱。
+      function tunnelSourceStrongUnderlay(source, aipIdx, tuIps) {
+        var s = (source || '').trim();
+        if (!s) return { ok: false, ev: '' };
+        var sip = s.split('/')[0].trim();
+        if (aipIdx[sip]) return { ok: true, ev: 'source-address=' + sip + ' 绑定接入层 ' + aipIdx[sip] + '（接口地址表）' };
+        if (tuIps[sip]) return { ok: true, ev: 'source-address=' + sip + ' 命中接入层 underlay IP 集合' };
+        return { ok: false, ev: '' };
+      }
+
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        node2 = tunnels[tnKeys[tk]];
+        if (node2.kind !== 'tunnel' || node2.inferred_role !== 'gre-unknown') continue;
+        var srcRes = tunnelSourceStrongUnderlay(node2.source, accessIPIndex, transportUnderlayIPs);
+        if (srcRes.ok) {
+          node2.inferred_role = 'gre-upe';
+          node2.evidence.push(srcRes.ev);
+        }
+      }
+
+      // -- NAT outbound -> gre-overseas --
+      var natIfaceSet = {};
+      for (var noi = 0; noi < natOutbounds.length; noi++) { natIfaceSet[natOutbounds[noi]] = true; }
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        node2 = tunnels[tnKeys[tk]];
+        if (node2.kind !== 'tunnel' || node2.inferred_role !== 'gre-unknown') continue;
+        if (natIfaceSet[node2.name]) {
+          node2.inferred_role = 'gre-overseas';
+          node2.evidence.push('NAT source rule outbound-interface 引用本隧道名');
+        }
+      }
+
+      // -- UPE peer route -> overseas --
+      var upePeersSet = {};
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var tn3 = tunnels[tnKeys[tk]];
+        if (tn3.inferred_role === 'gre-upe' && tn3.address) {
+          var peerIP = peerIPFromCIDR(tn3.address);
+          if (peerIP) upePeersSet[peerIP] = true;
+        }
+      }
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        node2 = tunnels[tnKeys[tk]];
+        if (node2.inferred_role !== 'gre-unknown' || !node2.remote) continue;
+        for (ri = 0; ri < routes.length; ri++) {
+          var rr3 = routes[ri];
+          if (rr3.destination.split('/')[0] === node2.remote && upePeersSet[rr3.next_hop]) {
+            node2.inferred_role = 'gre-overseas';
+            node2.evidence.push('route(remote/32)->next-hop 命中 UPE 对端IP');
+            break;
+          }
+        }
+      }
+
+      // -- Remark conflicts --
+      var remarkConflicts = [];
+      var greReadPartial = [];
+      function basisFromEvidence(evs) {
+        var s = (evs || []).join(' ');
+        if (s.indexOf('route(remote/32)') !== -1 || s.indexOf('命中 openvpn') !== -1) return 'route';
+        if (s.indexOf('NAT source') !== -1 || s.indexOf('outbound') !== -1) return 'nat_outbound';
+        if (s.indexOf('绑定接入层') !== -1 || s.indexOf('underlay IP') !== -1) return 'source_ip';
+        return 'merged';
+      }
+
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        node2 = tunnels[tnKeys[tk]];
+        if (node2.kind !== 'tunnel') continue;
+        var remarkRole = remarkGRERoleFromDesc(node2.description);
+        var descRef = 'interfaces tunnel ' + node2.name + " description '" + ((node2.description || '').substring(0, 160)) + "'";
+        if (node2.inferred_role === 'gre-unknown') {
+          var sl = (node2.source || '').toLowerCase();
+          if ((sl.indexOf('vtun') !== -1 || sl.indexOf('vti') !== -1) && (node2.source || '').trim()) {
+            greReadPartial.push(node2.name + ': source-address 含 vtun/vti 字样但未绑定到接入层接口 IP（当前值: ' + node2.source + '）');
+          }
+          if (remarkRole && acceptRemarkHeuristic) {
+            node2.inferred_role = remarkRole;
+            node2.evidence.push('interfaces description 备注启发（已勾选「接受备注启发」）');
+          }
+        }
+        if (remarkRole === 'gre-upe' || remarkRole === 'gre-overseas') {
+          if (remarkRole !== node2.inferred_role && (node2.inferred_role === 'gre-upe' || node2.inferred_role === 'gre-overseas')) {
+            remarkConflicts.push({
+              tunnel: node2.name, remark_hint: remarkRole,
+              resolved_role: node2.inferred_role,
+              strong_basis: basisFromEvidence(node2.evidence), reference: descRef
+            });
+          }
+        }
+      }
+
+      // === vtun_to_upe (FIX #1: IP equality) ===
+      function buildVtunToUpe(tuns) {
+        var pairs = [];
+        var tkeys = Object.keys(tuns);
+        var upeNodes = [];
+        var vtNodes = [];
+        for (var ti = 0; ti < tkeys.length; ti++) {
+          var t = tuns[tkeys[ti]];
+          if (t.inferred_role === 'gre-upe') upeNodes.push(t);
+          if (ACCESS_TRANSPORT_ROLES.indexOf(t.inferred_role) !== -1) vtNodes.push(t);
+        }
+        for (var ui = 0; ui < upeNodes.length; ui++) {
+          var upe = upeNodes[ui];
+          var upeSrcIP = (upe.source || '').split('/')[0];
+          for (var vi = 0; vi < vtNodes.length; vi++) {
+            var vt = vtNodes[vi];
+            var vtAddrIP = (vt.address || '').split('/')[0];
+            // Priority 1: exact IP match
+            if (vtAddrIP && vtAddrIP === upeSrcIP) { pairs.push([vt.name, upe.name]); break; }
+          }
+        }
+        return pairs;
+      }
+      var vtunToUpe = buildVtunToUpe(tunnels);
+
+      // -- UPE canvas_side from vtun (FIX #8) --
+      for (var vti = 0; vti < vtunToUpe.length; vti++) {
+        var vtName = vtunToUpe[vti][0], upeName = vtunToUpe[vti][1];
+        var vtN = tunnels[vtName], unN = tunnels[upeName];
+        if (!vtN || !unN || unN.inferred_role !== 'gre-upe') continue;
+        var vtCs = (vtN.canvas_side || '').trim();
+        if (vtCs !== 'main' && vtCs !== 'backup') continue;
+        var uCs = (unN.canvas_side || '').trim();
+        if (uCs !== 'main' && uCs !== 'backup') {
+          unN.canvas_side = vtCs;
+        } else if (uCs !== vtCs) {
+          unN.canvas_side = vtCs;  // FIX #8: conflict → prefer structural vtun evidence
+        }
+      }
+
+      // === overseas_parent (FIX #9: handle dum/lo prefixes) ===
+      var uplinkPublicIPs = {};
+      var loopDummyPublicIPs = {};
+      var iaKeys = Object.keys(ifaceAddrBook);
+      for (var iak = 0; iak < iaKeys.length; iak++) {
+        var iName = iaKeys[iak];
+        var iDescl = (ifaceDescBook[iName] || '').toLowerCase();
+        var addrs2 = ifaceAddrBook[iName];
+        for (ai = 0; ai < addrs2.length; ai++) {
+          var aip = String(addrs2[ai]).split('/')[0];
+          if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(aip)) continue;
+          if (ipIsPrivate(aip)) continue;
+          if (iDescl.indexOf('wan') !== -1 || iName.toLowerCase().indexOf('eth') === 0) {
+            uplinkPublicIPs[aip] = true;
+          }
+          if (iName.toLowerCase().indexOf('dum') === 0 || iName.toLowerCase().indexOf('lo') === 0) {
+            loopDummyPublicIPs[aip] = true;
+          }
+        }
+      }
+
+      var overseasParent = {};
+      var ovpnIPToName = {};
+      var upeIPToName = {};
+      var localIPToIfaceName2 = {};
+
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var tn4 = tunnels[tnKeys[tk]];
+        if (tn4.kind === 'openvpn' || tn4.kind === 'vti' || ACCESS_TRANSPORT_ROLES.indexOf(tn4.inferred_role) !== -1) {
+          var ip1 = localIPFromCIDR(tn4.address);
+          if (ip1) ovpnIPToName[ip1] = tn4.name;
+        }
+        if (tn4.inferred_role === 'gre-upe') {
+          ip1 = localIPFromCIDR(tn4.address);
+          if (ip1) upeIPToName[ip1] = tn4.name;
+        }
+      }
+      for (iak = 0; iak < iaKeys.length; iak++) {
+        iName = iaKeys[iak];
+        addrs2 = ifaceAddrBook[iName];
+        for (ai = 0; ai < addrs2.length; ai++) {
+          var ipLoc = localIPFromCIDR(String(addrs2[ai]));
+          if (ipLoc) localIPToIfaceName2[ipLoc] = iName;
+        }
+      }
+
+      // NAT translation evidence
+      var natTranslationToTunnel = {};
+      var nrtKeys = Object.keys(natRuleTranslation);
+      for (var nrti = 0; nrti < nrtKeys.length; nrti++) {
+        var nrid2 = nrtKeys[nrti];
+        var trIP = natRuleTranslation[nrid2];
+        var outIf = (natRuleOutbound[nrid2] || '').trim();
+        if (!outIf || !tunnels[outIf]) continue;
+        var outNode = tunnels[outIf];
+        if (ACCESS_TRANSPORT_ROLES.indexOf(outNode.inferred_role) === -1 &&
+            outNode.inferred_role !== 'gre-upe' && outNode.inferred_role !== 'gre-overseas') continue;
+        var ip0 = (trIP || '').trim();
+        if (!ip0) continue;
+        if (!natTranslationToTunnel[ip0]) natTranslationToTunnel[ip0] = [];
+        if (natTranslationToTunnel[ip0].indexOf(outIf) === -1) natTranslationToTunnel[ip0].push(outIf);
+      }
+
+      function nodeSideHintByRemark(nodeName) {
+        var n0 = tunnels[nodeName];
+        if (!n0) return 'unknown';
+        var exd = ifaceDescBook[nodeName] || '';
+        if (lineRemarkIsBackup(n0.description || '', exd, n0.name || '')) return 'backup';
+        if (lineRemarkIsMain(n0.description || '', exd, n0.name || '')) return 'main';
+        return 'unknown';
+      }
+
+      // -- Direct next-hop / best main route --
+      var connectedIfNets = [];
+      var physicalIfNets = [];
+      var localPublicIPs = {};
+
+      for (iak = 0; iak < iaKeys.length; iak++) {
+        iName = iaKeys[iak];
+        var isPhysical = iName.toLowerCase().indexOf('eth') === 0;
+        addrs2 = ifaceAddrBook[iName];
+        for (ai = 0; ai < addrs2.length; ai++) {
+          var aip2 = String(addrs2[ai]).split('/')[0].trim();
+          if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(aip2)) {
+            try {
+              if (!ipIsPrivate(aip2)) localPublicIPs[aip2] = true;
+            } catch(e) {}
+          }
+          try {
+            var nw2 = networkFromCIDR(String(addrs2[ai]).trim());
+            connectedIfNets.push(nw2);
+            if (isPhysical) physicalIfNets.push(nw2);
+          } catch(e) {}
+        }
+      }
+
+      function isDirectNextHop(ip) {
+        var ipN = ipToNum(ip);
+        if (isNaN(ipN)) return false;
+        for (var ni = 0; ni < connectedIfNets.length; ni++) {
+          var nw = connectedIfNets[ni];
+          var mask = nw.prefix === 0 ? 0 : (~0 << (32 - nw.prefix)) >>> 0;
+          if ((ipN & mask) === (nw.ip & mask)) return true;
+        }
+        return false;
+      }
+
+      function bestMainRouteForIP(ip) {
+        var cands = [];
+        for (var ri2 = 0; ri2 < routes.length; ri2++) {
+          var r2 = routes[ri2];
+          if (r2.origin === 'bgp-config' || r2.route_table !== 'main') continue;
+          if (ipInCIDR(ip, r2.destination)) cands.push(r2);
+        }
+        if (!cands.length) return null;
+        cands.sort(function(a, b) {
+          var pa = routePref(a), pb = routePref(b);
+          if (pa !== pb) return pa - pb;
+          return prefixLenFromCIDR(b.destination) - prefixLenFromCIDR(a.destination);
+        });
+        return cands[0];
+      }
+
+      function isHostDirectByUserRule(remoteIP) {
+        try {
+          var rip = ipToNum(remoteIP);
+          if (isNaN(rip)) return false;
+        } catch(e) { return false; }
+        for (var pi = 0; pi < physicalIfNets.length; pi++) {
+          var nw = physicalIfNets[pi];
+          var mask = nw.prefix === 0 ? 0 : (~0 << (32 - nw.prefix)) >>> 0;
+          if (nw.prefix === 30 && (rip & mask) === (nw.ip & mask)) return true;
+        }
+        if (ipIsPrivate(remoteIP) || !Object.keys(localPublicIPs).length) return false;
+        var br = bestMainRouteForIP(remoteIP);
+        if (!br) return false;
+        if (br.destination !== '0.0.0.0/0') return false;
+        if ((br.via_tunnel || '').trim()) return false;
+        return true;
+      }
+
+      function nextHopOnEthernetSegment(nh) {
+        nh = (nh || '').trim(); if (!nh) return false;
+        try {
+          var nhIP = ipToNum(nh);
+          if (isNaN(nhIP)) return false;
+        } catch(e) { return false; }
+        for (iak = 0; iak < iaKeys.length; iak++) {
+          var ifn2 = iaKeys[iak];
+          if (ifn2.toLowerCase().indexOf('eth') !== 0) continue;
+          var adds = ifaceAddrBook[ifn2] || [];
+          for (ai = 0; ai < adds.length; ai++) {
+            try {
+              var nw3 = networkFromCIDR(String(adds[ai]).trim());
+              var mask2 = nw3.prefix === 0 ? 0 : (~0 << (32 - nw3.prefix)) >>> 0;
+              if ((nhIP & mask2) === (nw3.ip & mask2)) return true;
+            } catch(e) {}
+          }
+        }
+        return false;
+      }
+
+      function remote32StaticEgressViaEthOnly(remoteIP) {
+        var rip = (remoteIP || '').trim(); if (!rip) return false;
+        var dst = rip + '/32';
+        var cands = [];
+        for (ri = 0; ri < routes.length; ri++) {
+          var r3 = routes[ri];
+          if (r3.origin === 'bgp-config') continue;
+          if ((r3.destination || '').trim() === dst) cands.push(r3);
+        }
+        if (!cands.length) return false;
+        for (var ci2 = 0; ci2 < cands.length; ci2++) {
+          if ((cands[ci2].via_tunnel || '').trim()) return false;
+        }
+        for (ci2 = 0; ci2 < cands.length; ci2++) {
+          var nh2 = (cands[ci2].next_hop || '').trim();
+          if (nh2 && nextHopOnEthernetSegment(nh2)) return true;
+        }
+        return false;
+      }
+
+      // === Build overseas_parent (FIX #9: handle dum/lo) ===
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var node3 = tunnels[tnKeys[tk]];
+        if (node3.inferred_role !== 'gre-overseas') continue;
+        var parent = '';
+        var srcIP = node3.source;
+        if (ovpnIPToName[srcIP]) {
+          parent = ovpnIPToName[srcIP];
+        } else if (upeIPToName[srcIP]) {
+          parent = upeIPToName[srcIP];
+        } else {
+          var srcIface = localIPToIfaceName2[srcIP] || '';
+          if (/^lo/i.test(srcIface) || /^dum/i.test(srcIface)) {
+            // source is loopback/dummy IP -> resolve via NAT translation
+            var cand = natTranslationToTunnel[srcIP] || [];
+            if (cand.length === 1) {
+              parent = cand[0];
+            } else if (cand.length > 1) {
+              var nSide = nodeSideHintByRemark(node3.name);
+              var sideMatched = [];
+              for (var si = 0; si < cand.length; si++) {
+                if (nodeSideHintByRemark(cand[si]) === nSide && (nSide === 'main' || nSide === 'backup')) {
+                  sideMatched.push(cand[si]);
+                }
+              }
+              if (sideMatched.length === 1) parent = sideMatched[0];
+            }
+          }
+        }
+        if (!parent && node3.remote) {
+          for (ri = 0; ri < routes.length; ri++) {
+            var r4 = routes[ri];
+            if (r4.destination.split('/')[0] !== node3.remote) continue;
+            var vt2 = (r4.via_tunnel || '').trim();
+            if (!vt2 || vt2 === node3.name) continue;
+            parent = vt2; break;
+          }
+        }
+        var hasNatAccessEvidence = !!(srcIP && (natTranslationToTunnel[srcIP] || []).length > 0);
+        if (!parent && !hasNatAccessEvidence && node3.remote) {
+          if (isHostDirectByUserRule(node3.remote)) {
+            parent = 'host';
+          } else if (remote32StaticEgressViaEthOnly(node3.remote)) {
+            parent = 'host';
+            node3.evidence.push('route(remote/32)->next-hop 落在 eth* 直连网段且无 via_tunnel（专线/以太侧静态路由证据）');
+          }
+        }
+        if (!parent && srcIP && loopDummyPublicIPs[srcIP]) {
+          var vtNodes2 = [];
+          for (tk = 0; tk < tnKeys.length; tk++) {
+            var tn5 = tunnels[tnKeys[tk]];
+            if (ACCESS_TRANSPORT_ROLES.indexOf(tn5.inferred_role) !== -1) vtNodes2.push(tn5);
+          }
+          if (vtNodes2.length === 1) parent = vtNodes2[0].name;
+        }
+        overseasParent[node3.name] = parent;
+      }
+
+      // -- Fill BGP transport_tunnel --
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        var b2 = bgpBindings[bi];
+        for (ri = 0; ri < routes.length; ri++) {
+          var r5 = routes[ri];
+          if (r5.origin === 'bgp-config') continue;
+          if (r5.destination.split('/')[0] !== b2.neighbor) continue;
+          if (r5.via_tunnel) { b2.transport_tunnel = r5.via_tunnel; break; }
+        }
+      }
+
+      // -- Default targets --
+      var overseasTunnels = [];
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        if (tunnels[tnKeys[tk]].inferred_role === 'gre-overseas') overseasTunnels.push(tnKeys[tk]);
+      }
+
+      var updateSourceToTunnel = {};
+      var nrtKeys2 = Object.keys(natRuleTranslation);
+      for (nrti = 0; nrti < nrtKeys2.length; nrti++) {
+        var nrid3 = nrtKeys2[nrti];
+        var trIP2 = natRuleTranslation[nrid3];
+        var out2 = natRuleOutbound[nrid3] || '';
+        if (out2 && trIP2 && trIP2.toLowerCase() !== 'masquerade') updateSourceToTunnel[trIP2] = out2;
+      }
+
+      var tunnelLocalIPIndex = {};
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var tn6 = tunnels[tnKeys[tk]];
+        var lip3 = localIPFromCIDR(tn6.address || '');
+        if (lip3) tunnelLocalIPIndex[lip3] = tn6.name;
+      }
+
+      // Route-map next-hop resolution
+      var routeMapAnyNextHop = {};
+      var routeMapAnyNextHopRank = {};
+      var rmnhKeys = Object.keys(routeMapRuleNextHop);
+      for (var rmnh = 0; rmnh < rmnhKeys.length; rmnh++) {
+        var parts2 = rmnhKeys[rmnh].split('|');
+        var rmName = parts2[0], rmRid = parts2[1], rmNh = routeMapRuleNextHop[rmnhKeys[rmnh]];
+        if (!rmName || !rmNh) continue;
+        var rank = parseInt(rmRid, 10);
+        if (isNaN(rank)) rank = 1e9;
+        if (!(rmName in routeMapAnyNextHopRank) || rank < routeMapAnyNextHopRank[rmName]) {
+          routeMapAnyNextHopRank[rmName] = rank;
+          routeMapAnyNextHop[rmName] = rmNh;
+        }
+      }
+
+      // -- BGP egress_hint resolution --
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        b2 = bgpBindings[bi];
+        var rm3 = bgpNeighborInRouteMap[b2.neighbor] || bgpPeerGroupInRouteMap[b2.peer_group] || '';
+        var nhRm = rm3 ? (routeMapAnyNextHop[rm3] || '').trim() : '';
+        if (nhRm) {
+          var tRm = tunnelPeerIPIndex[nhRm] || '';
+          if (!tRm) { var res2 = resolveNextHopChain(nhRm, 'main'); tRm = res2.tunnel; }
+          if (tRm) { b2.egress_hint = tRm; continue; }
+        }
+        var us2 = (b2.update_source || '').trim();
+        if (us2 && devIPToIface[us2]) {
+          b2.egress_hint = devIPToIface[us2];
+        } else if (updateSourceToTunnel[us2]) {
+          b2.egress_hint = updateSourceToTunnel[us2];
+        } else if (tunnelLocalIPIndex[us2]) {
+          b2.egress_hint = tunnelLocalIPIndex[us2];
+        } else {
+          for (ri = 0; ri < routes.length; ri++) {
+            var r6 = routes[ri];
+            if (r6.origin === 'bgp-config') continue;
+            if (r6.destination.split('/')[0] !== b2.neighbor) continue;
+            if (r6.via_tunnel) { b2.egress_hint = r6.via_tunnel; break; }
+          }
+        }
+      }
+
+      // -- Build tunnel chains --
+      var tunnelByNameLane = {};
+      for (tk = 0; tk < tnKeys.length; tk++) { tunnelByNameLane[tnKeys[tk]] = tunnels[tnKeys[tk]]; }
+
+      // BGP lane_side
+      function bgpCanvasLaneSide(bgpB, tunByName, ovParent, routeList) {
+        var pg = (bgpB.peer_group || '').toLowerCase();
+        if (pg && (pg.indexOf('rsvr2') !== -1 || pg.indexOf('backup') !== -1 || /2$/.test(pg))) return 'backup';
+        if (pg && pg.indexOf('rsvr') !== -1) return 'main';
+
+        function effOutSide(outNode) {
+          var cs = outNode.canvas_side || outNode.side;
+          if (cs === 'main' || cs === 'backup') return cs;
+          var parent2 = ovParent[outNode.name] || '';
+          if (tunByName[parent2]) {
+            var pn = tunByName[parent2];
+            var ps = pn.canvas_side || pn.side;
+            if (ps === 'main' || ps === 'backup') return ps;
+          }
+          return 'unknown';
+        }
+
+        var hint0 = bgpB.egress_hint || '';
+        if (hint0 === 'main') return 'main';
+        if (hint0 === 'backup') return 'backup';
+        if (tunByName[hint0]) {
+          var tn0 = tunByName[hint0];
+          var ts0 = tn0.canvas_side || tn0.side;
+          if (ts0 === 'main' || ts0 === 'backup') return ts0;
+          if (tn0.inferred_role === 'gre-overseas') { var es0 = effOutSide(tn0); if (es0 !== 'unknown') return es0; }
+          if (ACCESS_TRANSPORT_ROLES.indexOf(tn0.inferred_role) !== -1) {
+            var ts1 = tn0.canvas_side || tn0.side;
+            if (ts1 === 'main' || ts1 === 'backup') return ts1;
+          }
+        }
+        for (var rj = 0; rj < routeList.length; rj++) {
+          var r7 = routeList[rj];
+          if (r7.origin === 'bgp-config') continue;
+          if (r7.destination.split('/')[0] !== bgpB.neighbor) continue;
+          if (!r7.via_tunnel) continue;
+          var vn0 = tunByName[r7.via_tunnel];
+          if (vn0) {
+            var vns = vn0.canvas_side || vn0.side;
+            if (vns === 'main' || vns === 'backup') return vns;
+            if (vn0.inferred_role === 'gre-overseas') { var es1 = effOutSide(vn0); if (es1 !== 'unknown') return es1; }
+            if (ACCESS_TRANSPORT_ROLES.indexOf(vn0.inferred_role) !== -1) {
+              var vns2 = vn0.canvas_side || vn0.side;
+              if (vns2 === 'main' || vns2 === 'backup') return vns2;
+            }
+          }
+        }
+        return 'unknown';
+      }
+
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        bgpBindings[bi].lane_side = bgpCanvasLaneSide(bgpBindings[bi], tunnelByNameLane, overseasParent, routes);
+      }
+
+      // -- BGP anchor_tunnel --
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        var b3 = bgpBindings[bi];
+        var et = (b3.egress_hint || '').trim();
+        if (et && tunnelByNameLane[et]) {
+          b3.anchor_tunnel = et;
+        } else {
+          b3.anchor_tunnel = '';
+          for (ri = 0; ri < routes.length; ri++) {
+            var r8 = routes[ri];
+            if (r8.origin === 'bgp-config') continue;
+            if (r8.destination.split('/')[0] !== b3.neighbor) continue;
+            var vt3 = (r8.via_tunnel || '').trim();
+            if (vt3 && tunnelByNameLane[vt3]) { b3.anchor_tunnel = vt3; break; }
+          }
+        }
+      }
+
+      // === Chain Building (Task 5) ===
+      var eligibleRoles = {};
+      for (var er = 0; er < ACCESS_TRANSPORT_ROLES.length; er++) eligibleRoles[ACCESS_TRANSPORT_ROLES[er]] = true;
+      eligibleRoles['gre-upe'] = true; eligibleRoles['gre-overseas'] = true;
+
+      var chainNodes = [];
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        if (eligibleRoles[tunnels[tnKeys[tk]].inferred_role]) chainNodes.push(tnKeys[tk]);
+      }
+
+      var chainAdj = {};
+      for (var cn = 0; cn < chainNodes.length; cn++) { chainAdj[chainNodes[cn]] = {}; }
+      var chainEdges = [];
+      var chainRouteHints = [];
+
+      function addChainEdge(a, b, ev) {
+        if (a === b) return;
+        if (!(a in chainAdj) || !(b in chainAdj)) return;
+        if (!chainAdj[a][b]) {
+          chainAdj[a][b] = true; chainAdj[b][a] = true;
+          chainEdges.push([a, b, ev]);
+        }
+      }
+
+      // overseas_parent edges
+      var opKeys = Object.keys(overseasParent);
+      for (var opk = 0; opk < opKeys.length; opk++) {
+        var child = opKeys[opk], parent2 = overseasParent[child];
+        if (parent2 && (parent2 in chainAdj) && (child in chainAdj)) {
+          addChainEdge(parent2, child, 'overseas_parent');
+        }
+      }
+      // vtun_to_upe edges
+      for (var vtui = 0; vtui < vtunToUpe.length; vtui++) {
+        var vn1 = vtunToUpe[vtui][0], vn2 = vtunToUpe[vtui][1];
+        if ((vn1 in chainAdj) && (vn2 in chainAdj)) addChainEdge(vn1, vn2, 'vtun_to_upe');
+      }
+      // route hints
+      for (ri = 0; ri < routes.length; ri++) {
+        var r9 = routes[ri];
+        if (r9.origin === 'bgp-config') continue;
+        var vt4 = (r9.via_tunnel || '').trim();
+        if (!vt4 || !(vt4 in chainAdj)) continue;
+        var dstIP = r9.destination.split('/')[0];
+        var tn7 = tunnelPeerIPIndex[dstIP] || '';
+        if (tn7 && (tn7 in chainAdj)) {
+          chainRouteHints.push([vt4, tn7, 'route:' + r9.destination]);
+        }
+      }
+
+      // -- Connected components --
+      var tunnelChainIDByName = {};
+      var tunnelChains = {};
+      var cidIdx = 1;
+      var sortedNodes = Object.keys(chainAdj).sort();
+      for (var sni = 0; sni < sortedNodes.length; sni++) {
+        var n0 = sortedNodes[sni];
+        if (tunnelChainIDByName[n0]) continue;
+        var cid = 'chain' + cidIdx; cidIdx++;
+        var stack = [n0];
+        var comp = [];
+        tunnelChainIDByName[n0] = cid;
+        while (stack.length) {
+          var cur = stack.pop();
+          comp.push(cur);
+          var nbrs = Object.keys(chainAdj[cur] || {}).sort();
+          for (var nbi = 0; nbi < nbrs.length; nbi++) {
+            var nxt = nbrs[nbi];
+            if (tunnelChainIDByName[nxt]) continue;
+            tunnelChainIDByName[nxt] = cid;
+            stack.push(nxt);
+          }
+        }
+        tunnelChains[cid] = comp.sort();
+      }
+
+      // === Side Resolution (FIX #3, #5, #7) ===
+      var chainSideMap = {};
+      var chainSideReason = {};
+      var tcKeys = Object.keys(tunnelChains);
+      for (var tci = 0; tci < tcKeys.length; tci++) { chainSideMap[tcKeys[tci]] = 'unknown'; chainSideReason[tcKeys[tci]] = 'unknown'; }
+      var lineSideMap = {};
+      var lineSideReason = {};
+      var sideConflicts = [];
+
+      function applyChainSide(cid, side, reason) {
+        var cur = chainSideMap[cid] || 'unknown';
+        if (side !== 'main' && side !== 'backup') return;
+        if (cur === 'unknown') {
+          chainSideMap[cid] = side;
+          chainSideReason[cid] = reason;
+          return;
+        }
+        if (cur !== side) {
+          sideConflicts.push(cid + ':' + cur + ' vs ' + side + ' (' + reason + ')');
+        }
+      }
+
+      // Step 2: BGP naming (FIX #5: only apply to chain containing BGP's anchor_tunnel)
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        var b4 = bgpBindings[bi];
+        var side = nameHintSide((b4.neighbor || '') + ' ' + (b4.peer_group || ''));
+        if (side === 'unknown') continue;
+        var tbind = (b4.anchor_tunnel || '').trim() || (b4.egress_hint || '').trim() || (b4.transport_tunnel || '').trim();
+        if (tbind && tunnelChainIDByName[tbind]) {
+          var cidB = tunnelChainIDByName[tbind];
+          applyChainSide(cidB, side, 'bgp_name:' + (b4.neighbor || b4.peer_group));
+        }
+      }
+
+      // Step 3: track naming (only unknown chains)
+      for (ri = 0; ri < routes.length; ri++) {
+        var r10 = routes[ri];
+        var tr2 = (r10.track_name || '').trim();
+        if (!tr2) continue;
+        var sideT = nameHintSide(tr2);
+        if (sideT === 'unknown') continue;
+        var tbindT = (r10.via_tunnel || '').trim();
+        if (!tbindT || !tunnelChainIDByName[tbindT]) continue;
+        var cidT = tunnelChainIDByName[tbindT];
+        if ((chainSideMap[cidT] || 'unknown') === 'unknown') {
+          applyChainSide(cidT, sideT, 'track_name:' + tr2);
+        }
+      }
+
+      // Step 3.5: NAT source rule description hint (only unknown chains)
+      // 仅使用配置内显式的 MAIN/BACKUP 关键词，不做“无证据猜测”。
+      for (tci = 0; tci < tcKeys.length; tci++) {
+        var cidN = tcKeys[tci];
+        if ((chainSideMap[cidN] || 'unknown') !== 'unknown') continue;
+        var membersN = tunnelChains[cidN] || [];
+        if (!membersN.length) continue;
+        var memberSet = {};
+        for (var mni = 0; mni < membersN.length; mni++) memberSet[membersN[mni]] = true;
+
+        var natMain = 0, natBackup = 0;
+        for (var ridN in natRuleOutbound) {
+          if (!Object.prototype.hasOwnProperty.call(natRuleOutbound, ridN)) continue;
+          var outIf = (natRuleOutbound[ridN] || '').trim();
+          if (!outIf || !memberSet[outIf]) continue;
+          var dsc = (natRuleDescription[ridN] || '').trim();
+          if (!dsc) continue;
+          var sideByDesc = inferSide(dsc);
+          if (sideByDesc === 'main') natMain++;
+          else if (sideByDesc === 'backup') natBackup++;
+        }
+        if (natMain > natBackup) {
+          applyChainSide(cidN, 'main', 'nat_source_desc:main=' + natMain + ',backup=' + natBackup);
+        } else if (natBackup > natMain) {
+          applyChainSide(cidN, 'backup', 'nat_source_desc:main=' + natMain + ',backup=' + natBackup);
+        }
+      }
+
+      // Step 4: tunnel remark fallback (only unknown chains) (FIX #7: chain_side_map is authoritative)
+      // 词界优先，匹配不到再用宽松 inferSide（兼容 'HKmain' / 'USbackup' / 'upebk1' 这种没有分隔符的命名）。
+      for (tci = 0; tci < tcKeys.length; tci++) {
+        var cid2 = tcKeys[tci];
+        if ((chainSideMap[cid2] || 'unknown') !== 'unknown') continue;
+        var members = tunnelChains[cid2] || [];
+        var pickedSide = 'unknown', pickedReason = '';
+        for (var mi = 0; mi < members.length; mi++) {
+          var nm = members[mi];
+          var n02 = tunnels[nm];
+          if (!n02) continue;
+          var exd = ifaceDescBook[nm] || '';
+          if (lineRemarkIsBackup(n02.description || '', exd, n02.name || '')) {
+            pickedSide = 'backup'; pickedReason = 'remark_fallback_strict:' + nm; break;
+          }
+          if (lineRemarkIsMain(n02.description || '', exd, n02.name || '')) {
+            pickedSide = 'main'; pickedReason = 'remark_fallback_strict:' + nm; break;
+          }
+        }
+        if (pickedSide === 'unknown') {
+          for (mi = 0; mi < members.length; mi++) {
+            nm = members[mi];
+            n02 = tunnels[nm];
+            if (!n02) continue;
+            exd = ifaceDescBook[nm] || '';
+            var sideHint = inferSide(n02.description || '', exd, n02.name || '');
+            if (sideHint === 'backup' || sideHint === 'main') {
+              pickedSide = sideHint;
+              pickedReason = 'remark_fallback_loose:' + nm;
+              break;
+            }
+          }
+        }
+        if (pickedSide === 'main' || pickedSide === 'backup') {
+          applyChainSide(cid2, pickedSide, pickedReason);
+        }
+      }
+
+      // Expand chain side to tunnel side
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var tnName = tnKeys[tk];
+        var cid3 = tunnelChainIDByName[tnName] || '';
+        if (cid3 && (chainSideMap[cid3] === 'main' || chainSideMap[cid3] === 'backup')) {
+          lineSideMap[tnName] = chainSideMap[cid3];
+          lineSideReason[tnName] = cid3 + ':' + (chainSideReason[cid3] || 'unknown');
+        } else {
+          lineSideMap[tnName] = 'unknown';
+          lineSideReason[tnName] = 'unknown';
+        }
+      }
+
+      // Re-bind BGP lane from finalized chain side
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        var b5 = bgpBindings[bi];
+        var at = (b5.anchor_tunnel || '').trim();
+        if (at && (lineSideMap[at] === 'main' || lineSideMap[at] === 'backup' || lineSideMap[at] === 'unknown')) {
+          b5.lane_side = lineSideMap[at] || 'unknown';
+        } else {
+          b5.lane_side = 'unknown';
+        }
+      }
+
+      // -- BGP neighbor IPs for origin tagging --
+      var bgpNeighborIPs = {};
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        if (bgpBindings[bi].neighbor) bgpNeighborIPs[bgpBindings[bi].neighbor] = true;
+      }
+      for (ri = 0; ri < routes.length; ri++) {
+        var r11 = routes[ri];
+        if (r11.origin !== 'unknown') continue;
+        if (r11.destination !== '0.0.0.0/0') continue;
+        if (!r11.next_hop) continue;
+        if (bgpNeighborIPs[r11.next_hop]) r11.origin = 'bgp-fib';
+      }
+
+      // -- Outbound sources --
+      var outboundSources = {};
+      var outboundRuleInfo = {};
+      var nroKeys = Object.keys(natRuleOutbound);
+      for (var nko = 0; nko < nroKeys.length; nko++) {
+        var nridO = nroKeys[nko];
+        var outO = natRuleOutbound[nridO];
+        var srcsO = natRuleSources[nridO] || [];
+        if (srcsO.length) {
+          if (!outboundRuleInfo[outO]) outboundRuleInfo[outO] = [];
+          outboundRuleInfo[outO].push('rule' + nridO + ':' + srcsO.join(','));
+        } else {
+          if (!outboundRuleInfo[outO]) outboundRuleInfo[outO] = [];
+          outboundRuleInfo[outO].push('rule' + nridO + ':未限定源');
+        }
+        if (srcsO.length) {
+          if (!outboundSources[outO]) outboundSources[outO] = [];
+          for (var soi = 0; soi < srcsO.length; soi++) {
+            if (outboundSources[outO].indexOf(srcsO[soi]) === -1) outboundSources[outO].push(srcsO[soi]);
+          }
+          outboundSources[outO].sort();
+        }
+      }
+
+      // === Default Route Resolution (Task 6) ===
+      var routeMap80NextHops = {};
+      var rm80Keys = Object.keys(routeMapRuleMatch80);
+      for (var rmk = 0; rmk < rm80Keys.length; rmk++) {
+        if (!routeMapRuleMatch80[rm80Keys[rmk]]) continue;
+        var nh80 = routeMapRuleNextHop[rm80Keys[rmk]] || '';
+        if (nh80) { var parts80 = rm80Keys[rmk].split('|'); routeMap80NextHops[parts80[0]] = nh80; }
+      }
+
+      var bgpDefaultCandidates = [];
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        var b6 = bgpBindings[bi];
+        var rmB = bgpNeighborInRouteMap[b6.neighbor] || bgpPeerGroupInRouteMap[b6.peer_group] || '';
+        if (!rmB || !routeMap80NextHops[rmB]) continue;
+        bgpDefaultCandidates.push([b6.neighbor, rmB, routeMap80NextHops[rmB]]);
+      }
+
+      var defaultTargets = [];
+
+      if (bgpDefaultCandidates.length) {
+        bgpDefaultCandidates.sort(function(a, b) { return a[0].localeCompare(b[0]); });
+        var nbrD = bgpDefaultCandidates[0][0], rmD = bgpDefaultCandidates[0][1], nhD = bgpDefaultCandidates[0][2];
+        var viaTunD = tunnelPeerIPIndex[nhD] || '';
+        var nhChainD = [];
+        if (!viaTunD) {
+          for (ri = 0; ri < routes.length; ri++) {
+            if (routes[ri].destination.split('/')[0] === nhD && routes[ri].via_tunnel) {
+              viaTunD = routes[ri].via_tunnel; break;
+            }
+          }
+        }
+        if (!viaTunD) {
+          var resD = resolveNextHopChain(nhD, 'main');
+          viaTunD = resD.tunnel; nhChainD = resD.chain;
+        } else {
+          var resD2 = resolveNextHopChain(nhD, 'main');
+          nhChainD = resD2.chain.length ? resD2.chain : (nhD ? [nhD] : []);
+        }
+        if (viaTunD) {
+          if (!nhChainD.length && nhD) nhChainD = [nhD];
+          defaultTargets.push(['BGP默认(comm=80,rm=' + rmD + ',nh=' + nhD + ')', viaTunD, nhChainD]);
+        }
+      }
+
+      if (!defaultTargets.length) {
+        var staticDefaults = [];
+        for (ri = 0; ri < routes.length; ri++) {
+          var r12 = routes[ri];
+          if (r12.destination === '0.0.0.0/0' && r12.route_table === 'main' && r12.origin === 'static') {
+            staticDefaults.push(r12);
+          }
+        }
+        if (staticDefaults.length) {
+          staticDefaults.sort(function(a, b) {
+            var pa = (a.preference && /^\d+$/.test(a.preference)) ? parseInt(a.preference, 10) : 999999;
+            var pb = (b.preference && /^\d+$/.test(b.preference)) ? parseInt(b.preference, 10) : 999999;
+            if (pa !== pb) return pa - pb;
+            return a.next_hop.localeCompare(b.next_hop);
+          });
+          var chosen = staticDefaults[0];
+          var nhChain2 = [];
+          if (!chosen.via_tunnel && chosen.next_hop) {
+            var resS = resolveNextHopChain(chosen.next_hop, 'main');
+            if (resS.tunnel) chosen.via_tunnel = resS.tunnel;
+            nhChain2 = resS.chain;
+          } else if (chosen.next_hop) {
+            var resS2 = resolveNextHopChain(chosen.next_hop, 'main');
+            nhChain2 = resS2.chain;
+          }
+          var prefTxt = chosen.preference ? ',pref=' + chosen.preference : '';
+          if (chosen.via_tunnel) {
+            defaultTargets.push(['静态默认(main,nh=' + chosen.next_hop + prefTxt + ')', chosen.via_tunnel, nhChain2]);
+          }
+        }
+      }
+      if (defaultTargets.length > 1) defaultTargets = [defaultTargets[0]];
+
+      var defaultRouteResolution = null;
+      if (defaultTargets.length) {
+        defaultRouteResolution = {
+          kind: defaultTargets[0][0],
+          tunnel: defaultTargets[0][1],
+          nh_chain: defaultTargets[0][2] || []
+        };
+      }
+
+      // -- Summary --
+      var fastipBGP = false;
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        if ((bgpBindings[bi].peer_group || '').toLowerCase().indexOf('rsvr') !== -1) { fastipBGP = true; break; }
+      }
+      var bgpServiceType = fastipBGP ? 'fastip' : 'overlay';
+
+      // -- Counts --
+      var openvpnCount = 0, ipsecVtiCount = 0, ipsecPolicyCount = 0, greUpeCount = 0, greOverseasCount = 0, greUnknownCount = 0;
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var role = tunnels[tnKeys[tk]].inferred_role;
+        if (role === 'openvpn') openvpnCount++;
+        else if (role === 'ipsec-vti') ipsecVtiCount++;
+        else if (role === 'ipsec-policy') ipsecPolicyCount++;
+        else if (role === 'gre-upe') greUpeCount++;
+        else if (role === 'gre-overseas') greOverseasCount++;
+        else if (role === 'gre-unknown') greUnknownCount++;
+      }
+
+      // -- Warnings --
+      var accessTransportNodes = [];
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        if (ACCESS_TRANSPORT_ROLES.indexOf(tunnels[tnKeys[tk]].inferred_role) !== -1) accessTransportNodes.push(tunnels[tnKeys[tk]]);
+      }
+      var upeNodes2 = [];
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        if (tunnels[tnKeys[tk]].inferred_role === 'gre-upe') upeNodes2.push(tunnels[tnKeys[tk]]);
+      }
+
+      var warnings = [];
+      if (!accessTransportNodes.length) {
+        warnings.push('未识别到接入层（OpenVPN/vtun、VyOS `interfaces vti` IPsec-VTI、或策略 IPsec 的 local prefix 与 dummy/eth 地址对齐），请确认配置。');
+      }
+      if (!upeNodes2.length && greOverseasCount > 0) {
+        warnings.push('未识别到 UPE 也可能是正常场景：已按隧道 source-address/remote 推断为直连 NATPE。');
+      }
+      if (!overseasTunnels.length) {
+        warnings.push('未识别到海外出口 GRE 节点，请确认 NAT outbound-interface 或 pe_docking 路由。');
+      }
+      var unresolvedParent = [];
+      for (opk = 0; opk < opKeys.length; opk++) {
+        if (!overseasParent[opKeys[opk]]) unresolvedParent.push(opKeys[opk]);
+      }
+      if (unresolvedParent.length) {
+        warnings.push('以下 NATPE 未判定上游链路(无证据不猜测): ' + unresolvedParent.join(', '));
+      }
+      if (routeDepthExceeded.length) {
+        warnings.push('检测到策略路由递归超过3跳，以下LAN-MAP未展示: ' + routeDepthExceeded.slice(0, 6).join('; '));
+      }
+      var hasOvpnDirect = false;
+      for (opk = 0; opk < opKeys.length; opk++) {
+        var p = overseasParent[opKeys[opk]];
+        if (p && tunnels[p] && ACCESS_TRANSPORT_ROLES.indexOf(tunnels[p].inferred_role) !== -1) { hasOvpnDirect = true; break; }
+      }
+      if (hasOvpnDirect) {
+        warnings.push('检测到 接入层(vtun/VTI)->NATPE 直连场景（源IP来自本机 dummy/loopback 公网IP 且命中 SNAT translation）。');
+      }
+      var unlaneBGP = [];
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        if (bgpBindings[bi].lane_side === 'unknown') unlaneBGP.push(bgpBindings[bi].neighbor);
+      }
+      if (unlaneBGP.length) {
+        warnings.push('以下 BGP 邻居未能判定主/备画布区（仅文字摘要中保留，不在拓扑上绘制该邻居节点）: ' + unlaneBGP.slice(0, 16).join(', '));
+      }
+      var unanchorBGP = [];
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        if (!(bgpBindings[bi].anchor_tunnel || '').trim()) unanchorBGP.push(bgpBindings[bi].neighbor);
+      }
+      if (unanchorBGP.length) {
+        warnings.push('以下 BGP 邻居未能绑定到本机隧道接口（egress 非隧道名且无 neighbor/* 的 via_tunnel 证据），不在拓扑上绘制: ' + unanchorBGP.slice(0, 16).join(', '));
+      }
+      if (!defaultTargets.length) {
+        warnings.push('未从配置中解析到默认路由（优先：community80 route-map next-hop；回退：static main 0/0）。因此拓扑上不会把 NAT outbound 误标成"默认路由"；如你确认存在默认路由，请检查是否使用了未覆盖的 VyOS 语法。');
+      }
+
+      // -- Summary lines --
+      var summaryLines = [
+        '- Tunnel 总数: ' + Object.keys(tunnels).length + ' (OpenVPN=' + openvpnCount + ', IPsec-VTI=' + ipsecVtiCount +
+        ', 策略IPsec=' + ipsecPolicyCount + ', 国内GRE=' + greUpeCount + ', 海外GRE=' + greOverseasCount +
+        ', 待判定=' + greUnknownCount + ')',
+        '- 默认出口链路: ' + defaultTargets.length + ' 条',
+        '- BGP 邻居: ' + bgpBindings.length + '，含 update-source 绑定: ' +
+        bgpBindings.filter(function(x) { return x.update_source; }).length + '，含 export prefix-list: ' +
+        bgpBindings.filter(function(x) { return x.export_prefix_list; }).length + '，已展开宣告前缀条目: ' +
+        bgpBindings.reduce(function(s, x) { return s + x.advertised_prefixes.length; }, 0),
+        '- 海外出口隧道: ' + (overseasTunnels.length ? overseasTunnels.join(', ') : '无（未发现 NATPE 海外出口隧道）')
+      ];
+      if (bgpBindings.length) {
+        summaryLines.splice(3, 0, '- BGP 业务归类: ' + (bgpServiceType === 'fastip' ? 'ER FastIP(RSVR)' : 'GRE组网/非RSVR'));
+      }
+      if (dnatRuleCount) {
+        var dnatPrefixesAll = [];
+        var dpKeys = Object.keys(dnatRulePrefixes);
+        for (var dpk = 0; dpk < dpKeys.length; dpk++) {
+          for (var dpi = 0; dpi < dnatRulePrefixes[dpKeys[dpk]].length; dpi++) {
+            dnatPrefixesAll.push(dnatRulePrefixes[dpKeys[dpk]][dpi]);
+          }
+        }
+        dnatPrefixesAll.sort();
+        if (dnatPrefixesAll.length > 4) {
+          summaryLines.push('- DNAT 网段: ' + dnatPrefixesAll.length + ' 条（详见NAT梳理）');
+        } else if (dnatPrefixesAll.length) {
+          summaryLines.push('- DNAT 网段: ' + dnatPrefixesAll.join(','));
+        } else {
+          summaryLines.push('- DNAT 配置命中: ' + dnatRuleCount + ' 行（未提取到 destination address）');
+        }
+      }
+      if (defaultRouteResolution) {
+        var chx = defaultRouteResolution.nh_chain || [];
+        var tunX = defaultRouteResolution.tunnel || '';
+        var kdx = defaultRouteResolution.kind || '';
+        if (chx.length) {
+          summaryLines.push('- 默认路由递归: ' + kdx + ' | ' + chx.join(' -> ') + ' -> 隧道 ' + tunX);
+        } else if (tunX) {
+          summaryLines.push('- 默认路由: ' + kdx + ' -> 隧道 ' + tunX);
+        }
+      }
+
+      // -- Mermaid graph --
+      var graphNodes = [];
+      var graphEdges = [];
+
+      function addMNode(nodeId, label, nodeType) {
+        if (!graphNodes.some(function(n) { return n.id === nodeId; })) {
+          graphNodes.push({ id: nodeId, label: label, type: nodeType });
+        }
+      }
+      function addMEdge(src, dst, label, edgeType) {
+        graphEdges.push({ src: src, dst: dst, label: label, type: edgeType });
+      }
+      function safeID(s) { return String(s).replace(/[^a-zA-Z0-9_]/g, '_'); }
+
+      addMNode('openvpn_core', '接入层(OpenVPN/IPsec-VTI/策略IPsec)', 'core');
+
+      var sortedTunnels = Object.keys(tunnels).sort();
+      for (var sti = 0; sti < sortedTunnels.length; sti++) {
+        var node4 = tunnels[sortedTunnels[sti]];
+        var nid = safeID(node4.name);
+        var role4 = node4.inferred_role;
+        var desc4 = (node4.description || '').trim();
+        var nodeLbl = node4.name + ' [' + role4 + ']';
+        if (desc4) nodeLbl += '\\n(' + desc4 + ')';
+        addMNode(nid, nodeLbl, role4);
+        if (ACCESS_TRANSPORT_ROLES.indexOf(role4) !== -1) {
+          var lbl4 = role4 === 'ipsec-vti' ? 'vti' : (role4 === 'ipsec-policy' ? 'ipsec-s2s' : 'vtun');
+          addMEdge('openvpn_core', nid, lbl4, 'link');
+        }
+      }
+
+      // pe_docking edges
+      var remoteToTunnel = {};
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var tn8 = tunnels[tnKeys[tk]];
+        if (tn8.remote) remoteToTunnel[tn8.remote] = tn8.name;
+      }
+      for (ri = 0; ri < routes.length; ri++) {
+        var r13 = routes[ri];
+        var dstIP2 = r13.destination.split('/')[0];
+        if (remoteToTunnel[dstIP2] && r13.via_tunnel) {
+          var overseas = remoteToTunnel[dstIP2];
+          addMEdge(safeID(r13.via_tunnel), safeID(overseas), 'pe_docking', 'link');
+        }
+      }
+
+      // vtun_to_upe
+      for (vtui = 0; vtui < vtunToUpe.length; vtui++) {
+        addMEdge(safeID(vtunToUpe[vtui][0]), safeID(vtunToUpe[vtui][1]), 'vtun->upe', 'link');
+      }
+
+      // default targets
+      for (var dti = 0; dti < defaultTargets.length; dti++) {
+        var dt = defaultTargets[dti];
+        var did = safeID('default_' + dt[0] + '_' + dt[1]);
+        addMNode(did, 'Default:' + dt[0], 'default');
+        addMEdge(did, safeID(dt[1]), '0.0.0.0/0', 'default');
+      }
+
+      // BGP nodes
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        var b7 = bgpBindings[bi];
+        var pgTag = b7.peer_group || 'direct';
+        var bid = safeID('bgp_' + pgTag + '_' + b7.neighbor);
+        var advBrief = '';
+        if (b7.advertised_prefixes.length) {
+          advBrief = '\\nexport:' + b7.advertised_prefixes.slice(0, 4).join(',');
+          if (b7.advertised_prefixes.length > 4) advBrief += '...';
+        }
+        var raTxt = b7.remote_as ? ' AS' + b7.remote_as : '';
+        addMNode(bid, 'BGP' + raTxt + '\\n' + b7.neighbor + advBrief, 'bgp');
+        var target = b7.egress_hint;
+        if (target && tunnels[target]) {
+          addMEdge(bid, safeID(target), 'update-source=' + (b7.update_source || '-'), 'bgp');
+        } else {
+          addMEdge(bid, 'openvpn_core', 'update-source=' + (b7.update_source || '-'), 'bgp');
+        }
+      }
+
+      var mermaidLines = ['flowchart LR'];
+      for (var gni = 0; gni < graphNodes.length; gni++) {
+        mermaidLines.push(graphNodes[gni].id + '["' + graphNodes[gni].label + '"]');
+      }
+      for (var gei = 0; gei < graphEdges.length; gei++) {
+        var e = graphEdges[gei];
+        if (e.label) {
+          mermaidLines.push(e.src + ' -->|"' + e.label + '"| ' + e.dst);
+        } else {
+          mermaidLines.push(e.src + ' --> ' + e.dst);
+        }
+      }
+
+      // -- Parse Ledger --
+      var notReadSample = [];
+      for (var li2 = 0; li2 < rawLines.length; li2++) {
+        if (lineConsumed[li2] === 'unparsed_set') notReadSample.push(rawLines[li2].trim());
+      }
+
+      var ledgerLines = ['=== 解析备注（证据与未覆盖项）==='];
+      ledgerLines.push('\n--- 已解析（摘要） ---');
+      ledgerLines.push('- [隧道与接口] n=' + Object.keys(tunnels).length + ' 含 interfaces tunnel/openvpn/vti 及推导对象');
+      ledgerLines.push('- [路由] n=' + routes.filter(function(r) { return r.origin !== 'bgp-config'; }).length + ' static / table / 递归 via_tunnel');
+      ledgerLines.push('- [BGP 邻居] n=' + bgpBindings.length + ' peer-group / update-source / route-map 等');
+      ledgerLines.push('- [NAT source] n=' + Object.keys(natRuleOutbound).length + ' outbound-interface / translation / source');
+      ledgerLines.push('- [策略路由 PBR] n=0 policy route + local-route');
+
+      if (greReadPartial.length) {
+        ledgerLines.push('\n--- 部分解析 ---');
+        for (var gpi = 0; gpi < greReadPartial.length; gpi++) {
+          ledgerLines.push('- [GRE source-address 弱命中] n=1 ' + greReadPartial[gpi]);
+        }
+      }
+
+      var unresolvedList = [];
+      for (tk = 0; tk < tnKeys.length; tk++) {
+        var tn9 = tunnels[tnKeys[tk]];
+        if (tn9.kind === 'tunnel' && tn9.inferred_role === 'gre-unknown') {
+          unresolvedList.push('- [tunnel:' + tn9.name + '] n=1 角色未判定：无 route/NAT/source 强证据' +
+            (acceptRemarkHeuristic ? '' : '；可勾选「接受备注启发」试用 description'));
+        }
+      }
+      for (opk = 0; opk < opKeys.length; opk++) {
+        if (!overseasParent[opKeys[opk]]) {
+          unresolvedList.push('- [NATPE:' + opKeys[opk] + '] n=1 未解析上游父链路（无 source/路由证据）');
+        }
+      }
+      if (unresolvedList.length) {
+        ledgerLines.push('\n--- 未判定对象 ---');
+        for (var uli = 0; uli < unresolvedList.length; uli++) { ledgerLines.push(unresolvedList[uli]); }
+      }
+
+      if (remarkConflicts.length) {
+        ledgerLines.push('\n--- 备注与结构化结论冲突 ---');
+        for (var rci = 0; rci < remarkConflicts.length; rci++) {
+          var rc = remarkConflicts[rci];
+          ledgerLines.push('- 隧道 ' + rc.tunnel + ': 备注暗示 [' + rc.remark_hint + '] vs 采用 [' + rc.resolved_role + '] 依据=' + rc.strong_basis);
+          if (rc.reference) ledgerLines.push('  引用: ' + rc.reference.substring(0, 240));
+        }
+      }
+
+      if (notReadSample.length) {
+        ledgerLines.push('\n--- 未消费配置行（抽样） ---');
+        ledgerLines.push('- [未解析的 set 行] n=' + notReadSample.length);
+        var sample = notReadSample.slice(0, 20);
+        for (var nsi = 0; nsi < sample.length; nsi++) { ledgerLines.push('  例: ' + sample[nsi]); }
+      }
+
+      if (!Object.keys(lineConsumed).length) {
+        ledgerLines.push('\n--- 全部未消费 ---');
+        ledgerLines.push('- 解析器未匹配到任何已知配置行');
+      }
+
+      // Chain diagnostics
+      var chainDiag = ['\n=== 隧道链构建结果 ==='];
+      for (tci = 0; tci < tcKeys.length; tci++) {
+        var cidD = tcKeys[tci];
+        chainDiag.push(cidD + ': ' + (tunnelChains[cidD] || []).join(','));
+      }
+      for (var cei = 0; cei < chainEdges.length; cei++) {
+        chainDiag.push('edge ' + chainEdges[cei][0] + ' <-> ' + chainEdges[cei][1] + ' (' + chainEdges[cei][2] + ')');
+      }
+      for (var chi = 0; chi < chainRouteHints.length; chi++) {
+        chainDiag.push('hint ' + chainRouteHints[chi][0] + ' -> ' + chainRouteHints[chi][1] + ' (' + chainRouteHints[chi][2] + ')');
+      }
+      var lineDiag = ['\n=== 主备判定（顺序2→3→4） ==='];
+      for (tci = 0; tci < tcKeys.length; tci++) {
+        var cidE = tcKeys[tci];
+        lineDiag.push(cidE + ' -> ' + (chainSideMap[cidE] || 'unknown') + ' (' + (chainSideReason[cidE] || 'unknown') + ')');
+      }
+      var sortedTNames = Object.keys(tunnels).sort();
+      for (var sti2 = 0; sti2 < sortedTNames.length; sti2++) {
+        var tn10 = tunnels[sortedTNames[sti2]];
+        if (ACCESS_TRANSPORT_ROLES.indexOf(tn10.inferred_role) === -1 && tn10.inferred_role !== 'gre-upe' && tn10.inferred_role !== 'gre-overseas') continue;
+        var ls = lineSideMap[tn10.name] || 'unknown';
+        var rs = lineSideReason[tn10.name] || 'unknown';
+        lineDiag.push((tn10.name + '                 ').substring(0, 18) + ' -> ' + (ls + '       ').substring(0, 7) + ' (' + rs + ') role=' + tn10.inferred_role);
+      }
+      if (sideConflicts.length) {
+        lineDiag.push('conflicts: ' + sideConflicts.slice(0, 32).join('; '));
+      }
+      var parseLedgerText = ledgerLines.join('\n') + '\n' + chainDiag.join('\n') + '\n' + lineDiag.join('\n');
+
+      // -- IP Digest --
+      var ipToIfaces2 = {};
+      for (iak = 0; iak < iaKeys.length; iak++) {
+        var iname2 = iaKeys[iak];
+        var addrs3 = ifaceAddrBook[iname2];
+        for (ai = 0; ai < addrs3.length; ai++) {
+          var hip4 = hostIPFromPfxOrAddr(String(addrs3[ai]));
+          if (!hip4) continue;
+          if (!ipToIfaces2[hip4]) ipToIfaces2[hip4] = [];
+          if (ipToIfaces2[hip4].indexOf(iname2) === -1) ipToIfaces2[hip4].push(iname2);
+        }
+      }
+      var ifaceIPs2 = {};
+      var i2iKeys = Object.keys(ipToIfaces2);
+      for (var i2k = 0; i2k < i2iKeys.length; i2k++) { ifaceIPs2[i2iKeys[i2k]] = true; }
+
+      var ipOcc = {};
+      var sortedIPs = Object.keys(ifaceIPs2).sort();
+      for (var sipi = 0; sipi < sortedIPs.length; sipi++) { ipOcc[sortedIPs[sipi]] = []; }
+
+      var bgpUpdateSourceIPs = {};
+      for (bi = 0; bi < bgpBindings.length; bi++) {
+        var usB = (bgpBindings[bi].update_source || '').trim();
+        if (usB) bgpUpdateSourceIPs[usB] = true;
+      }
+
+      var excludedDeclTags = {
+        'interfaces.address': true, 'interfaces.tunnel_addr': true, 'interfaces.openvpn_local': true,
+        'interfaces.vti_addr': true, 'interfaces.description': true, 'interfaces.tunnel_desc': true,
+        'interfaces.vti_desc': true
+      };
+
+      var IP_PATTERN = /\b(?:\d{1,3}\.){3}\d{1,3}(?:\/\d{1,2})?\b/g;
+
+      for (li2 = 0; li2 < rawLines.length; li2++) {
+        var s2 = rawLines[li2].trim();
+        if (!s2 || s2.charAt(0) === '#') continue;
+        if (excludedDeclTags[lineConsumed[li2] || '']) continue;
+        var tag = lineConsumed[li2] || '';
+        var ipMatches = s2.match(IP_PATTERN);
+        if (ipMatches) {
+          for (var imi = 0; imi < ipMatches.length; imi++) {
+            var ip0m = String(ipMatches[imi]).split('/')[0];
+            if (ipOcc[ip0m]) {
+              ipOcc[ip0m].push([li2 + 1, tag || 'unparsed', s2]);
+            }
+          }
+        }
+      }
+
+      var ipDigestLines = ['=== IP梳理（不计算声明和备注的应用次数）===', ''];
+      var rankedIPs = Object.keys(ipOcc).sort(function(a, b) { return ipOcc[b].length - ipOcc[a].length || a.localeCompare(b); });
+      for (var rpi = 0; rpi < rankedIPs.length; rpi++) {
+        var ipx = rankedIPs[rpi];
+        var hits = ipOcc[ipx] || [];
+        var ifaces2 = ipToIfaces2[ipx] || [];
+        var ifn3 = ifaces2.length ? ifaces2[0] : 'unknown-iface';
+        var descI = ifaceDescBook[ifn3] || '';
+        descI = descI.trim() ? descI : '无';
+        ipDigestLines.push('- ' + ifn3 + ' ' + ipx + ' | 引用 ' + hits.length + ' 次 | description: ' + descI);
+        if (hits.length) {
+          for (var hi = 0; hi < hits.length; hi++) {
+            ipDigestLines.push('  . L' + hits[hi][0] + ' [' + hits[hi][1] + '] ' + hits[hi][2]);
+          }
+        } else {
+          ipDigestLines.push('  . (无引用)');
+        }
+        ipDigestLines.push('');
+      }
+      var ipDigestText = ipDigestLines.join('\n');
+
+      // -- Return result object (Task 6 assembly) --
+      return {
+        tunnels: tunnels,
+        routes: routes,
+        bgp: bgpBindings,
+        graph_nodes: graphNodes,
+        graph_edges: graphEdges,
+        chain_side_map: chainSideMap,
+        chain_side_reason: chainSideReason,
+        line_side_map: lineSideMap,
+        line_side_reason: lineSideReason,
+        tunnel_chain_id_by_name: tunnelChainIDByName,
+        tunnel_chains: tunnelChains,
+        overseas_parent: overseasParent,
+        vtun_to_upe: vtunToUpe,
+        bgp_service_type: bgpServiceType,
+        default_targets: defaultTargets,
+        default_route_resolution: defaultRouteResolution,
+        outbound_sources: outboundSources,
+        outbound_rule_info: outboundRuleInfo,
+        warnings: warnings,
+        hostname: hostname,
+        mermaid: mermaidLines.join('\n'),
+        summary: summaryLines.join('\n'),
+        parse_ledger_text: parseLedgerText,
+        parse_ledger: { remark_conflicts: remarkConflicts },
+        remark_conflicts: remarkConflicts,
+        ip_digest_text: ipDigestText,
+        line_consumed_count: Object.keys(lineConsumed).length
+      };
+    }
+  };
+
+  // ============================================================
+  // SVG Topology Canvas Rendering (Task 7)
+  // ============================================================
+  window.TopoCanvas = (function() {
+    'use strict';
+
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var ZOOM = 1.0;
+    var PAN_X = 0, PAN_Y = 0;
+    var IS_PANNING = false;
+    var LAST_MOUSE_X = 0, LAST_MOUSE_Y = 0;
+
+    // ── Dynamic layout constants ────────────────────────────────
+    var NODE_W      = 200;    // wider for better readability
+    var NODE_H      = 52;     // taller for 2-line text
+    var COL_GAP_X   = 36;     // horizontal gap between columns
+    var ROW_GAP_Y   = 20;     // vertical gap between nodes in same lane
+    var LANE_GAP_Y  = 64;     // gap between lanes
+    var HOST_W      = 80;     // host oval width
+    var HOST_H      = 48;     // host oval height
+    var LEFT_PAD    = 80;     // left margin
+    var TOP_PAD2    = 40;     // top margin
+    var FONT_SZ     = 13;     // base font size (from 10-11px)
+    var FONT_SZ_SM  = 11;     // small font size
+    var NOTE_MAX_W  = 320;    // max width for SNAT note text
+
+    var ACCESS_TRANSPORT_ROLES = ['openvpn', 'ipsec-vti', 'ipsec-policy'];
+
+    function F(v) { return v * ZOOM; }
+
+    // FIX #6: bound clamping
+    function clampY(y, top, bot, h) {
+      return Math.max(top, Math.min(bot - h, y));
+    }
+
+    // ── SVG builders ─────────────────────────────────────────────
+    function elt(tag, attrs) {
+      var e = document.createElementNS(SVG_NS, tag);
+      for (var k in attrs) {
+        if (!attrs.hasOwnProperty(k)) continue;
+        if (k === 'text') e.textContent = attrs[k];
+        else if (k === 'html') e.innerHTML = attrs[k];
+        else e.setAttribute(k, attrs[k]);
+      }
+      return e;
+    }
+
+    function mtext(x, y, str, opts) {
+      opts = opts || {};
+      var a = {
+        x: x, y: y,
+        'font-family': opts.font || '"JetBrains Mono","Fira Code",monospace',
+        'font-size': F(opts.size || FONT_SZ),
+        fill: opts.fill || '#26251e'
+      };
+      if (opts.anchor) a['text-anchor'] = opts.anchor;
+      if (opts.bold) a['font-weight'] = '600';
+      var te = elt('text', a);
+      var lines = str.split('\n');
+      te.textContent = lines[0] || '';
+      var lh = F(opts.lineH || Math.round((opts.size || FONT_SZ) * 1.35));
+      for (var i = 1; i < lines.length; i++) {
+        var tsp = elt('tspan', {
+          x: x, dy: lh,
+          'font-size': F(opts.size2 || opts.size || FONT_SZ),
+          fill: opts.fill2 || opts.fill || '#5a5852'
+        });
+        tsp.textContent = lines[i];
+        te.appendChild(tsp);
+      }
+      return te;
+    }
+
+    function nodeRect(x, y, w, h, fill, stroke) {
+      return elt('rect', { x: x, y: y, width: w, height: h, rx: F(4), fill: fill, stroke: stroke || '#111827', 'stroke-width': F(1) + '' });
+    }
+
+    function arrowLine(x1, y1, x2, y2, color, dash) {
+      color = color || '#111827';
+      var mid = color === '#2563eb' ? 'ah-blue' : (color === '#0e7490' ? 'ah-cyan' : 'ah-black');
+      var ln = elt('line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: color, 'stroke-width': Math.max(1, Math.round(F(1.5))) + '', 'marker-end': 'url(#' + mid + ')' });
+      if (dash) ln.setAttribute('stroke-dasharray', dash);
+      return ln;
+    }
+
+    // ── Labels ───────────────────────────────────────────────────
+    function tunnelLabel(tn) {
+      var desc = (tn.description || '').trim();
+      if (desc) return tn.name + '\n(' + desc + ')';
+      return tn.name;
+    }
+
+    function roleTag(role, kind) {
+      if (role === 'openvpn')       return 'OpenVPN';
+      if (role === 'ipsec-vti')     return 'IPsec-VTI';
+      if (role === 'ipsec-policy')  return '策略IPsec';
+      if (role === 'gre-upe')       return 'GRE-UPE';
+      if (role === 'gre-overseas')  return 'GRE-Overseas';
+      return (kind || role || 'unknown').substring(0, 12);
+    }
+
+    // ── Main draw ────────────────────────────────────────────────
+    function draw(topology) {
+      var svg = document.getElementById('topoSvg');
+      if (!svg) return;
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+      if (!topology || !topology.tunnels) return;
+
+      // Extract data
+      var tunnels = topology.tunnels || {};
+      var lineSideMap = topology.line_side_map || {};
+      var overseasParent = topology.overseas_parent || {};
+      var vtunToUpe = topology.vtun_to_upe || [];
+      var bgpList = topology.bgp || [];
+      var defaultTargets = topology.default_targets || [];
+      var outboundSources = topology.outbound_sources || {};
+      var outboundRuleInfo = topology.outbound_rule_info || {};
+      var hostname = topology.hostname || '本机';
+      var routes = topology.routes || [];
+
+      var tunnelNodes = [];
+      var tunnelByName = {};
+      var tnKeys = Object.keys(tunnels);
+      for (var ti = 0; ti < tnKeys.length; ti++) {
+        var tn = tunnels[tnKeys[ti]];
+        if (!tn || !tn.name) continue;
+        tunnelNodes.push(tn);
+        tunnelByName[tn.name] = tn;
+      }
+
+      function lineSide(tn) {
+        var v = lineSideMap[tn.name];
+        return (v === 'main' || v === 'backup') ? v : 'unknown';
+      }
+
+      // Partition by role + side
+      var accessBySide = { main: [], backup: [], unknown: [] };
+      var upeBySide    = { main: [], backup: [], unknown: [] };
+      var outBySide    = { main: [], backup: [], unknown: [] };
+      for (var ai = 0; ai < tunnelNodes.length; ai++) {
+        var t = tunnelNodes[ai];
+        var role = t.inferred_role || 'unknown';
+        var side = lineSide(t);
+        if (ACCESS_TRANSPORT_ROLES.indexOf(role) !== -1) accessBySide[side].push(t);
+        else if (role === 'gre-upe') upeBySide[side].push(t);
+        else if (role === 'gre-overseas') outBySide[side].push(t);
+      }
+
+      // Only render lanes that actually have content
+      var activeSides = [];
+      ['main', 'backup', 'unknown'].forEach(function(s) {
+        if (accessBySide[s].length || upeBySide[s].length || outBySide[s].length) activeSides.push(s);
+      });
+      if (!activeSides.length) activeSides = ['main', 'backup', 'unknown'];
+
+      // Compute underlay order per lane
+      var underlayOrders = {};
+      var maxUnderlay = 1;
+      activeSides.forEach(function(s) {
+        var ul = [];
+        var acc = accessBySide[s] || [];
+        for (var i = 0; i < acc.length; i++) { ul.push(acc[i].name); }
+        underlayOrders[s] = ul;
+        if (ul.length > maxUnderlay) maxUnderlay = ul.length;
+      });
+      maxUnderlay = Math.max(1, maxUnderlay);
+
+      // ── Compute dynamic column positions ──────────────────────
+      var nw = F(NODE_W), nh = F(NODE_H), cgx = F(COL_GAP_X), rgy = F(ROW_GAP_Y);
+      var hostW2 = Math.max(F(HOST_W), F(28 + String(hostname || '').length * 8));
+      var hostH2 = F(HOST_H);
+
+      // X columns — compute dynamically from max underlay count
+      var xHost    = F(LEFT_PAD);
+      var xChain0  = xHost + hostW2 + cgx;
+      var slotW    = nw + cgx;
+      var xUPE0    = xChain0 + maxUnderlay * slotW + cgx;
+      var xOut0    = xUPE0 + nw + cgx * 2;
+
+      // Compute total overseas columns needed
+      var maxOverseasInLane = 0;
+      activeSides.forEach(function(s) { maxOverseasInLane = Math.max(maxOverseasInLane, (outBySide[s] || []).length); });
+
+      // ── Compute lane heights dynamically ───────────────────────
+      var laneInfo = {};  // { side: { baseY, height, top, bottom } }
+      var curY = F(TOP_PAD2);
+
+      activeSides.forEach(function(side) {
+        var underlays = underlayOrders[side] || [];
+        var ulCount = underlays.length;
+        var overseasCount = (outBySide[side] || []).length;
+        var hasUPE = !!(upeBySide[side] && upeBySide[side].length);
+        var bgpInLane = 0;
+        for (var bi = 0; bi < bgpList.length; bi++) {
+          var at = (bgpList[bi].anchor_tunnel || '').trim();
+          if (at && (lineSideMap[at] || 'unknown') === side) bgpInLane++;
+        }
+        bgpInLane = Math.min(bgpInLane, 8);
+
+        // Compute height needed for this lane
+        var maxRow = Math.max(ulCount, overseasCount, 1);
+        var bodyH = maxRow * (nh + rgy) + rgy;
+        // Add BGP section height
+        if (bgpInLane > 0) bodyH += bgpInLane * F(42);
+
+        laneInfo[side] = {
+          baseY: curY,
+          height: bodyH,
+          top: curY,
+          bottom: curY + bodyH
+        };
+        curY += bodyH + F(LANE_GAP_Y);
+      });
+
+      // Host Y = center between first lane top and last lane bottom
+      var hostY = Math.round((laneInfo[activeSides[0]].top + laneInfo[activeSides[activeSides.length - 1]].bottom) / 2);
+      var totalW = xOut0 + maxOverseasInLane * (nw + cgx) + F(NOTE_MAX_W) + F(40);
+      var totalH = curY + F(40);
+
+      // ── SVG setup ──────────────────────────────────────────────
+      var g = elt('g', {});
+
+      var defs = elt('defs', {});
+      var markers = [
+        { id: 'ah-black', color: '#111827' },
+        { id: 'ah-blue',  color: '#2563eb' },
+        { id: 'ah-cyan',  color: '#0e7490' }
+      ];
+      for (var mi = 0; mi < markers.length; mi++) {
+        var mk = elt('marker', { id: markers[mi].id, markerWidth: '8', markerHeight: '6', refX: '7', refY: '3', orient: 'auto' });
+        mk.innerHTML = '<polygon points="0 0, 8 3, 0 6" fill="' + markers[mi].color + '"/>';
+        defs.appendChild(mk);
+      }
+      g.appendChild(defs);
+
+      var usedBoxes = []; // for overlap detection: [x, y, w, h]
+
+      function rectsOverlap(a, b) {
+        return !(a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0] || a[1] + a[3] <= b[1] || b[1] + b[3] <= a[1]);
+      }
+      function checkOverlap(x, y, w, h) {
+        var b = [x, y, w, h];
+        for (var i = 0; i < usedBoxes.length; i++) {
+          if (rectsOverlap(b, usedBoxes[i])) return true;
+        }
+        usedBoxes.push(b);
+        return false;
+      }
+
+      // ── Lane backgrounds ───────────────────────────────────────
+      var laneLabels = { main: '主线', backup: '备线', unknown: '未知线路' };
+      activeSides.forEach(function(side) {
+        var li = laneInfo[side];
+        g.appendChild(elt('rect', {
+          x: F(10), y: li.top, width: totalW - F(20), height: li.height,
+          fill: '#f9fafb', rx: F(4), 'fill-opacity': '0.5'
+        }));
+        g.appendChild(mtext(F(20), li.top + F(20), laneLabels[side] || side, { anchor: 'start', bold: true, fill: '#26251e', size: FONT_SZ_SM + 1 }));
+      });
+
+      // ── Host oval ──────────────────────────────────────────────
+      var hostCX = xHost + hostW2 / 2;
+      var hostCY = hostY;
+      var hostRX = hostW2 / 2, hostRY = hostH2 / 2;
+      g.appendChild(elt('ellipse', { cx: hostCX, cy: hostCY, rx: hostRX, ry: hostRY, fill: '#26251e', stroke: '#26251e', 'stroke-width': '1' }));
+      g.appendChild(mtext(hostCX, hostCY, hostname, { anchor: 'middle', fill: '#ffffff', size: FONT_SZ_SM + 1, bold: true }));
+      checkOverlap(xHost, hostCY - hostRY, hostW2, hostH2);
+      var hostEdgeR = xHost + hostW2;
+
+      // Position trackers
+      var upeYByName = {};
+      var vtYByName  = {};
+      var vtXByName  = {};
+      var outYByName = {};
+      var outXByName = {};
+      var tunnelUIBox  = {};
+      var bgpAnchorBox = {};
+
+      // Default route
+      var defaultIface = '';
+      var dr = topology.default_route_resolution || {};
+      if (typeof dr === 'object' && dr.tunnel) defaultIface = String(dr.tunnel).trim();
+      if (!defaultIface && defaultTargets && defaultTargets.length) defaultIface = String(defaultTargets[0][1] || '').trim();
+
+      function drawDefaultBadge(bx, by) {
+        var bw = F(72), bh = F(20);
+        g.appendChild(elt('rect', { x: bx + nw - bw, y: by - bh + F(2), width: bw + F(4), height: bh, fill: '#fef3c7', stroke: '#b45309', 'stroke-width': F(0.8) + '', rx: F(3) }));
+        g.appendChild(mtext(bx + nw - bw / 2, by - bh / 2 + F(2), 'default', { anchor: 'middle', size: FONT_SZ_SM, bold: true, fill: '#b45309' }));
+      }
+
+      // Track-fallback info
+      var outTrackFallbackParents = {};
+      var deferredTrackFallbackEdges = [];
+      for (var otfi = 0; otfi < tunnelNodes.length; otfi++) {
+        var ot = tunnelNodes[otfi];
+        if (ot.inferred_role !== 'gre-overseas' || !(ot.remote || '').trim()) continue;
+        var rmt = (ot.remote || '').trim();
+        if (!rmt) continue;
+        var primaryParent = overseasParent[ot.name] || '';
+        if (!primaryParent || !tunnelByName[primaryParent]) continue;
+        var primarySide = lineSide(tunnelByName[primaryParent]);
+        if (primarySide !== 'main' && primarySide !== 'backup') continue;
+        var dstRemote32 = rmt + '/32';
+        var matchedRoutes = [];
+        for (var mri = 0; mri < routes.length; mri++) {
+          if (routes[mri].destination === dstRemote32 && routes[mri].via_tunnel) matchedRoutes.push(routes[mri]);
+        }
+        if (!matchedRoutes.length) continue;
+        var hasTrack = matchedRoutes.some(function(mr) { return !!mr.track_name; });
+        if (!hasTrack) continue;
+        for (var mri3 = 0; mri3 < matchedRoutes.length; mri3++) {
+          var mr2 = matchedRoutes[mri3];
+          var via = mr2.via_tunnel.trim();
+          var trn = mr2.track_name.trim() || 'failover';
+          if (via === primaryParent || !tunnelByName[via]) continue;
+          var viaSide = lineSide(tunnelByName[via]);
+          if (viaSide === primarySide || (viaSide !== 'main' && viaSide !== 'backup')) continue;
+          if (!outTrackFallbackParents[ot.name]) outTrackFallbackParents[ot.name] = [];
+          outTrackFallbackParents[ot.name].push([via, trn]);
+        }
+      }
+
+      // ── DRAW EACH LANE ────────────────────────────────────────
+      activeSides.forEach(function(side) {
+        var li = laneInfo[side];
+        var baseY = li.top;
+        var underlays = underlayOrders[side] || [];
+        var upeList = upeBySide[side] || [];
+        var overseasList = outBySide[side] || [];
+
+        // UPE X
+        var xUpeLane = xUPE0;
+
+        // ── Access transport nodes ─────────────────────────────
+        for (var ui = 0; ui < underlays.length; ui++) {
+          var uname = underlays[ui];
+          var tn2 = tunnelByName[uname];
+          if (!tn2) continue;
+          var xu = xChain0 + ui * slotW;
+          var role2 = tn2.inferred_role || '';
+          vtYByName[uname] = baseY;
+          vtXByName[uname] = xu;
+
+          if (role2 === 'local-iface') continue;
+
+          var fill, stroke;
+          if (role2 === 'openvpn')           { fill = '#dbeafe'; stroke = '#93c5fd'; }
+          else if (role2 === 'ipsec-policy') { fill = '#ddd6fe'; stroke = '#c4b5fd'; }
+          else if (role2 === 'ipsec-vti')    { fill = '#e0e7ff'; stroke = '#c7d2fe'; }
+          else                               { fill = '#e5e7eb'; stroke = '#d1d5db'; }
+
+          g.appendChild(nodeRect(xu, baseY, nw, nh, fill, stroke));
+          g.appendChild(mtext(xu + nw / 2, baseY + F(16), tunnelLabel(tn2) + '\n' + roleTag(role2, tn2.kind), { anchor: 'middle', size: FONT_SZ_SM, size2: FONT_SZ_SM - 1 }));
+          checkOverlap(xu, baseY, nw, nh);
+
+          tunnelUIBox[uname] = [xu, baseY, nw, nh];
+          bgpAnchorBox[uname + '|' + side] = [xu, baseY, nw, nh];
+          if (defaultIface && uname === defaultIface) drawDefaultBadge(xu, baseY);
+        }
+
+        // Host → access arrows
+        for (var ui2 = 0; ui2 < underlays.length; ui2++) {
+          var aname2 = underlays[ui2];
+          var atn2 = tunnelByName[aname2];
+          if (!atn2 || atn2.inferred_role === 'local-iface') continue;
+          var ax = vtXByName[aname2];
+          if (ax == null) continue;
+          g.appendChild(arrowLine(hostEdgeR, hostCY, ax + F(10), baseY + nh / 2));
+        }
+
+        // ── UPE ─────────────────────────────────────────────────
+        var upe = upeList[0];
+        if (!upe) {
+          // Try to find UPE via vtun_to_upe
+          var vtFirst = accessBySide[side][0];
+          if (vtFirst) {
+            for (var vpi = 0; vpi < vtunToUpe.length; vpi++) {
+              var pair = vtunToUpe[vpi];
+              if (!pair || pair.length < 2) continue;
+              if (pair[0] === vtFirst.name) {
+                var cand = tunnelByName[pair[1]];
+                if (cand && cand.inferred_role === 'gre-upe' && lineSide(cand) === side) { upe = cand; break; }
+              }
+            }
+          }
+        }
+        if (upe) {
+          // Check overlap — if UPE X would overlap with rightmost access, push it
+          var upeX = xUpeLane;
+          var lastAccessRight = xChain0 + underlays.length * slotW;
+          if (upeX < lastAccessRight + F(20)) upeX = lastAccessRight + F(20);
+          xUpeLane = upeX;
+
+          g.appendChild(nodeRect(upeX, baseY, nw, nh, '#dcfce7', '#86efac'));
+          g.appendChild(mtext(upeX + nw / 2, baseY + F(16), tunnelLabel(upe) + '\n' + roleTag(upe.inferred_role, upe.kind), { anchor: 'middle', size: FONT_SZ_SM, size2: FONT_SZ_SM - 1 }));
+          checkOverlap(upeX, baseY, nw, nh);
+
+          upeYByName[upe.name] = baseY;
+          tunnelUIBox[upe.name] = [upeX, baseY, nw, nh];
+          bgpAnchorBox[upe.name + '|' + side] = [upeX, baseY, nw, nh];
+          if (defaultIface && upe.name === defaultIface) drawDefaultBadge(upeX, baseY);
+
+          // Arrow from rightmost access to UPE
+          var lastAX = xChain0;
+          for (var ui3 = underlays.length - 1; ui3 >= 0; ui3--) {
+            var una3 = underlays[ui3];
+            var unt3 = tunnelByName[una3];
+            if (unt3 && ACCESS_TRANSPORT_ROLES.indexOf(unt3.inferred_role || '') !== -1 && vtXByName[una3] != null) {
+              lastAX = vtXByName[una3] + nw;
+              break;
+            }
+          }
+          g.appendChild(arrowLine(lastAX, baseY + nh / 2, upeX, baseY + nh / 2));
+
+          // Update xOut0 to be after UPE
+          var upeRight = upeX + nw + cgx * 2;
+          if (upeRight > xOut0) xOut0 = upeRight;
+        }
+
+        // ── Overseas nodes ──────────────────────────────────────
+        if (overseasList.length) {
+          var overseasColX = Math.max(xOut0, xUpeLane + nw + cgx * 3);
+          var maxOutPerCol = Math.max(1, Math.floor((li.height - F(20)) / (nh + rgy)));
+          var outNoteOffsetX = nw + F(16);
+
+          for (var oi = 0; oi < overseasList.length; oi++) {
+            var out = overseasList[oi];
+            var colIdx = Math.floor(oi / maxOutPerCol);
+            var rowIdx = oi % maxOutPerCol;
+            var ox = overseasColX + colIdx * (nw + F(NOTE_MAX_W) + cgx);
+            var oy = clampY(baseY + rowIdx * (nh + rgy), li.top, li.bottom, nh);
+
+            g.appendChild(nodeRect(ox, oy, nw, nh, '#fee2e2', '#fca5a5'));
+            g.appendChild(mtext(ox + nw / 2, oy + F(16), tunnelLabel(out) + '\n' + roleTag(out.inferred_role, out.kind), { anchor: 'middle', size: FONT_SZ_SM, size2: FONT_SZ_SM - 1 }));
+            checkOverlap(ox, oy, nw, nh);
+
+            outYByName[out.name] = oy;
+            outXByName[out.name] = ox;
+            tunnelUIBox[out.name] = [ox, oy, nw, nh];
+            bgpAnchorBox[out.name + '|' + side] = [ox, oy, nw, nh];
+
+            // Parent → overseas arrow
+            var parent = overseasParent[out.name] || '';
+            var yDst = oy + nh / 2;
+            if (parent && upeYByName[parent] != null) {
+              var pbox = tunnelUIBox[parent];
+              g.appendChild(arrowLine(pbox[0] + pbox[2], pbox[1] + pbox[3] / 2, ox, yDst));
+            } else if (parent && vtYByName[parent] != null) {
+              var vbox = tunnelUIBox[parent];
+              g.appendChild(arrowLine(vbox[0] + vbox[2], vbox[1] + vbox[3] / 2, ox, yDst));
+            } else if (parent === 'host') {
+              g.appendChild(arrowLine(hostEdgeR + F(4), hostCY, ox, yDst));
+            }
+
+            // Track-fallback deferred
+            var fbList = outTrackFallbackParents[out.name] || [];
+            for (var fbi = 0; fbi < fbList.length; fbi++) {
+              deferredTrackFallbackEdges.push([fbList[fbi][0], out.name, fbList[fbi][1]]);
+            }
+
+            // Default route badge
+            var isDefault = (defaultIface && out.name === defaultIface);
+            if (!isDefault && defaultTargets && defaultTargets.length) {
+              for (var dti = 0; dti < defaultTargets.length; dti++) {
+                if (defaultTargets[dti][1] === out.name) { isDefault = true; break; }
+              }
+            }
+            if (isDefault) drawDefaultBadge(ox, oy);
+
+            // SNAT note — with overlap-aware placement
+            var srcs = outboundSources[out.name] || [];
+            var rules = outboundRuleInfo[out.name] || [];
+            var srcText = '';
+            if (rules && rules.length) {
+              var uniqSrc = [];
+              for (var sri = 0; sri < srcs.length; sri++) {
+                if (uniqSrc.indexOf(srcs[sri]) === -1) uniqSrc.push(srcs[sri]);
+              }
+              uniqSrc.sort();
+              srcText = uniqSrc.length > 4
+                ? 'SNAT ' + uniqSrc.length + '条'
+                : (uniqSrc.length ? uniqSrc.join(',') : '(未识别)');
+            } else if (srcs && srcs.length) {
+              srcText = srcs.length > 4 ? 'SNAT ' + srcs.length + '条' : srcs.join(',');
+            } else {
+              srcText = '(未识别)';
+            }
+            var noteX = ox + outNoteOffsetX;
+            // Check if note would overlap with next overseas node
+            var noteW = Math.min(srcText.length * F(FONT_SZ_SM * 0.7), F(NOTE_MAX_W));
+            if (!checkOverlap(noteX, oy, noteW, nh)) {
+              g.appendChild(mtext(noteX, oy + F(16), srcText, { anchor: 'start', size: FONT_SZ_SM - 1, fill: '#4b5563', font: '"Inter",system-ui,sans-serif' }));
+            }
+          }
+        }
+      });
+
+      // ── Deferred track-fallback edges ──────────────────────────
+      for (var dfei = 0; dfei < deferredTrackFallbackEdges.length; dfei++) {
+        var df = deferredTrackFallbackEdges[dfei];
+        var fbParent = df[0], outName = df[1], fbTrack = df[2];
+        var pb = tunnelUIBox[fbParent];
+        var ob = tunnelUIBox[outName];
+        if (!pb || !ob) continue;
+        g.appendChild(arrowLine(pb[0] + pb[2], pb[1] + pb[3] / 2, ob[0], ob[1] + ob[3] / 2, '#2563eb', '4,4'));
+        if (fbTrack) {
+          g.appendChild(mtext(Math.round((pb[0] + pb[2] + ob[0]) / 2), Math.round((pb[1] + pb[3] / 2 + ob[1] + ob[3] / 2) / 2) - F(6), 'track:' + fbTrack, { anchor: 'middle', size: FONT_SZ_SM - 1, fill: '#1d4ed8' }));
+        }
+      }
+
+      // ── BGP bindings ───────────────────────────────────────────
+      if (bgpList && bgpList.length) {
+        var byKey = {};
+        for (var bi = 0; bi < bgpList.length; bi++) {
+          var b = bgpList[bi];
+          var at = (b.anchor_tunnel || '').trim();
+          if (!at) continue;
+          var ln = lineSideMap[at] || 'unknown';
+          if (ln !== 'main' && ln !== 'backup' && ln !== 'unknown') ln = 'unknown';
+          var key = at + '|' + ln;
+          if (!byKey[key]) byKey[key] = [];
+          byKey[key].push(b);
+        }
+
+        var byKeys = Object.keys(byKey);
+        for (var bki = 0; bki < byKeys.length; bki++) {
+          var key2 = byKeys[bki];
+          var band = byKey[key2].slice(0, 8);
+          var box2 = bgpAnchorBox[key2];
+          if (!box2) continue;
+
+          var bx = box2[0], by2 = box2[1], bw2 = box2[2], bh2 = box2[3];
+          var bgpRX = F(28), bgpRY = F(18);
+          var cy = by2 + bh2 + F(12);
+          var cx = bx + bw2 / 2;
+
+          for (var bj = 0; bj < band.length; bj++) {
+            var bgp = band[bj];
+            // Check BGP doesn't overlap with anything important
+            var bgpY = cy + bgpRY;
+            checkOverlap(cx - bgpRX, bgpY - bgpRY, bgpRX * 2, bgpRY * 2 + F(44));
+
+            // BGP oval
+            g.appendChild(elt('ellipse', { cx: cx, cy: bgpY, rx: bgpRX, ry: bgpRY, fill: '#cffafe', stroke: '#0e7490', 'stroke-width': F(0.8) + '' }));
+            g.appendChild(mtext(cx, bgpY, 'BGP', { anchor: 'middle', size: FONT_SZ_SM - 1, bold: true, fill: '#0c4a6e' }));
+
+            // Neighbor label
+            var nbrLabelY = bgpY + bgpRY + F(8);
+            g.appendChild(mtext(cx, nbrLabelY, bgp.neighbor, { anchor: 'middle', size: FONT_SZ_SM - 1, bold: true, fill: '#26251e' }));
+
+            // Dashed polyline to anchor
+            var hint0 = (bgp.anchor_tunnel || bgp.egress_hint || '').trim();
+            var tgtX = null, tgtY = null;
+            if (hint0 && vtYByName[hint0] != null) {
+              tgtX = (vtXByName[hint0] || xChain0) + nw / 2;
+              tgtY = vtYByName[hint0] + nh / 2;
+            } else if (hint0 && upeYByName[hint0] != null) {
+              tgtX = xUPE0 + nw / 2;
+              tgtY = upeYByName[hint0] + nh / 2;
+            } else if (hint0 && outYByName[hint0] != null) {
+              tgtX = outXByName[hint0] + nw / 2;
+              tgtY = outYByName[hint0] + nh / 2;
+            }
+            if (tgtX != null) {
+              var midX = Math.max(cx, tgtX) + F(20);
+              g.appendChild(elt('polyline', {
+                points: cx + ',' + (nbrLabelY + F(6)) + ' ' + midX + ',' + (nbrLabelY + F(6)) + ' ' + midX + ',' + tgtY + ' ' + tgtX + ',' + tgtY,
+                fill: 'none', stroke: '#0e7490', 'stroke-width': F(0.8) + '', 'stroke-dasharray': '4,4',
+                'marker-end': 'url(#ah-cyan)'
+              }));
+            }
+            cy = nbrLabelY + F(32);
+          }
+        }
+      }
+
+      // ── Default route label on host→default-vtun ──────────────
+      var defaultVtun = '';
+      if (defaultTargets && defaultTargets.length) {
+        var dtun = String(defaultTargets[0][1] || '');
+        var dnode = tunnelByName[dtun];
+        if (dnode && ACCESS_TRANSPORT_ROLES.indexOf(dnode.inferred_role || '') !== -1) defaultVtun = dtun;
+      }
+      if (defaultVtun && vtXByName[defaultVtun] != null) {
+        var dvx = vtXByName[defaultVtun];
+        var dlSide = lineSideMap[defaultVtun] || 'unknown';
+        var dli = laneInfo[dlSide];
+        var dlBaseY = dli ? dli.top : laneInfo[activeSides[0]].top;
+        var dlYMid = dlBaseY + nh / 2;
+        var my2 = hostCY + 0.55 * (dlYMid - hostCY) - F(18);
+        g.appendChild(mtext(hostEdgeR + 0.55 * (dvx + F(10) - hostEdgeR), my2, 'default', { anchor: 'middle', size: FONT_SZ_SM, bold: true, fill: '#b45309' }));
+      }
+
+      // ── Final viewBox (auto-fit) ───────────────────────────────
+      svg.appendChild(g);
+      svg.setAttribute('viewBox', '0 0 ' + (totalW / ZOOM) + ' ' + (totalH / ZOOM));
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      applyPanTransform();
+    }
+
+    function applyPanTransform() {
+      var svg = document.getElementById('topoSvg');
+      if (!svg) return;
+      var g = svg.firstElementChild;
+      if (!g) return;
+      g.setAttribute('transform', 'translate(' + PAN_X + ',' + PAN_Y + ')');
+    }
+
+    function updateZoomLabel() {
+      var lbl = document.getElementById('zoomLabel');
+      if (lbl) lbl.textContent = Math.round(ZOOM * 100) + '%';
+    }
+
+    // ── Public API ────────────────────────────────────────────
+    return {
+      draw: draw,
+
+      getZoom: function() { return ZOOM; },
+      setZoom: function(z) { ZOOM = Math.max(0.4, Math.min(2.5, z)); return ZOOM; },
+
+      getPanX: function() { return PAN_X; },
+      setPanX: function(x) { PAN_X = x; },
+      getPanY: function() { return PAN_Y; },
+      setPanY: function(y) { PAN_Y = y; },
+
+      applyPanTransform: applyPanTransform,
+      updateZoomLabel: updateZoomLabel,
+
+      startPan: function(cx, cy) {
+        IS_PANNING = true;
+        LAST_MOUSE_X = cx;
+        LAST_MOUSE_Y = cy;
+      },
+      movePan: function(cx, cy) {
+        if (!IS_PANNING) return;
+        var svg = document.getElementById('topoSvg');
+        if (!svg) return;
+        var vb = svg.getAttribute('viewBox');
+        if (!vb) return;
+        var vbParts = vb.split(' ');
+        var vbW = parseFloat(vbParts[2]) || 1600;
+        var scale = vbW / svg.clientWidth;
+        PAN_X -= (cx - LAST_MOUSE_X) * scale;
+        PAN_Y -= (cy - LAST_MOUSE_Y) * scale;
+        LAST_MOUSE_X = cx;
+        LAST_MOUSE_Y = cy;
+        applyPanTransform();
+      },
+      endPan: function() {
+        IS_PANNING = false;
+      }
+    };
+  })();
+
+  // ============================================================
+  // UI Functions (Task 6 Part F)
+  // ============================================================
+  function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function renderNATTable(rows) {
+    var tbody = document.querySelector('#natTable tbody');
+    if (!rows || !rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px;">暂无数据。请粘贴配置后点击"解析并梳理"。</td></tr>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      html += '<tr>';
+      html += '<td>' + escHtml(r.rule) + '</td>';
+      html += '<td>' + escHtml(r.source_ip) + '</td>';
+      html += '<td>' + escHtml(r.egress_name) + '</td>';
+      html += '<td>' + escHtml(r.egress_remark) + '</td>';
+      html += '<td>' + escHtml(r.fake_ip) + '</td>';
+      html += '<td>' + escHtml(r.real_ip) + '</td>';
+      html += '</tr>';
+    }
+    tbody.innerHTML = html;
+  }
+
+  function switchResultTab(name) {
+    var panels = {
+      'nat': document.getElementById('natPanel'),
+      'topology': document.getElementById('topologyPanel'),
+      'ledger': document.getElementById('ledgerPanel'),
+      'ipdigest': document.getElementById('ipDigestPanel')
+    };
+    var tabs = {
+      'nat': document.getElementById('tabNat'),
+      'topology': document.getElementById('tabTopology'),
+      'ledger': document.getElementById('tabLedger'),
+      'ipdigest': document.getElementById('tabIpDigest')
+    };
+
+    var panelKeys = Object.keys(panels);
+    for (var i = 0; i < panelKeys.length; i++) {
+      var key = panelKeys[i];
+      if (key === name) {
+        panels[key].removeAttribute('hidden');
+        tabs[key].classList.add('active');
+        tabs[key].setAttribute('aria-selected', 'true');
+      } else {
+        panels[key].setAttribute('hidden', '');
+        tabs[key].classList.remove('active');
+        tabs[key].setAttribute('aria-selected', 'false');
+      }
+    }
+  }
+
+  // ============================================================
+  // Event Wiring
+  // ============================================================
+  document.addEventListener('DOMContentLoaded', function() {
+    // Scene tabs
+    var sceneTabs = document.querySelectorAll('.scene-tab');
+    for (var i = 0; i < sceneTabs.length; i++) {
+      sceneTabs[i].addEventListener('click', function() {
+        var scene = this.getAttribute('data-scene');
+        state.currentScene = scene;
+        document.querySelectorAll('.scene-tab').forEach(function(t) { t.classList.remove('active'); });
+        this.classList.add('active');
+      });
+    }
+
+    // Result tabs
+    var resultTabs = document.querySelectorAll('.result-tab');
+    for (var j = 0; j < resultTabs.length; j++) {
+      resultTabs[j].addEventListener('click', function() {
+        var result = this.getAttribute('data-result');
+        switchResultTab(result);
+      });
+    }
+
+    // Analyze button
+    document.getElementById('btnAnalyze').addEventListener('click', function() {
+      var scene = document.querySelector('.scene-tab.active').getAttribute('data-scene');
+      var configText = document.getElementById('configText').value;
+      var mappingText = document.getElementById('mappingText').value;
+      var acceptRemark = document.getElementById('acceptRemark').checked;
+
+      if (scene === 'er') {
+        state.rows = window.Analyzer.buildOutputRows(configText, mappingText);
+        try {
+          state.topology = window.Topology.analyze(configText, acceptRemark);
+        } catch(e) {
+          console.error('Topology analysis failed:', e);
+          state.topology = null;
+        }
+      } else {
+        state.rows = window.Analyzer.buildOutputRowsUSG(configText, mappingText);
+        state.topology = null;
+      }
+
+      renderNATTable(state.rows);
+      if (state.topology) {
+        document.getElementById('topoSummary').value = state.topology.summary || '';
+        document.getElementById('topoMermaid').value = state.topology.mermaid || '';
+        document.getElementById('ledgerText').textContent = state.topology.parse_ledger_text || '';
+        document.getElementById('ipDigestText').textContent = state.topology.ip_digest_text || '';
+      }
+      // Draw topology canvas if data is available
+      if (state.topology && state.topology.tunnels) {
+        try {
+          window.TopoCanvas.draw(state.topology);
+        } catch(e) {
+          console.error('TopoCanvas draw failed:', e);
+        }
+      } else {
+        // Clear canvas for USG scene or missing topology
+        try { window.TopoCanvas.draw(null); } catch(e) {}
+      }
+      switchResultTab('nat');
+    });
+
+    // Export CSV
+    document.getElementById('btnExport').addEventListener('click', function() {
+      if (!state.rows || !state.rows.length) {
+        alert('暂无数据可导出。');
+        return;
+      }
+      var headers = ['Rule', '源IP/网段', '出口接口', '出口备注', '假IP', '真IP'];
+      var csvLines = [headers.join(',')];
+      for (var k = 0; k < state.rows.length; k++) {
+        var row = state.rows[k];
+        csvLines.push([
+          '"' + (row.rule || '').replace(/"/g, '""') + '"',
+          '"' + (row.source_ip || '').replace(/"/g, '""') + '"',
+          '"' + (row.egress_name || '').replace(/"/g, '""') + '"',
+          '"' + (row.egress_remark || '').replace(/"/g, '""') + '"',
+          '"' + (row.fake_ip || '').replace(/"/g, '""') + '"',
+          '"' + (row.real_ip || '').replace(/"/g, '""') + '"'
+        ].join(','));
+      }
+      var blob = new Blob(['﻿' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'er_config_analysis.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // Clear button
+    document.getElementById('btnClear').addEventListener('click', function() {
+      document.getElementById('configText').value = '';
+      document.getElementById('mappingText').value = '';
+      state.rows = [];
+      state.topology = null;
+      renderNATTable([]);
+      document.getElementById('topoSummary').value = '';
+      document.getElementById('topoMermaid').value = '';
+      document.getElementById('ledgerText').textContent = '暂无数据。请解析 ER 配置以查看解析备注账本。';
+      document.getElementById('ipDigestText').textContent = '暂无数据。请解析 ER 配置以查看 IP 摘要。';
+    });
+
+    // File import
+    document.getElementById('configFile').addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        document.getElementById('configText').value = ev.target.result;
+      };
+      reader.readAsText(file);
+    });
+
+    // ── Zoom controls ──────────────────────────────────────────
+    document.getElementById('zoomIn').addEventListener('click', function() {
+      var z = window.TopoCanvas.getZoom();
+      window.TopoCanvas.setZoom(Math.min(2.5, z * 1.2));
+      window.TopoCanvas.updateZoomLabel();
+      if (state.topology && state.topology.tunnels) window.TopoCanvas.draw(state.topology);
+    });
+    document.getElementById('zoomOut').addEventListener('click', function() {
+      var z = window.TopoCanvas.getZoom();
+      window.TopoCanvas.setZoom(Math.max(0.4, z * 0.8));
+      window.TopoCanvas.updateZoomLabel();
+      if (state.topology && state.topology.tunnels) window.TopoCanvas.draw(state.topology);
+    });
+    document.getElementById('zoomReset').addEventListener('click', function() {
+      window.TopoCanvas.setZoom(1.0);
+      window.TopoCanvas.setPanX(0);
+      window.TopoCanvas.setPanY(0);
+      window.TopoCanvas.updateZoomLabel();
+      if (state.topology && state.topology.tunnels) window.TopoCanvas.draw(state.topology);
+    });
+
+    // ── Mouse wheel zoom ───────────────────────────────────────
+    document.getElementById('topoContainer').addEventListener('wheel', function(e) {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        var z = window.TopoCanvas.getZoom();
+        window.TopoCanvas.setZoom(Math.max(0.4, Math.min(2.5, z * (e.deltaY > 0 ? 0.9 : 1.1))));
+        window.TopoCanvas.updateZoomLabel();
+        if (state.topology && state.topology.tunnels) window.TopoCanvas.draw(state.topology);
+      }
+    }, { passive: false });
+
+    // ── Mouse drag pan ─────────────────────────────────────────
+    var topoContainer = document.getElementById('topoContainer');
+    topoContainer.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return; // Only left button
+      window.TopoCanvas.startPan(e.clientX, e.clientY);
+      topoContainer.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+      window.TopoCanvas.movePan(e.clientX, e.clientY);
+    });
+    document.addEventListener('mouseup', function(e) {
+      window.TopoCanvas.endPan();
+      topoContainer.style.cursor = 'grab';
+    });
+
+    console.log('ER/USG Config Analyzer loaded. Parsing engine ready.');
+  });
+  </script>
+</body>
+</html>

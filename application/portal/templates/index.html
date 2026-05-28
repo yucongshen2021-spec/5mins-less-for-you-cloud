@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<!-- v4 console -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>帮你节省5分钟</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --canvas: #f7f7f4;
+    --ink: #26251e;
+    --body: #5a5852;
+    --muted: #807d72;
+    --surface: #ffffff;
+    --hairline: #e6e5e0;
+    --hairline-strong: #cfcdc4;
+    --primary: #f54e00;
+    --primary-active: #d04200;
+    --success: #1f8a65;
+    --error: #cf2d56;
+    --hdr-h: 48px;
+    --sidebar-w: 180px;
+    --gutter: 16px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%; background: var(--canvas);
+    font-family: 'DM Sans', system-ui, -apple-system, 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    font-size: 14px; line-height: 1.5; color: var(--body);
+    overflow: hidden; -webkit-font-smoothing: antialiased;
+  }
+
+  /* ═══════════ Page Shell ═══════════ */
+  body { display: flex; flex-direction: column; }
+
+  /* ── Header bar (compact, tool-style) ── */
+  .topbar {
+    height: var(--hdr-h); min-height: var(--hdr-h); flex-shrink: 0;
+    background: var(--surface); border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; padding: 0 var(--gutter); gap: 12px;
+    z-index: 10;
+  }
+  .topbar .brand {
+    font-size: 14px; font-weight: 600; color: var(--ink); letter-spacing: 0.2px;
+    white-space: nowrap;
+  }
+  .topbar .brand-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--primary);
+    flex-shrink: 0;
+  }
+  .topbar .sep { width: 1px; height: 18px; background: var(--hairline); flex-shrink: 0; }
+  .topbar .current-app {
+    font-size: 13px; color: var(--muted); flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .topbar .current-app em { font-style: normal; color: var(--ink); font-weight: 500; }
+  .topbar .live-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--success);
+    animation: livePulse 2s ease-in-out infinite; flex-shrink: 0;
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .35; }
+  }
+  .topbar .live-label {
+    font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  .topbar .hdr-btn {
+    background: none; border: 1px solid transparent; color: var(--muted);
+    cursor: pointer; width: 30px; height: 30px; border-radius: 6px;
+    font-size: 15px; display: flex; align-items: center; justify-content: center;
+    transition: background .12s, color .12s, border-color .12s;
+    flex-shrink: 0;
+  }
+  .topbar .hdr-btn:hover { background: var(--canvas); color: var(--ink); border-color: var(--hairline); }
+
+  /* ═══════════ Body Grid ═══════════ */
+  .body-grid {
+    flex: 1; min-height: 0;
+    display: flex; padding: var(--gutter); gap: var(--gutter);
+  }
+
+  /* ── Sidebar card ── */
+  .sidebar {
+    width: var(--sidebar-w); min-width: var(--sidebar-w);
+    background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px;
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: margin-left .25s ease, opacity .25s ease;
+  }
+  .sidebar.collapsed {
+    margin-left: calc(-1 * (var(--sidebar-w) + var(--gutter)));
+    opacity: 0; pointer-events: none;
+  }
+
+  .sidebar-hd {
+    padding: 12px 14px 10px; border-bottom: 1px solid var(--hairline);
+    font-size: 10px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .sidebar-nav { flex: 1; padding: 6px 8px; overflow-y: auto; }
+  .sidebar-ft {
+    padding: 8px 14px; border-top: 1px solid var(--hairline);
+    font-size: 10px; color: var(--muted);
+  }
+  .sidebar-ft .cnt { color: var(--primary); font-weight: 600; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 7px; cursor: pointer;
+    text-decoration: none; color: var(--ink); border: 1px solid transparent;
+    opacity: 0; transform: translateY(4px);
+    animation: navIn .25s ease forwards;
+    transition: background .1s, border-color .1s;
+  }
+  .nav-item:nth-child(1) { animation-delay: .05s; }
+  .nav-item:nth-child(2) { animation-delay: .10s; }
+  .nav-item:nth-child(3) { animation-delay: .15s; }
+  .nav-item:nth-child(4) { animation-delay: .20s; }
+  @keyframes navIn { to { opacity: 1; transform: translateY(0); } }
+
+  .nav-item:hover { background: #fafaf7; }
+  .nav-item.active {
+    background: linear-gradient(135deg, rgba(245, 78, 0, 0.18) 0%, rgba(255, 160, 110, 0.08) 100%);
+    border-color: var(--hairline);
+  }
+
+  .nav-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: var(--hairline); transition: background .2s;
+  }
+  .nav-dot.online { background: var(--success); }
+  .nav-dot.offline { background: var(--error); }
+  .nav-item.active .nav-dot.online { background: var(--primary); }
+
+  .nav-label { flex: 1; font-size: 13px; font-weight: 500; line-height: 1.3; }
+
+  /* ── Main content card ── */
+  .main-card {
+    flex: 1; min-width: 0;
+    background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .main-card-body {
+    flex: 1; min-height: 0; position: relative; overflow: hidden;
+  }
+  .main-card-body iframe {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%; border: none;
+    opacity: 0; transition: opacity .2s ease;
+    pointer-events: none;
+  }
+  .main-card-body iframe.visible { opacity: 1; pointer-events: auto; }
+
+  /* Placeholder */
+  .placeholder {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--muted); pointer-events: none;
+  }
+  .placeholder .ph-hex {
+    font-family: 'JetBrains Mono', monospace; font-size: 40px;
+    opacity: 0.12; margin-bottom: 12px;
+  }
+  .placeholder .ph-text { font-size: 13px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #fff; font-size: 13px;
+    padding: 10px 22px; border-radius: 9999px;
+    opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 99;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ Header ═══════════ -->
+<header class="topbar">
+  <span class="brand-dot"></span>
+  <span class="brand">帮你节省5分钟</span>
+  <span class="sep"></span>
+  <span class="current-app" id="bannerAppName"><em>选择应用</em></span>
+  <span class="live-dot"></span>
+  <span class="live-label">Live</span>
+  <button class="hdr-btn" id="toggleSidebar" title="侧栏">&#9776;</button>
+</header>
+
+<!-- ═══════════ Body ═══════════ -->
+<div class="body-grid">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-hd">Applications</div>
+    <nav class="sidebar-nav" id="appList">
+      {% for app in apps %}
+      <a class="nav-item" href="#" data-id="{{ app.id }}" data-url="{{ app.url }}" data-name="{{ app.name }}">
+        <span class="nav-dot {{ 'online' if app.reachable else 'offline' }}"></span>
+        <span class="nav-label">{{ app.name }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-ft"><span class="cnt">{{ online_count }}</span> / {{ total_count }} online</div>
+  </aside>
+
+  <!-- Main Content Card -->
+  <main class="main-card">
+    <div class="main-card-body" id="frameArea">
+      <div class="placeholder" id="placeholder">
+        <div class="ph-hex">&lt;/&gt;</div>
+        <div class="ph-text">选择应用开始</div>
+      </div>
+      <iframe id="iframe_first" class="visible"
+        src="{{ apps[0].url }}"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
+        style="position:absolute;top:0;left:0;width:100%;height:100%;border:none">
+      </iframe>
+      <div id="framePool"></div>
+    </div>
+  </main>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  var items = document.querySelectorAll('.nav-item');
+  var pool = document.getElementById('framePool');
+  var placeholder = document.getElementById('placeholder');
+  var bannerAppName = document.getElementById('bannerAppName');
+  var sidebar = document.getElementById('sidebar');
+  var toggleBtn = document.getElementById('toggleSidebar');
+  var toast = document.getElementById('toast');
+  var sidebarOpen = true;
+  var toastTimer = null;
+  var activeId = null;
+
+  // One iframe per app, kept alive across switches.
+  // The first app's iframe is pre-rendered in HTML for instant load.
+  var frames = {};
+  var preIframe = document.getElementById('iframe_first');
+  var firstAppId = items[0].dataset.id;
+  frames[firstAppId] = preIframe;
+  // Mark as already-loaded (visible class is in HTML)
+  preIframe._loaded = true;
+
+  function showToast(msg) {
+    toast.textContent = msg; toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { toast.classList.remove('show'); }, 2500);
+  }
+
+  function switchApp(item) {
+    var id = item.dataset.id;
+    var url = item.dataset.url;
+    var name = item.dataset.name;
+    if (id === activeId) return;
+    activeId = id;
+
+    items.forEach(function(el) { el.classList.remove('active'); });
+    item.classList.add('active');
+    bannerAppName.innerHTML = '<em>' + name + '</em>';
+
+    // Hide all frames
+    Object.keys(frames).forEach(function(k) {
+      frames[k].classList.remove('visible');
+    });
+
+    // Create iframe on first visit
+    if (!frames[id]) {
+      var ifr = document.createElement('iframe');
+      ifr.sandbox = 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads';
+      ifr.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;border:none';
+      ifr.src = url;
+      ifr.addEventListener('load', function() {
+        ifr.classList.add('visible');
+      });
+      pool.appendChild(ifr);
+      frames[id] = ifr;
+    } else {
+      // Already loaded — show instantly
+      frames[id].classList.add('visible');
+    }
+
+    placeholder.style.display = 'none';
+  }
+
+  toggleBtn.addEventListener('click', function() {
+    sidebarOpen = !sidebarOpen;
+    sidebar.classList.toggle('collapsed', !sidebarOpen);
+  });
+
+  items.forEach(function(item) {
+    item.addEventListener('click', function(e) {
+      e.preventDefault();
+      switchApp(item);
+    });
+  });
+
+  var firstOnline = document.querySelector('.nav-dot.online');
+  var toActivate = firstOnline ? firstOnline.parentElement : items[0];
+  if (toActivate) switchApp(toActivate);
+
+  setInterval(function() {
+    fetch('/api/status')
+      .then(function(r) { return r.json(); })
+      .then(function(apps) {
+        items.forEach(function(item) {
+          var app = apps.find(function(a) { return a.id === item.dataset.id; });
+          if (!app) return;
+          var dot = item.querySelector('.nav-dot');
+          var cls = app.reachable ? 'online' : 'offline';
+          if (!dot.classList.contains(cls)) dot.className = 'nav-dot ' + cls;
+        });
+        var online = apps.filter(function(a) { return a.reachable; }).length;
+        var cnt = document.querySelector('.sidebar-ft .cnt');
+        if (cnt) cnt.textContent = online;
+      }).catch(function() {});
+  }, 10000);
+})();
+</script>
+
+</body>
+</html>

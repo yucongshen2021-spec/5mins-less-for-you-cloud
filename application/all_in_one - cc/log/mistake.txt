@@ -1,0 +1,252 @@
+# 犯错记录 — all_in_one 项目
+
+记录每次修改过程中因判断失误、遗漏、工具误用等原因导致的错误，
+供后续避免同类问题。
+
+======================================================================
+2026-05-13
+======================================================================
+
+## 错误 1: `_patch_format_dict` 只处理 DHCP ON，遗漏 DHCP OFF
+- 现象: 修复 WAN DHCP 按钮不生效时，只在 `_patch_format_dict` 中加了 `if network.get("wan_dhcp"):` 分支覆盖 `wan_addr`/`wan_route_block` 为 dhcp 值。当 DHCP OFF 时，builder 产生的 stale DHCP 值无法被纠正。
+- 后果: 用户取消 DHCP 勾选后生成仍输出 dhcp。
+- 修复: 新增 `else` 分支，从 network dict 读取 wan_cidr/wan_gw 恢复静态值。
+- 教训: 写 if-else 逻辑时必须两个分支都处理，不能只写"开启"逻辑。
+
+## 错误 2: 修完代码不重启 Flask 就测试
+- 现象: 修改 `er_mpls_v1.py` 后用 Playwright 测试，MPLS 仍输出 2 行"暂不可用"。实际 Flask 进程缓存了旧模块。
+- 后果: 浪费多轮 Playwright 测试时间，误以为修复无效。
+- 教训: 修改 .py 源码后必须重启 Flask（`debug=False` 无热重载）。测试前先确认服务器进程已更新。
+
+======================================================================
+2026-05-14
+======================================================================
+
+## 错误 3: 修复 MPLS 模板 KeyError 时遗漏 WAN/LAN 关键 key
+- 现象: 在 `build_mpls_domestic_format_dict` / `build_mpls_overseas_format_dict` 中添加了 `d.setdefault("return_routes_block", "")` 和 `d.setdefault("prefix_list_block", "")`，但遗漏了 `wan_if`、`wan_addr`、`lan_if_block`、`wan_route_block`、`dhcp_server_block` 五个模板必需 key。
+- 后果: 模板 `tpl.format(**d)` 仍然抛出 KeyError，且被 `except Exception: pass` 静默吞掉，output 显示"MPLS 配置生成暂不可用"（2 行）。
+- 修复: 在 build 函数内部调用 `build_wan_lan_blocks` 并 `d.update(blocks)`。
+- 教训: 修复模板 KeyError 时必须穷举模板中所有 `{变量}`，不能逐个试探。应先用正则提取全部变量名再逐一核对。
+
+## 错误 4: 使用 Playwright `setChecked()` 而非 `click()`
+- 现象: `page.locator('#epoch-fastip-wan-dhcp').setChecked(true)` 直接设置 checked 属性，不触发 DOM `onchange` 事件。`dhcpToggle()` JavaScript 函数未执行，WAN IP/网关字段仍为 "dhcp"。
+- 后果: DHCP OFF 测试显示静态 IP 未恢复，误判为后端 bug。
+- 修复: 改用 `page.click('#epoch-fastip-wan-dhcp')` 模拟真实点击。
+- 教训: Playwright 中操作 checkbox 应使用 `.check()` / `.uncheck()` 或 `.click()`，避免直接操作属性。
+
+## 错误 5: f-string 内嵌套同类型引号
+- 现象: `_humanize_error()` 中写了 `f"...包含完整的"海外出口ip"字段..."`，Python 解析器将内层 `"` 视为字符串结束符。
+- 后果: SyntaxError，Flask 无法启动。
+- 修复: 将内层引号改为中文书名号「」或改用单引号字符串。
+- 教训: f-string 中如需引号嵌套，内层必须用不同类型引号或转义。中文引号 "" 与 ASCII 引号 " 同码点，不能混用。
+
+## 错误 6: `dict.setdefault()` 无法覆盖空字符串
+- 现象: `parse_epoch_mpls` 返回 `hostname=""`（空字符串），后续 `d.setdefault("hostname", "请填写Hostname")` 不生效——key 已存在，setdefault 不覆盖。
+- 后果: hostname 始终为空，模板中 `{hostname}` 显示为空。
+- 修复: 改为 `if not d.get("hostname"): d["hostname"] = extract_lineid_mpls(raw) or "（请填写Hostname）"`。
+- 教训: `setdefault` 只看 key 是否存在，不看 value 是否为空。需要"值为空时覆盖"场景必须显式检查。
+
+## 错误 7: `except Exception: pass` 吞掉关键错误
+- 现象: `web/app.py` MPLS generate 路径中 `tpl.format(**d)` 的异常被 `except Exception: pass` 静默捕获，没有任何日志。
+- 后果: 模板 KeyError 不可见，只能看到 fallback 输出"MPLS 配置生成暂不可用"，排查耗时。
+- 修复: 改为 `except Exception as _fe: import traceback; _tb3.print_exc(); output = f"# Template format error: {_fe}\n"`。
+- 教训: 绝不要用裸 `except: pass`。至少应打印 traceback，或将异常信息输出到用户可见的位置。
+
+## 错误 8: `_humanize_error` 中 str(err) 转换丢失类型信息
+- 现象: 错误元组 `('natmiss', ['备线海外出口ip'])` 在 web endpoint 中被 `str(err)` 转成字符串后才传给前端，`_humanize_error` 收到的是字符串而非原始 tuple。
+- 后果: 需要在 `_humanize_error` 中同时处理 tuple 和字符串两种类型。
+- 修复: 在所有调用 `_humanize_error` 的地方传入原始 err（不做 str() 转换），`_humanize_error` 内部统一判断类型。
+- 教训: 错误传递链路中尽早转换类型会丢失结构信息。应保持原始类型尽可能晚地做格式化。
+
+======================================================================
+2026-05-14 (continued)
+======================================================================
+
+## 错误 9: `_set_closure_vars` cell 索引全错 — WAN DHCP 勾选触发了旁挂模式
+- 现象: 勾选 WAN DHCP 后，LAN 接口地址变为 WAN CIDR（`address '10.0.0.1/24'`），
+  DHCP server 子网也变成 WAN 网段。同时 `wan_addr` 也不显示 `dhcp`。
+- 根因: `_set_closure_vars` 中 `("us_get_net", 7): ("DEFAULT_WAN_DHCP", "bool")`
+  是错的。cell [7] 实际是 `bypass_var`（BooleanVar），cell [15] 才是 `wan_dhcp_var`。
+  cell [14] 实际是 `return_route_var`，不是 `DEFAULT_BYPASS`。
+  cell [15] 是 `wan_dhcp_var`，不是 `DEFAULT_GEN_RETURN_ROUTE`。
+  当 WAN DHCP=True 时，bypass_var 被错误设置为 True，触发了完整的旁挂路径：
+  lan_if_block 清空 → _patch_format_dict 重建时用了被污染的 lan_cidr（WAN CIDR）。
+- 后果:
+  - set interfaces ethernet eth5 address '10.0.0.1/24'（应为 192.168.5.1/24）
+  - DHCP server subnet 10.0.0.0/24（应为 192.168.5.0/24）
+  - WAN 接口不显示 dhcp（因为真正的 wan_dhcp_var 从未被设置）
+- 修复:
+  - 重排 er_map: [7]=DEFAULT_BYPASS, [14]=DEFAULT_GEN_RETURN_ROUTE, [15]=DEFAULT_WAN_DHCP
+  - hk_overrides 同步修正
+  - _patch_format_dict LAN 字段优先用 DEFAULT_LAN_CIDR 而非 lan_cidr（防御）
+- 教训: **闭包 cell 索引不能猜，必须逐一实测验证。** 通过设置每个 BooleanVar 为 True
+  并观察 get_net_cfg 的输出来反推正确的 cell→变量映射。编写 `_set_closure_vars` 的
+  原始作者就是猜错了索引，导致 WAN DHCP 和 bypass 的 BooleanVar 互换。
+
+1. **修改代码后必须重启服务** — Flask debug=False 无热重载，所有 .py 修改都需重启进程。
+2. **模板 KeyError 排查用正则提取 `{变量}`** — 不要逐个试探，用 `re.findall(r'\{(\w+)\}', template)` 一次性找到所有变量名。
+3. **Playwright 模拟用户操作必须用 click/check/uncheck** — 直接 set property 不触发事件。
+4. **永远不要 `except: pass`** — 至少 print traceback 或输出到用户可见位置。
+5. **写 if-else 必须两个分支都处理** — 只写一个分支意味着另一个分支的 bug。
+6. **`setdefault` 不覆盖空值** — 需要覆盖空字符串时用显式 `if not d.get(k):`。
+7. **f-string 引号嵌套检查** — 中文双引号 "" 与 ASCII " 是同一码点，不能同时使用。
+8. **闭包 cell 索引不能猜测** — `_set_closure_vars` 的 cell→变量映射必须通过实测验证，
+   不能靠"看起来像"来推断。本次 [7]=bypass_var 而非 wan_dhcp_var 的 bug 就是原始作者猜错了。
+9. **修复一个 bug 后必须验证所有关联行为** — 修复 `_set_closure_vars` 索引后，
+   不仅验证了 LAN 恢复正常，还验证了 WAN DHCP、旁挂、回程路由的联动行为。
+
+======================================================================
+2026-05-14 (本轮会话)
+======================================================================
+
+## 错误 10: `_set_closure_vars` 索引将 WAN DHCP 写入 bypass 变量
+- 现象: 勾选 WAN DHCP 后，bypass 模式被激活（`bypass_mode=True`），LAN 接口消失，
+  LAN CIDR 被设为 WAN CIDR。
+- 根因: cell [7] 实际是 `bypass_var`，但 `er_map` 写的是 `("us_get_net", 7): ("DEFAULT_WAN_DHCP")`。
+  真正对应关系: [7]=bypass, [14]=return_route, [15]=wan_dhcp。
+- 后果: 用户勾选 WAN DHCP → bypass_var 被设为 True → 整个旁挂路径执行。
+- 修复: 逐一实测每个 cell（set True → 观察 get_net_cfg 输出），重排 er_map。
+- 教训: 闭包 cell 索引必须实测，不能凭经验猜。
+
+## 错误 11: `build_epoch_us_format_dict` 有重复的回程路由覆盖代码
+- 现象: US 变体回程路由逻辑与 HK 不同，且 `d.get("DEFAULT_WAN_DHCP")` 永远返回 False。
+- 根因: 之前为解决 cell 索引 bug 添加的 workaround，cell 索引修复后变成多余代码。
+  `DEFAULT_WAN_DHCP` 从未被写入 dict d，所以 dhcp-interface 分支永不触发。
+- 后果: 回程路由在某些组合下产生错误结果。
+- 修复: 删除覆盖代码（20 行），让 `us_get_net()` 统一处理，与 HK 完全对齐。
+- 教训: 临时 workaround 修复根因后必须清理，否则残留代码继续造成歧义。
+
+## 错误 12: 多次 Edit replace_all 损坏文件内容
+- 现象: 用 `replace_all=true` 分别删除 `  {name1}`、`  {name2}`、`  {name3}` 时，
+  第一次 `distance 5  {name` → `distance 5` 替换后留下 `1}` 残片（变成 `distance 51}`），
+  第二次删除 `  {name2}` 时意外合并了两行（删除了换行符）。
+- 后果: 模板语法损坏，`distance 52}` `distance 53}` 无效命令。
+- 修复: 重新手写整个 TEMPLATE_ER_FLINK_VISUAL 模板块。
+- 教训:
+  - `replace_all=true` + 逐个子串删除 = 高风险。应一次性替换完整上下文。
+  - 删除操作应匹配完整模式，不要将 `{name1}` `{name2}` `{name3}` 分三次删除。
+  - 修改模板/多行字符串时，先 Read 确认当前内容，再精确匹配 old_string。
+
+## 错误 13: USG `_set_closure_vars` 去遍历无闭包的函数
+- 现象: USG 的 `build_usg_us_format_dict` / `build_usg_hk_format_dict` 没有 `__closure__`，
+  但 `_set_closure_vars` 仍逐个 cell 去尝试写入。由于函数指针下无 widget，所有操作都是
+  在 for 循环中空转（还错误地将所有 Entry 都覆写为同一个值）。
+- 后果: 性能浪费，代码误导。USG 实际架构是直接从 `globals()` 读取参数。
+- 修复: 删除 32 行死代码，替换为 2 行注释。
+- 教训: 修改框架代码前应先确认目标对象的实际结构（有没有闭包、闭包里有什么）。
+  不要假设所有模块架构相同。
+
+## 错误 14: 修完源码不重启 Flask 就认为 bug 没修好
+- 现象: 修复 ER Flink 的 `#` 后，用户仍看到旧输出带 `#`。检查源码确认已修改，最终发现
+  是 Flask 缓存的旧模块。
+- 教训: Flask `debug=False` + `_EMBEDDED_NS` 缓存 = 源码修改后必须重启进程。
+
+## 错误 15: 模板中 {name} 占位符不仅要去掉 `#`，连名字本身也要去掉
+- 现象: 第一次只去掉了 `#`，保留了 `{name1}` 等占位符，用户指出生成的命令后面
+  还有 `szd-vupe6 / F-ShenZhen4` 等描述文字，这些在 VyOS 命令中同样是非法后缀。
+- 后果: `set protocols static route ... distance 5  szd-vupe6 / F-ShenZhen4` 中，
+  `szd-vupe6` 会被当作无效参数。
+- 修复: 彻底删除 `{name1}` `{name2}` `{name3}` 占位符，以及 builder 中的 comment 拼接。
+- 教训: 理解用户需求要到位——不是"不要 #"，而是"命令行末尾不能有任何非命令文本"。
+
+======================================================================
+2026-05-16 (本轮会话)
+======================================================================
+
+## 错误 16: Edit 工具中 Unicode 弯引号与 ASCII 引号混淆
+- 现象: 用 Edit 工具写入的 Python 代码中，字符串分隔符使用了 Unicode 弯引号 `"` `"` (U+201C/U+201D) 而非 ASCII 直引号 `"` (U+0022)，导致 SyntaxError。
+- 根因: Claude 在生成中文文本时可能输出 Unicode 弯引号，Edit 工具将这些字符原样写入 .py 文件。而 Python 只认 ASCII 引号作为字符串分隔符。
+- 后果: 模块无法被 exec() 加载，Flask 启动失败。
+- 修复: 用 PowerShell 批量替换 U+201C → U+0022 和 U+201D → U+0022，同时将中文强调文本中的引号改为「」角括号以避免内嵌 ASCII 引号截断外层字符串。
+- 教训: 写入 .py 文件时必须检查引号字符编码。中文 UI 文本中的强调引号应用「」角括号(U+300C/U+300D)而非弯引号。
+
+## 错误 17: PowerShell WriteAllText 默认写入 UTF-8 BOM
+- 现象: 用 `[System.IO.File]::WriteAllText` 保存文件后，Python exec() 报告 `SyntaxError: invalid non-printable character U+FEFF`。
+- 根因: .NET 的 `File.WriteAllText` 默认使用 UTF-8 with BOM 编码。Python 3 在文件开头遇到 BOM (U+FEFF) 会报语法错误。
+- 后果: 模块加载失败，Flask 无法启动。
+- 修复: 使用 `New-Object System.Text.UTF8Encoding $false`（无 BOM）重新写入文件。
+- 教训: 用 PowerShell 写 Python 文件时，必须显式指定 UTF-8 without BOM 编码。
+
+======================================================================
+2026-05-20
+======================================================================
+
+## 错误 18: Version pills 放在 variant-bar 内导致 gv() 返回空字符串
+- 现象: 在 ER FastIP 4.0 页面上添加 5.0 版本切换按钮后，4.0 所有初始化默认值消失。
+- 根因: Version pills (class="variant-pill active") 放在 `[data-tool="epoch-fastip"]`
+  div 内，但没有 `data-variant` 属性。`gv()` 函数取第一个 `.variant-pill.active`
+  的 `dataset.variant`，取到 version pill → 返回 `undefined` → `''`。
+  所有依赖 `gv()` 的函数（ldInitForm/gen/ldNotes/ldEx）的场景 key lookup 失败。
+- 后果: 4.0 初始化表单空白，生成配置时 variant 为空走不到正确分支。
+- 修复: 将 version pills 移到 variant-bar 外部独立 div，variant-bar 只含 variant pills。
+- 教训: 任何放入 variant-bar 的按钮必须有 `data-variant` 属性，否则破坏 gv() 查询。
+  更安全的做法是 version pills 不使用 `variant-pill` class。
+
+## 错误 19: PowerShell Replace 在大型 HTML 文件中产生块级复制
+- 现象: 用 PowerShell `$content.Replace($block1, $block2)` 修改 index.html 后，
+  文件从 749 行膨胀到 2249 行，出现 3 份完整 `<script>` 块拷贝。
+- 根因: Replace 匹配的字符串在文件中出现多次（被替换的旧块和新块内容相似），
+  导致 Replace 将同一内容替换多次，叠加后产生指数级复制。
+- 后果: 页面 JS 函数重复定义，功能乱套。
+- 修复: 裁剪回 749 行，后续全部使用 Edit tool 做精确单次替换。
+- 教训: 绝对不要对大型 HTML 文件用 PowerShell 做块级 Replace。
+  使用 Edit tool 的精确逐行匹配，或限制匹配上下文确保唯一性。
+
+## 错误 20: 5.0 面板藏在 er-normal-layout 内，父容器被 hide 导致子面板不可见
+- 现象: 切换到 5.0 版本后页面空白，4.0 和 5.0 面板都不显示。
+- 根因: `showNetPanel` 中 `er-normal-layout.style.display = (isDs||isV5)?'none':''`
+  将整个父容器隐藏。5.0 面板在 er-normal-layout 内部，父不可见 → 子永远不可见。
+  4.0 面板已被单独 hide，5.0 面板也被父容器连带隐藏。
+- 修复: 改为 `isDs?'none':''`，仅域名分流时隐藏父容器。
+- 教训: 添加新 UI 面板时必须检查 DOM 层级关系。父容器 show/hide 影响所有子元素。
+
+## 错误 21: _EXAMPLE_MAP 缺少 5.0 条目导致默认数据头为空
+- 现象: 5.0 页面"填写示例" textarea 为空。
+- 根因: `web/app.py` 的 `_EXAMPLE_MAP` 未注册 `("epoch_fastip5", "hk")` 等条目。
+- 修复: 添加 5 个 variant 映射指向 `("er_fastip_5in1_v1.py", "HK5_EXAMPLE")`。
+- 教训: 新增 scenario 时必须同步更新 _EXAMPLE_MAP、_NOTES、_SCENARIO_LIST、
+  _DISK_ALIASES、_get_init_keys 五处。遗漏任一处都会产生用户可见的空缺。
+
+## 错误 22: 5.0 builder 未处理 bypass 模式
+- 现象: 勾选"旁挂模式"后生成 5.0 配置，LAN 接口仍然存在。
+- 根因: (1) `_inject_network_to_module` 的 bool keys 循环缺少 `DEFAULT_BYPASS`；
+  (2) 5.0 builder 未读取 `DEFAULT_BYPASS`；(3) 模板中 LAN 接口行无条件生成。
+- 修复: 三步联动 — backend 注入 bypass → builder 读取并生成 `{lan_if_block}`
+  条件块 → 模板用 `{lan_if_block}` 替换硬编码 LAN 行。同时 bypass 时 DNS 劫持
+  切换到 WAN 口、DHCP server 不生成。
+- 教训: 新增模块时必须完整移植 4.0 的所有参数处理逻辑。checkbox 参数涉及
+  前端 JS (gn5) → backend (_inject_network_to_module) → builder (globals读取)
+  → template ({变量}) 四层链路，每层都不能遗漏。
+
+======================================================================
+2026-05-24
+======================================================================
+
+## 错误 23: 新增功能后忘记在所有入口调用初始化函数
+- 现象: 用户保存的 5.0 初始化默认值（WAN IP: 10.200.200.10/24）在页面加载和版本切换时
+  不生效，表单始终显示 HTML 硬编码默认值（192.168.1.10/24）。
+- 根因: 添加 5.0 版本切换功能（`switchERVersion`）时，新增了两个调用路径但都遗漏了
+  `ldInitForm()`：
+  1. `switchERVersion()` — 切换 4.0/5.0 时只调用了 `ldNotes()/ldEx()`，遗漏 `ldInitForm()`
+  2. `DOMContentLoaded` — 页面初始加载时根本没有 `ldInitForm()` 调用
+- 后果: 用户在前端看到的参数值与后端生成时使用的值不一致（后端从 `user_init_placeholders.json`
+  加载了正确值，但前端表单未同步）。
+- 修复: 在两处各添加 `ldInitForm('epoch-fastip');`
+- 教训: 新增 UI 操作路径（tab 切换、版本切换、页面初始化）时，必须检查所有初始化相关
+  函数是否都被调用。对比已有路径（tab 点击、variant 切换）确认调用清单完整：
+  `showNetPanel` → `ldNotes` → `ldEx` → `ldInitForm`。
+
+======================================================================
+2026-05-24 (continued)
+======================================================================
+
+## 错误 24: 新增简化模板时未从完整模板移植关键配置项
+- 现象: USG 飞连 / 新增出口的 GRE Tunnel 接口缺少 `mtu 1300` 配置，且 description
+  包含冗余后缀 `flink` / `newexit`（如 `Main-{pe}-flink-{line_id}`）。
+- 根因: 飞连和新增出口的简化模板是从完整模板（HK/US）"剪切"出 GRE Tunnel 部分
+  创建的，但 `mtu 1300` 行被遗漏，description 格式也未对齐。
+- 后果: 生成的配置缺少 `mtu 1300`，tunnel 描述语义不正确。
+- 修复: 在两个简化模板的 4 个 tunnel 接口块各添加 `mtu 1300`，并将 description
+  改为 `Main-{main_pe}-{main_line_id}` / `BK-{backup_pe}-{backup_line_id}`。
+- 教训: 从已有模板派生新模板时，必须逐行对比，确认所有关键配置项都已移植。
+  特别是 mtu、description 格式、防火墙 zone 引用等"看起来不重要"的行。

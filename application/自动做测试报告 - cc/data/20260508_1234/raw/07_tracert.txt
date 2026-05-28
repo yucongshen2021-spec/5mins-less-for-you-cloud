@@ -1,0 +1,10 @@
+
+Tracing route to www.google.com [142.251.153.119]
+over a maximum of 30 hops:
+
+  1    <1 ms    <1 ms    <1 ms  192.168.5.1 
+  2   151 ms     *      151 ms  10.22.11.57 
+  3   152 ms   152 ms   152 ms  4.78.197.65 
+  4   152 ms     *      152 ms  142.251.153.119 
+
+Trace complete.
