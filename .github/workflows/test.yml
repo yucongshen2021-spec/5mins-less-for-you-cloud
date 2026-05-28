@@ -37,17 +37,30 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install flask pytest
 
+      - name: Start Xvfb (provides $DISPLAY for tkinter)
+        run: |
+          Xvfb :99 -screen 0 1024x768x24 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          # 等 Xvfb socket 出现，避免后续步骤抢跑
+          for i in 1 2 3 4 5; do
+            [ -e /tmp/.X99-lock ] && break
+            sleep 1
+          done
+
       - name: Show test inventory
         working-directory: application/test/all_in_one
+        env:
+          TEST_MODE: "1"
+          NO_BROWSER: "1"
         run: |
           python --version
           python -m pytest --collect-only -q --ignore=test_e2e_playwright.py
 
-      - name: Run pytest under xvfb
+      - name: Run pytest
         working-directory: application/test/all_in_one
         env:
           TEST_MODE: "1"
           NO_BROWSER: "1"
           PYTHONIOENCODING: utf-8
         run: |
-          xvfb-run -a python -m pytest -q --ignore=test_e2e_playwright.py
+          python -m pytest -q --ignore=test_e2e_playwright.py
