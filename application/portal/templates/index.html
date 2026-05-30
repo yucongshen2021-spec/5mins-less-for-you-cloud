@@ -7,7 +7,7 @@
 <title>帮你节省5分钟</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
     --canvas: #f7f7f4;
@@ -30,7 +30,7 @@
 
   html, body {
     height: 100%; background: var(--canvas);
-    font-family: 'DM Sans', system-ui, -apple-system, 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, 'Microsoft YaHei', 'PingFang SC', sans-serif;
     font-size: 14px; line-height: 1.5; color: var(--body);
     overflow: hidden; -webkit-font-smoothing: antialiased;
   }
@@ -40,8 +40,8 @@
 
   /* ── Header bar (compact, tool-style) ── */
   .topbar {
-    flex-shrink: 0; background: var(--surface); border-bottom: 1px solid var(--hairline);
-    display: flex; flex-direction: column; padding: 6px var(--gutter) 4px; gap: 3px;
+    flex-shrink: 0; background: var(--canvas); border-bottom: 1px solid var(--hairline);
+    display: flex; flex-direction: column; padding: 8px var(--gutter) 6px; gap: 4px;
     z-index: 10;
   }
   .hdr-row { display: flex; align-items: center; gap: 10px; }
@@ -284,43 +284,19 @@
   <div class="help-panel" style="position:relative;">
     <button class="hlp-close" id="hlpClose">&times;</button>
     <h2>帮你节省5分钟</h2>
-    <div class="hlp-ver">Demo 版 · port 5000-5004</div>
+    <div class="hlp-ver">Demo 试用版</div>
 
-    <h3>Demo 版是什么</h3>
-    <p>这是<strong>测试先行版</strong>，新功能和测试都在这里开发。代码永远是最新的，日常开发、调试、添加新功能都在这个版本。</p>
-
-    <h3>启动</h3>
+    <h3>四个工具</h3>
+    <p>左侧菜单切换，每个工具独立运行：</p>
     <ul>
-      <li>双击 <code>start_all.bat</code> 一键启动全部 5 个服务</li>
-      <li>或单独启动子应用：<code>application\xxx\start_xxx.bat</code></li>
+      <li><strong>配置生成</strong> — 填写线路参数（LineID、PE、隧道、IP 等），一键生成 ER/USG/MPLS/AR 网络设备配置。支持 4.0 / 5.0 版本语法切换，内置可视化模板编辑器可自定义输出格式。</li>
+      <li><strong>测试报告</strong> — 连接客户设备自动执行测试，生成 Word 格式的 FASTIP 测试报告。</li>
+      <li><strong>域名抓取</strong> — 输入网站地址，自动抓取所有请求域名，展示 DNS CNAME 链路和 CDN 归属（支持国内外几十家 CDN 识别）。</li>
+      <li><strong>配置梳理</strong> — 粘贴 VyOS 或华为防火墙配置文本，自动解析并画出拓扑图。主线/备线/未知线路分车道显示，隧道类型自动配色，SNAT 网段和默认路由一目了然。</li>
     </ul>
 
-    <h3>端口</h3>
-    <ul>
-      <li>Portal → <code>5000</code> · 域名抓取 → <code>5001</code> · 测试报告 → <code>5002</code></li>
-      <li>配置生成 → <code>5003</code> · 配置梳理 → <code>5004</code></li>
-    </ul>
-
-    <h3>侧栏下载按钮</h3>
-    <p>左侧栏底部的<strong>「下载完整应用」</strong>按钮，可以下载 <code>dist/</code> 中最新的打包 zip。这就是客户拿到的交付版。</p>
-
-    <h3>发布交付版</h3>
-    <ol>
-      <li>在 demo 版完成所有功能开发和测试</li>
-      <li><code>git checkout release && git merge main</code> 同步到交付分支</li>
-      <li>运行 <code>py -3 tools/build_release.py --version v1.0.0 --mirror-url http://外部IP:6000/api/update/manifest</code></li>
-      <li>把生成的 zip 部署到交付版服务器 <code>dist/</code> 目录</li>
-      <li>客户端的交付版自动检测到新版本并提示升级</li>
-    </ol>
-
-    <h3>测试</h3>
-    <p>全量测试（不含浏览器 E2E）：</p>
-    <p><code>cd application\test && py -3 -m pytest --deselect all_in_one/test_e2e_playwright.py</code></p>
-    <p>预期 <strong>50 passed</strong>。</p>
-
-    <h3>交付版怎么用</h3>
-    <p>交付版在 <code>release</code> 分支，端口 6000-6004。客户通过外部 IP 访问更新。切换到 release 分支即可查看：</p>
-    <p><code>git checkout release</code></p>
+    <h3>下载正式版本</h3>
+    <p>左侧栏底部的 <strong>「下载完整应用」</strong> 按钮，可以下载最新打包的交付版 zip。交付版解压即用，无需安装 Python。</p>
   </div>
 </div>
 
