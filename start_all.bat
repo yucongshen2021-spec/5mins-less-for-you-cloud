@@ -1,10 +1,18 @@
 @echo off
 chcp 65001 >nul
 set "PYTHONUTF8=1"
+set "PYTHONNOUSERSITE=1"
 cd /d "%~dp0"
+
+rem 优先用包内便携 Python（客户解压后存在），否则回退到系统 py -3（开发机器）
+set "PYTHON=%~dp0runtime\python\python.exe"
+if not exist "%PYTHON%" set "PYTHON=py -3"
+
 echo ============================================
 echo   Network Tools Portal
 echo ============================================
+echo.
+echo   Python: %PYTHON%
 echo.
 echo   [1/2] Cleaning old processes...
 for %%p in (5741 5740 5739 5742 5000) do call :kill_port %%p
@@ -20,7 +28,7 @@ echo   Press Ctrl+C to stop all.
 echo ============================================
 echo.
 cd /d "%~dp0application\portal"
-py -3 app.py
+%PYTHON% app.py
 pause
 goto :eof
 

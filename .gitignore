@@ -13,6 +13,7 @@ __pycache__/
 # ---- 打包产物 ----
 build/
 dist/
+.build_cache/
 *.egg-info/
 *.spec.bak
 
@@ -64,3 +65,7 @@ desktop.ini
 *.local.json
 secrets.json
 credentials.json
+
+# ---- 运行期缓存（portal 更新检查、临时数据）----
+.update_cache.json
+**/.update_cache.json

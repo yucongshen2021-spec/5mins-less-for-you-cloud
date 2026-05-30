@@ -46,18 +46,20 @@ application\自动梳理配置 - cc\start_配置梳理.bat
 
 ---
 
-## 环境
+## 运行环境
 
-- **OS**：Windows 10 / 11（产品本体；CI 在 Ubuntu 上跑后端测试）
-- **Python**：3.11+（开发用 3.13）
-- **依赖**：见各子应用目录下的 `requirements.txt`；最低需要：
-  ```bash
-  py -3 -m pip install flask playwright dnspython python-docx paramiko Pillow
-  ```
-- **Playwright 浏览器**（仅 `domain_capture` 和 E2E 测试需要）：
-  ```bash
-  py -3 -m playwright install chromium
-  ```
+- **客户使用（发布包）**：不需要安装 Python。解压 zip 后双击 `start_all.bat` 即可。
+- **开发环境（源码运行）**：
+  - OS：Windows 10 / 11
+  - Python：3.11+（建议 3.13）
+  - 依赖（最低）：
+    ```bash
+    py -3 -m pip install flask playwright dnspython python-docx paramiko Pillow
+    ```
+  - Playwright 浏览器（仅 `domain_capture` 和 E2E 测试需要）：
+    ```bash
+    py -3 -m playwright install chromium
+    ```
 
 ---
 
@@ -80,6 +82,9 @@ application\自动梳理配置 - cc\start_配置梳理.bat
 ├── framework/                   各子应用共用的样式 / 文档
 ├── log/                         工作区级变动记录（.md）
 ├── plan/                        设计 / 重构计划文档
+├── tools/
+│   └── build_release.py         打包客户可分发 zip
+├── dist/                        打包产物（gitignored）
 ├── start_all.bat                一键启动
 └── README.md
 ```
@@ -136,6 +141,53 @@ py -3 -m pytest all_in_one/test_hostname_all.py   # 某一组用例
 | 5742 | config_analyzer |
 
 启动前会自动清理这 5 个端口上的旧进程，所以不用担心残留。
+
+---
+
+## 发布新版本（下载通道）
+
+客户拿到的是一个解压即用的 zip 包：解压一次得到 `帮你节省5分钟/` 文件夹，双击里面的 `start_all.bat` 就能跑起整套工具。
+
+包内包含：源码 + 启动脚本 + `framework` + `runtime/python`（便携 Python + 运行时依赖）。
+因此最终 zip 体积约 **70MB~80MB**（随依赖变动）。
+
+包内不包含：`log/`、`application/test/`、`经历.md`、`plan/`、`.git/`、`editor_workspace/` 等开发期内容。
+
+### 路径 1：本地打包（手动）
+
+在项目根运行：
+
+```bash
+py -3 tools/build_release.py --version v1.0.0
+```
+
+产出 `dist/帮你节省5分钟-1.0.0.zip`。
+
+补充：
+- 不传 `--version` 时按 `git describe --tags --always --dirty` 推导，没 tag 时落到 `dev`
+- `--list-only` 可以先看源码部分会被打进去的文件清单，**不实际写 zip**
+- 构建时会自动执行 `tools/prepare_runtime.py`，把便携 Python 放进 zip 的 `runtime/python/`
+- portal 首页（http://localhost:5000）侧栏底部会自动出现一个「下载完整应用」按钮，连到 `dist/` 里最新一份合法 zip。本地没有包时按钮自动隐藏
+
+### 路径 2：GitHub Release（自动）
+
+推一个 `v*` tag，CI 自动打包并发布到对应 Release：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+`.github/workflows/release.yml`（Windows runner）会做：
+1. 跑 `tools/build_release.py --version v1.0.0`
+2. 把 zip 上传为 workflow artifact
+3. 把 zip 挂到 `v1.0.0` 这个 GitHub Release（Release notes 自动生成）
+
+也可以在 GitHub Actions 页面手动触发 `release` workflow（带版本号），用于演练或试发；这种情况下只产出 artifact，不创建 git tag、不发 Release。
+
+### 严谨性约束
+
+按项目"不允许猜测"原则，portal 端的 `/api/download/latest` 只承认**zip 内含 `RELEASE_INFO.json`** 的合法包。把别的来路 zip 丢进 `dist/` 不会被识别——必须用 `tools/build_release.py` 产出。
 
 ---
 

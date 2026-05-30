@@ -105,10 +105,49 @@
   }
   .sidebar-nav { flex: 1; padding: 6px 8px; overflow-y: auto; }
   .sidebar-ft {
-    padding: 8px 14px; border-top: 1px solid var(--hairline);
+    border-top: 1px solid var(--hairline);
     font-size: 10px; color: var(--muted);
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 10px 10px 10px;
   }
+  .sidebar-ft .ft-status { padding: 0 4px; }
   .sidebar-ft .cnt { color: var(--primary); font-weight: 600; }
+
+  /* ── Download card (sidebar bottom) ── */
+  .dl-card {
+    display: none;
+    text-decoration: none;
+    color: var(--ink);
+    background: var(--canvas);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 9px 10px 8px;
+    transition: border-color .12s, background .12s, transform .12s;
+  }
+  .dl-card.visible { display: block; }
+  .dl-card:hover {
+    border-color: var(--primary);
+    background: #fffaf6;
+  }
+  .dl-card:active { transform: translateY(1px); }
+  .dl-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 500; color: var(--ink);
+    line-height: 1.2;
+  }
+  .dl-icon {
+    width: 18px; height: 18px; flex-shrink: 0;
+    border-radius: 5px; background: var(--primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 700;
+  }
+  .dl-meta {
+    margin-top: 4px; padding-left: 26px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--muted);
+    letter-spacing: 0.2px;
+  }
 
   .nav-item {
     display: flex; align-items: center; gap: 8px;
@@ -177,6 +216,56 @@
     opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 99;
   }
   .toast.show { opacity: 1; }
+
+  /* ═══════════ Update Banner ═══════════ */
+  .update-banner {
+    display: none;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: #fff;
+    background: var(--primary);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  .update-banner.visible { display: flex; }
+  .update-banner .ub-icon {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.22);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 12px; flex-shrink: 0;
+  }
+  .update-banner .ub-msg { flex: 1; min-width: 0; line-height: 1.4; }
+  .update-banner .ub-msg b { font-weight: 600; }
+  .update-banner .ub-msg .ub-meta {
+    opacity: 0.85; font-size: 12px; margin-left: 8px;
+  }
+  .update-banner a.ub-cta {
+    color: #fff;
+    background: rgba(255,255,255,0.22);
+    border: 1px solid rgba(255,255,255,0.35);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .update-banner a.ub-cta:hover { background: rgba(255,255,255,0.32); }
+  .update-banner button.ub-dismiss {
+    background: transparent;
+    color: #fff;
+    border: none;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 6px;
+    opacity: 0.7;
+    flex-shrink: 0;
+  }
+  .update-banner button.ub-dismiss:hover { opacity: 1; }
 </style>
 </head>
 <body>
@@ -192,6 +281,17 @@
   <button class="hdr-btn" id="toggleSidebar" title="侧栏">&#9776;</button>
 </header>
 
+<!-- ═══════════ Update Banner (默认隐藏；JS 检测到新版本时显示) ═══════════ -->
+<div class="update-banner" id="updateBanner" role="status" aria-live="polite">
+  <span class="ub-icon">↑</span>
+  <span class="ub-msg">
+    发现新版本 <b id="ubRemote">—</b>
+    <span class="ub-meta">当前 <span id="ubLocal">—</span></span>
+  </span>
+  <a class="ub-cta" id="ubCta" href="#" target="_blank" rel="noopener">查看并下载</a>
+  <button class="ub-dismiss" id="ubDismiss" type="button" title="本次不再提醒">×</button>
+</div>
+
 <!-- ═══════════ Body ═══════════ -->
 <div class="body-grid">
 
@@ -206,7 +306,17 @@
       </a>
       {% endfor %}
     </nav>
-    <div class="sidebar-ft"><span class="cnt">{{ online_count }}</span> / {{ total_count }} online</div>
+    <div class="sidebar-ft">
+      <a class="dl-card" id="dlCard" href="/download/latest.zip" download
+         title="下载整个工具套件的 zip 包">
+        <div class="dl-row">
+          <span class="dl-icon">↓</span>
+          <span>下载完整应用</span>
+        </div>
+        <div class="dl-meta"><span id="dlVersion">—</span> · <span id="dlSize">—</span></div>
+      </a>
+      <div class="ft-status"><span class="cnt">{{ online_count }}</span> / {{ total_count }} online</div>
+    </div>
   </aside>
 
   <!-- Main Content Card -->
@@ -324,6 +434,60 @@
         if (cnt) cnt.textContent = online;
       }).catch(function() {});
   }, 10000);
+
+  // ── 下载入口：仅当本地 dist/ 内有合法 zip 时显示 ──
+  fetch('/api/download/latest')
+    .then(function(r) { return r.json(); })
+    .then(function(info) {
+      if (!info || !info.available) return;
+      var card = document.getElementById('dlCard');
+      var ver = document.getElementById('dlVersion');
+      var size = document.getElementById('dlSize');
+      if (info.version) ver.textContent = 'v' + String(info.version).replace(/^v/, '');
+      if (typeof info.size_mb === 'number') size.textContent = info.size_mb.toFixed(2) + ' MB';
+      card.classList.add('visible');
+    })
+    .catch(function() {});
+
+  // ── 版本更新提醒 ──
+  // 严守"不允许猜测"：只有 status==ok 且 has_update==true 才显示横幅；
+  // 任何其他情况（network_error / config_error / incomparable / same / newer）
+  // 一律不出 banner，绝不假装"已是最新"。
+  var DISMISS_KEY = 'updateBanner.dismissedFor';
+  var banner = document.getElementById('updateBanner');
+  var ubRemote = document.getElementById('ubRemote');
+  var ubLocal = document.getElementById('ubLocal');
+  var ubCta = document.getElementById('ubCta');
+  var ubDismiss = document.getElementById('ubDismiss');
+
+  function showBanner(info) {
+    var local = info.local_version || '未知';
+    var remote = info.remote_version || '—';
+    ubLocal.textContent = local;
+    ubRemote.textContent = remote;
+    var url = info.release_url || info.download_url || '#';
+    ubCta.href = url;
+    banner.classList.add('visible');
+  }
+
+  ubDismiss.addEventListener('click', function() {
+    var v = ubRemote.textContent;
+    if (v && v !== '—') {
+      try { localStorage.setItem(DISMISS_KEY, v); } catch (e) {}
+    }
+    banner.classList.remove('visible');
+  });
+
+  fetch('/api/update/check')
+    .then(function(r) { return r.json(); })
+    .then(function(info) {
+      if (!info || info.status !== 'ok' || !info.has_update) return;
+      var dismissed = '';
+      try { dismissed = localStorage.getItem(DISMISS_KEY) || ''; } catch (e) {}
+      if (dismissed && dismissed === info.remote_version) return;
+      showBanner(info);
+    })
+    .catch(function() {});
 })();
 </script>
 

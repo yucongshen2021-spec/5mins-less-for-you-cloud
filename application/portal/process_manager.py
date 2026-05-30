@@ -7,9 +7,13 @@ import atexit
 import threading
 import os
 
-BASE = r"C:\Users\123\Desktop\帮你节省5分钟"
+# portal/process_manager.py 位于 <BASE>/application/portal/，向上三级即项目根
+_HERE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.dirname(os.path.dirname(_HERE))
+# sys.executable 由启动脚本（start_*.bat）决定：客户解压包内是 runtime/python/python.exe，
+# 开发机上是系统 py。子进程沿用同一个解释器，保证依赖一致。
 PYTHON = sys.executable
-LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+LOG_DIR = os.path.join(_HERE, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # Prevent sub-apps from auto-opening browser windows.
