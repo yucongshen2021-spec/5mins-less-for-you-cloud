@@ -2,6 +2,7 @@
 import re
 import urllib.request
 import urllib.error
+import urllib.parse
 import gzip
 from flask import request, Response
 
@@ -60,7 +61,7 @@ def proxy_to(app_id: str, subpath: str, port_map: dict) -> Response:
     if port is None:
         return Response(f"Unknown app: {app_id}", status=404)
 
-    target = f"http://127.0.0.1:{port}/{subpath}"
+    target = f"http://127.0.0.1:{port}/{urllib.parse.quote(subpath, safe='/')}"
     if request.query_string:
         target += "?" + request.query_string.decode("utf-8")
 

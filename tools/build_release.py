@@ -168,7 +168,7 @@ def collect_runtime_files(runtime_python_dir: Path) -> list[tuple[Path, str]]:
     return out
 
 
-def build(version: str, output_dir: Path, include_runtime: bool) -> Path:
+def build(version: str, output_dir: Path, include_runtime: bool, mirror_url: str | None = None) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     zip_path = output_dir / f"{BUNDLE_NAME}-{version}.zip"
     if zip_path.exists():
@@ -210,9 +210,17 @@ def build(version: str, output_dir: Path, include_runtime: bool) -> Path:
               f"({runtime_info['total_bytes']/1024/1024:.1f} MB raw)", flush=True)
     print(f"[build] writing {zip_path.name} ...", flush=True)
 
+    update_config_dst = f"{BUNDLE_NAME}/application/portal/update_config.json"
+
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for src, dst in all_files:
-            zf.write(src, dst)
+            if mirror_url and dst == update_config_dst:
+                cfg = json.loads(src.read_text(encoding="utf-8"))
+                cfg["mirror_url"] = mirror_url
+                print(f"[build] mirror_url = {mirror_url}", flush=True)
+                zf.writestr(dst, json.dumps(cfg, ensure_ascii=False, indent=2))
+            else:
+                zf.write(src, dst)
         zf.writestr(
             f"{BUNDLE_NAME}/RELEASE_INFO.json",
             json.dumps(manifest, ensure_ascii=False, indent=2),
@@ -229,6 +237,9 @@ def main():
                         help="只列出会被打包的文件，不实际写 zip（仅源码部分，便于排查规则）")
     parser.add_argument("--no-runtime", action="store_true",
                         help="跳过便携 Python（zip 会非常小，仅本地小测用，客户拿到无法运行）")
+    parser.add_argument("--mirror-url",
+                        help="镜像更新地址，写入客户包 update_config.json。"
+                             "例：http://192.168.72.219:5000/api/update/manifest")
     args = parser.parse_args()
 
     version = detect_version(args.version)
@@ -242,10 +253,15 @@ def main():
             print(dst)
         return
 
+    if not args.mirror_url:
+        print("[build] WARNING: 未指定 --mirror-url，客户包内 mirror_url 保持源码默认值", flush=True)
+        print("[build]         外部客户可能无法收到更新提醒，建议指定外部可达的 mirror 地址", flush=True)
+
     print(f"[build] version = {version}")
     print(f"[build] output  = {output_dir}")
     print(f"[build] runtime = {'no' if args.no_runtime else 'yes'}")
-    zip_path = build(version, output_dir, include_runtime=not args.no_runtime)
+    zip_path = build(version, output_dir, include_runtime=not args.no_runtime,
+                     mirror_url=args.mirror_url or None)
     size_mb = zip_path.stat().st_size / 1024 / 1024
     print(f"[build] OK -> {zip_path} ({size_mb:.2f} MB)")
 

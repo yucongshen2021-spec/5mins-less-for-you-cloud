@@ -1,4 +1,4 @@
-"""Portal Flask app — unified shell + reverse proxy for all sub-apps on port 5000."""
+"""Portal Flask app — unified shell + reverse proxy for all sub-apps on port 5000 (demo)."""
 import json
 import os
 import sys
@@ -12,7 +12,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from flask import Flask, abort, jsonify, render_template, request, send_file
 import process_manager
 import proxy
-import update_check
 
 app = Flask(__name__)
 
@@ -85,54 +84,12 @@ def api_download_latest():
     return jsonify(info)
 
 
-@app.route("/api/update/check")
-def api_update_check():
-    """检查远端是否有更新版本。
-
-    ?force=1 跳过缓存（前端"重试"按钮用）。其余情况按 update_config.json 内
-    cache_ttl_seconds 的值复用上次检查结果，避免每次首页刷新都打外网。
-    """
-    force = request.args.get("force") in ("1", "true", "yes")
-    return jsonify(update_check.check(force=force))
-
-
-@app.route("/api/update/manifest")
-def api_update_manifest():
-    """对外提供更新源 manifest（让本机 portal 充当其它客户端的 mirror）。
-
-    其它机器上的 portal 把 update_config.json 的 mirror_url 指向这个端点，
-    就能拿到「本机 dist/ 里最新一份合法 zip」的版本号 + 下载地址，
-    用户点"查看并下载"会直接命中本机 portal 的 /download/latest.zip。
-
-    - 没有合法 zip 时返回 HTTP 404 + 明确错误（绝不返回 200 + 空 manifest，
-      避免客户端误把空数据当成"已是最新"）。
-    - download_url / release_url 用 request.host_url 动态生成，
-      跟随客户端发起请求时使用的 IP 或域名，避免硬编码失配。
-    """
-    info = _find_latest_release()
-    if info is None:
-        return jsonify({
-            "error": "no_release_available",
-            "message": "本机 dist/ 内没有合法 zip 包",
-        }), 404
-
-    base = request.host_url.rstrip("/")
-    return jsonify({
-        "version": info["version"],
-        "release_url": f"{base}/",
-        "download_url": f"{base}/download/latest.zip",
-        "filename": info["filename"],
-        "size_bytes": info["size"],
-        "built_at": info.get("built_at"),
-    })
-
-
 @app.route("/download/latest.zip")
 def download_latest_zip():
     """下发最新可分发包；本地无包时 404。"""
     info = _find_latest_release()
     if info is None:
-        abort(404, description="本地暂无可分发包，请先在项目根运行 python tools/build_release.py")
+        abort(404, description="本地暂无可分发 zip，请先在项目根运行 python tools/build_release.py")
     file_path = _DIST_DIR / info["filename"]
     return send_file(
         file_path,
@@ -153,7 +110,7 @@ def download_latest_zip():
     "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 def proxy_route(app_id, subpath):
     if app_id == "config_analyzer":
-        # Config analyzer is http.server on port 5742; default page:
+        # Config analyzer is http.server; default page:
         if not subpath:
             from flask import redirect
             return redirect(f"/app/{app_id}/er_config_analyzer.html")

@@ -11,7 +11,7 @@ from _smoke_helpers import APPLICATION_DIR, PYTHON, SmokeServer, http_get
 
 APP_DIR = APPLICATION_DIR / "自动抓域名发2"
 APP = APP_DIR / "app.py"
-PORT = 5739
+PORT = 5001
 
 
 @pytest.fixture(scope="module")

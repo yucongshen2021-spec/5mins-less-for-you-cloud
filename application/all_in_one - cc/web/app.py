@@ -2424,7 +2424,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    port = 5741
+    port = 5003
     print(f"all_in_one web · http://localhost:{port}")
 
     # 预加载所有模块（创建 Tk root + exec 模块代码），避免首次请求阻塞

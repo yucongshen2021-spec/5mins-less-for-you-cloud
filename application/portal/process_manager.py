@@ -30,7 +30,7 @@ APPS = [
         "name": "配置生成",
         "cwd": os.path.join(BASE, "application", "all_in_one - cc", "web"),
         "cmd": [PYTHON, "app.py"],
-        "port": 5741,
+        "port": 5003,
         "url": "/app/all_in_one/",
     },
     {
@@ -38,7 +38,7 @@ APPS = [
         "name": "测试报告",
         "cwd": os.path.join(BASE, "application", "自动做测试报告 - cc"),
         "cmd": [PYTHON, "app.py"],
-        "port": 5740,
+        "port": 5002,
         "url": "/app/test_report/",
     },
     {
@@ -46,15 +46,15 @@ APPS = [
         "name": "域名抓取",
         "cwd": os.path.join(BASE, "application", "自动抓域名发2"),
         "cmd": [PYTHON, "app.py"],
-        "port": 5739,
+        "port": 5001,
         "url": "/app/domain_capture/",
     },
     {
         "id": "config_analyzer",
         "name": "配置梳理",
         "cwd": os.path.join(BASE, "application", "自动梳理配置 - cc"),
-        "cmd": [PYTHON, "-m", "http.server", "5742"],
-        "port": 5742,
+        "cmd": [PYTHON, "-m", "http.server", "5004"],
+        "port": 5004,
         "url": "/app/config_analyzer/er_config_analyzer.html",
     },
 ]

@@ -15,14 +15,14 @@ echo.
 echo   Python: %PYTHON%
 echo.
 echo   [1/2] Cleaning old processes...
-for %%p in (5741 5740 5739 5742 5000) do call :kill_port %%p
+for %%p in (5003 5002 5001 5004 5000) do call :kill_port %%p
 echo   [2/2] Starting all services...
 echo.
 echo   Portal:      http://localhost:5000
-echo   Config Gen:  http://localhost:5741
-echo   Test Report: http://localhost:5740
-echo   DNS Capture: http://localhost:5739
-echo   Config Ana:  http://localhost:5742
+echo   Config Gen:  http://localhost:5003
+echo   Test Report: http://localhost:5002
+echo   DNS Capture: http://localhost:5001
+echo   Config Ana:  http://localhost:5004
 echo.
 echo   Press Ctrl+C to stop all.
 echo ============================================

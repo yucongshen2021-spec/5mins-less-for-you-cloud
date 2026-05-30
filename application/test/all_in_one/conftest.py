@@ -20,7 +20,7 @@ import pytest
 import _bootstrap  # noqa: F401 — 同步注入 sys.path/TEST_MODE
 from _bootstrap import APP_DIR
 
-PORT = 5741
+PORT = 5003
 BASE = f"http://127.0.0.1:{PORT}"
 APP_FILE = APP_DIR / "web" / "app.py"
 PYTHON = sys.executable

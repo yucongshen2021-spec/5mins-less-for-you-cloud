@@ -11,7 +11,7 @@ from _smoke_helpers import APPLICATION_DIR, PYTHON, SmokeServer, http_get
 
 APP_DIR = APPLICATION_DIR / "自动做测试报告 - cc"
 APP = APP_DIR / "app.py"
-PORT = 5740
+PORT = 5002
 
 
 @pytest.fixture(scope="module")

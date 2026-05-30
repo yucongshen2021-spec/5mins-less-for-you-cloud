@@ -15,7 +15,7 @@ from _smoke_helpers import APPLICATION_DIR, PYTHON, SmokeServer, http_get
 
 APP_DIR = APPLICATION_DIR / "自动梳理配置 - cc"
 HTML = APP_DIR / "er_config_analyzer.html"
-PORT = 5742
+PORT = 5004
 
 
 @pytest.fixture(scope="module")

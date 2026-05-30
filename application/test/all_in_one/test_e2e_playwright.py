@@ -22,7 +22,7 @@ PROJ = APP_DIR
 from playwright.sync_api import sync_playwright, TimeoutError as PwTimeout
 
 PYTHON = r"C:\Users\123\AppData\Local\Programs\Python\Python313\python.exe"
-PORT = 5741
+PORT = 5003
 BASE = f"http://127.0.0.1:{PORT}"
 APP_FILE = PROJ / "web" / "app.py"
 

@@ -1,12 +1,7 @@
 {
-  "_comment_zh": "客户端版本检查配置。mirror_url 已默认指向开发机 portal，内网即时生效。",
-  "_comment_format": "服务端必须返回 JSON：{ \"version\": \"x.y.z\", \"release_url\": \"http://...\", \"download_url\": \"http://....zip\" }",
-  "_comment_dev_ip": "如果开发机 IP 变了，把下面 mirror_url 里的 192.168.5.10 改成新 IP 即可。",
-
   "github_repo": "",
-  "mirror_url": "http://192.168.5.10:5000/api/update/manifest",
-
+  "mirror_url": "",
   "timeout_seconds": 5,
   "cache_ttl_seconds": 3600,
-  "user_agent": "5mins-portal-update-check"
+  "user_agent": "5mins-portal-demo"
 }
