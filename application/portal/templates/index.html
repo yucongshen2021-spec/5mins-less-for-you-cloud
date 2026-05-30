@@ -80,6 +80,36 @@
   }
   .topbar .hdr-btn:hover { background: var(--canvas); color: var(--ink); border-color: var(--hairline); }
 
+  /* ── Help overlay ── */
+  .help-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 100; align-items: center; justify-content: center;
+  }
+  .help-overlay.visible { display: flex; }
+  .help-panel {
+    background: var(--surface); border-radius: 12px; border: 1px solid var(--hairline);
+    max-width: 620px; width: 90vw; max-height: 80vh; overflow-y: auto;
+    padding: 28px 32px 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  }
+  .help-panel h2 { font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .help-panel .hlp-ver { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  .help-panel h3 { font-size: 14px; font-weight: 600; color: var(--ink); margin: 20px 0 6px; }
+  .help-panel h3:first-of-type { margin-top: 0; }
+  .help-panel p, .help-panel li { font-size: 13px; color: var(--body); line-height: 1.6; }
+  .help-panel ul { padding-left: 18px; margin: 4px 0 10px; }
+  .help-panel ol { padding-left: 18px; margin: 4px 0 10px; }
+  .help-panel code {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    background: var(--canvas); padding: 2px 6px; border-radius: 4px;
+    border: 1px solid var(--hairline); white-space: nowrap;
+  }
+  .help-panel .hlp-close {
+    position: absolute; top: 12px; right: 16px;
+    background: none; border: none; color: var(--muted); font-size: 20px;
+    cursor: pointer; line-height: 1;
+  }
+  .help-panel .hlp-close:hover { color: var(--ink); }
+
   /* ═══════════ Body Grid ═══════════ */
   .body-grid {
     flex: 1; min-height: 0;
@@ -230,7 +260,53 @@
   <span class="live-dot"></span>
   <span class="live-label">Live</span>
   <button class="hdr-btn" id="toggleSidebar" title="侧栏">&#9776;</button>
+  <button class="hdr-btn" id="toggleHelp" title="帮助">?</button>
 </header>
+
+<!-- ═══════════ Help Overlay ═══════════ -->
+<div class="help-overlay" id="helpOverlay">
+  <div class="help-panel" style="position:relative;">
+    <button class="hlp-close" id="hlpClose">&times;</button>
+    <h2>帮你节省5分钟</h2>
+    <div class="hlp-ver">Demo 版 · port 5000-5004</div>
+
+    <h3>Demo 版是什么</h3>
+    <p>这是<strong>测试先行版</strong>，新功能和测试都在这里开发。代码永远是最新的，日常开发、调试、添加新功能都在这个版本。</p>
+
+    <h3>启动</h3>
+    <ul>
+      <li>双击 <code>start_all.bat</code> 一键启动全部 5 个服务</li>
+      <li>或单独启动子应用：<code>application\xxx\start_xxx.bat</code></li>
+    </ul>
+
+    <h3>端口</h3>
+    <ul>
+      <li>Portal → <code>5000</code> · 域名抓取 → <code>5001</code> · 测试报告 → <code>5002</code></li>
+      <li>配置生成 → <code>5003</code> · 配置梳理 → <code>5004</code></li>
+    </ul>
+
+    <h3>侧栏下载按钮</h3>
+    <p>左侧栏底部的<strong>「下载完整应用」</strong>按钮，可以下载 <code>dist/</code> 中最新的打包 zip。这就是客户拿到的交付版。</p>
+
+    <h3>发布交付版</h3>
+    <ol>
+      <li>在 demo 版完成所有功能开发和测试</li>
+      <li><code>git checkout release && git merge main</code> 同步到交付分支</li>
+      <li>运行 <code>py -3 tools/build_release.py --version v1.0.0 --mirror-url http://外部IP:6000/api/update/manifest</code></li>
+      <li>把生成的 zip 部署到交付版服务器 <code>dist/</code> 目录</li>
+      <li>客户端的交付版自动检测到新版本并提示升级</li>
+    </ol>
+
+    <h3>测试</h3>
+    <p>全量测试（不含浏览器 E2E）：</p>
+    <p><code>cd application\test && py -3 -m pytest --deselect all_in_one/test_e2e_playwright.py</code></p>
+    <p>预期 <strong>50 passed</strong>。</p>
+
+    <h3>交付版怎么用</h3>
+    <p>交付版在 <code>release</code> 分支，端口 6000-6004。客户通过外部 IP 访问更新。切换到 release 分支即可查看：</p>
+    <p><code>git checkout release</code></p>
+  </div>
+</div>
 
 <!-- ═══════════ Body ═══════════ -->
 <div class="body-grid">
@@ -289,6 +365,18 @@
   var toggleBtn = document.getElementById('toggleSidebar');
   var toast = document.getElementById('toast');
   var sidebarOpen = true;
+
+  // ── Help overlay ──
+  var helpOverlay = document.getElementById('helpOverlay');
+  document.getElementById('toggleHelp').addEventListener('click', function() {
+    helpOverlay.classList.add('visible');
+  });
+  document.getElementById('hlpClose').addEventListener('click', function() {
+    helpOverlay.classList.remove('visible');
+  });
+  helpOverlay.addEventListener('click', function(e) {
+    if (e.target === helpOverlay) helpOverlay.classList.remove('visible');
+  });
   var toastTimer = null;
   var activeId = null;
 
