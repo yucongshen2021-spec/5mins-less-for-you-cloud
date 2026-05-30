@@ -1,11 +1,10 @@
 @echo off
 chcp 65001 >nul
 set "PYTHONUTF8=1"
-set "PYTHONNOUSERSITE=1"
-set "PORT=5742"
+set "PORT=5004"
 
 set "PYTHON=%~dp0..\..\runtime\python\python.exe"
-if not exist "%PYTHON%" set "PYTHON=py -3"
+if exist "%PYTHON%" (set "PYTHONNOUSERSITE=1") else (set "PYTHON=py -3")
 
 echo [1/2] Cleaning port %PORT%...
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%PORT%" ^| findstr "LISTENING" 2^>nul') do (

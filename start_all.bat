@@ -1,12 +1,15 @@
 @echo off
 chcp 65001 >nul
 set "PYTHONUTF8=1"
-set "PYTHONNOUSERSITE=1"
 cd /d "%~dp0"
 
 rem 优先用包内便携 Python（客户解压后存在），否则回退到系统 py -3（开发机器）
 set "PYTHON=%~dp0runtime\python\python.exe"
-if not exist "%PYTHON%" set "PYTHON=py -3"
+if exist "%PYTHON%" (
+    set "PYTHONNOUSERSITE=1"
+) else (
+    set "PYTHON=py -3"
+)
 
 echo ============================================
 echo   Network Tools Portal
