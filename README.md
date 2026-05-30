@@ -6,60 +6,78 @@
 
 ---
 
+## 双版本架构
+
+项目分两个版本，通过 Git 分支管理：
+
+| | Demo 版（`main`） | Release 版（`release`） |
+|---|---|---|
+| **定位** | 测试先行，永远最新 | 稳定交付，客户使用 |
+| **Portal** | 5000 | 6000 |
+| **域名抓取** | 5001 | 6001 |
+| **测试报告** | 5002 | 6002 |
+| **配置生成** | 5003 | 6003 |
+| **配置梳理** | 5004 | 6004 |
+| **下载按钮** | 有 | 无 |
+| **更新横幅** | 无 | 有 |
+| **在线升级** | 无 | 有 |
+| **CI 测试** | test.yml | release.yml（含打包发布） |
+
+两版端口互不冲突，可同时启动。
+
+### 日常流程
+
+```
+main (demo)                    release (交付)
+─────                          ─────
+开发新功能、写测试              git merge main
+测试通过                       测试通过
+                              git tag v1.0.0 → CI 自动打包发布
+                              客户通过外部 IP 检测更新 + 在线升级
+```
+
+---
+
 ## 5 个子应用
 
-| 子应用 | 端口 | 干啥的 |
-| --- | :---: | --- |
-| **portal** | 5000 | 统一入口，反向代理 + 监控其余 4 个子应用 |
-| **all_in_one** （配置生成） | 5741 | Epoch FastIP / USG FastIP / Epoch MPLS / AR SD-WAN 一键配置生成；可视化模板编辑器 |
-| **test_report** （自动做测试报告） | 5740 | 跑完测试用例后一键生成 Word 报告 |
-| **domain_capture** （自动抓域名发2） | 5739 | 域名批量抓取、解析、聚合 |
-| **config_analyzer** （自动梳理配置） | 5742 | 粘 VyOS / 华为 USG 配置进去自动出拓扑图 + 摘要 |
+| 子应用 | 功能 |
+|---|---|
+| **portal** | 统一入口，反向代理，状态监控，更新管理 |
+| **配置生成** | Epoch FastIP / USG FastIP / Epoch MPLS / AR SD-WAN 一键生成；可视化模板编辑器 |
+| **测试报告** | 跑完测试用例后一键生成 Word 报告 |
+| **域名抓取** | 域名批量抓取、DNS CNAME 链路追踪、CDN 识别 |
+| **配置梳理** | 粘贴 VyOS / 华为 USG 配置，自动生成拓扑图 + 摘要 |
 
-打开 `http://localhost:5000` 一个面板即可访问全部子应用。
+打开 portal 统一入口即可访问全部子应用。点击右上角 **"?"** 查看使用教程。
 
 ---
 
 ## 启动
 
-### 一键全启（推荐）
+### Demo 版
 
 ```bat
-start_all.bat
+start_all.bat            # 一键启动，打开 http://localhost:5000
 ```
 
-这个脚本会做：
-1. 杀掉 5000 / 5741 / 5740 / 5739 / 5742 上的旧进程
-2. 拉起 portal（5000），portal 再依次拉起其余 4 个子应用
-3. 浏览器自动打开 `http://localhost:5000`
-
-按 `Ctrl+C` 退出，portal 会把所有子应用一并清理。
-
-### 单独启某个子应用
+### Release 版
 
 ```bat
-application\all_in_one - cc\start_配置生成.bat
-application\自动做测试报告 - cc\start_测试报告.bat
-application\自动抓域名发2\start_域名抓取.bat
-application\自动梳理配置 - cc\start_配置梳理.bat
+start_all.bat            # 一键启动，打开 http://localhost:6000
 ```
+
+Ctrl+C 退出，portal 会把所有子应用一并清理。
 
 ---
 
 ## 运行环境
 
 - **客户使用（发布包）**：不需要安装 Python。解压 zip 后双击 `start_all.bat` 即可。
-- **开发环境（源码运行）**：
-  - OS：Windows 10 / 11
-  - Python：3.11+（建议 3.13）
-  - 依赖（最低）：
-    ```bash
-    py -3 -m pip install flask playwright dnspython python-docx paramiko Pillow
-    ```
-  - Playwright 浏览器（仅 `domain_capture` 和 E2E 测试需要）：
-    ```bash
-    py -3 -m playwright install chromium
-    ```
+- **开发环境**：Windows 10/11，Python 3.13
+  ```bash
+  py -3 -m pip install flask playwright dnspython python-docx paramiko Pillow
+  py -3 -m playwright install chromium          # domain_capture + E2E 测试需要
+  ```
 
 ---
 
@@ -68,24 +86,24 @@ application\自动梳理配置 - cc\start_配置梳理.bat
 ```
 .
 ├── application/
-│   ├── portal/                  统一入口 + 反向代理 (5000)
-│   ├── all_in_one - cc/         配置生成 (5741)
-│   ├── 自动做测试报告 - cc/      测试报告 (5740)
-│   ├── 自动抓域名发2/            域名抓取 (5739)
-│   ├── 自动梳理配置 - cc/        配置梳理 (5742)
-│   └── test/                    全部 Python 测试（按 app 分子目录）
-│       ├── all_in_one/
-│       ├── portal/
-│       ├── test_report/
-│       ├── domain_capture/
-│       └── config_analyzer/
-├── framework/                   各子应用共用的样式 / 文档
-├── log/                         工作区级变动记录（.md）
-├── plan/                        设计 / 重构计划文档
+│   ├── portal/                      统一入口 + 反向代理
+│   ├── all_in_one - cc/             配置生成
+│   ├── 自动做测试报告 - cc/          测试报告
+│   ├── 自动抓域名发2/                域名抓取
+│   ├── 自动梳理配置 - cc/            配置梳理
+│   └── test/                        全部测试（按 app 分目录）
 ├── tools/
-│   └── build_release.py         打包客户可分发 zip
-├── dist/                        打包产物（gitignored）
-├── start_all.bat                一键启动
+│   ├── build_release.py             打包客户可分发 zip
+│   ├── prepare_runtime.py           准备便携 Python 运行时
+│   ├── publish_manifest.py          生成更新清单
+│   └── simulate_customer.py         模拟客户更新检测
+├── .github/workflows/
+│   ├── test.yml                     CI 测试（main 分支）
+│   └── release.yml                  CI 测试 + 打包发布（release 分支）
+├── log/                             变动记录
+├── plan/                            设计文档
+├── dist/                            打包产物（gitignored）
+├── start_all.bat                    一键启动
 └── README.md
 ```
 
@@ -93,109 +111,97 @@ application\自动梳理配置 - cc\start_配置梳理.bat
 
 ## 测试
 
-测试统一放在 `application/test/`，按子应用分目录。
-
-### 跑后端全量（不含浏览器自动化）
+### 全量后端测试
 
 ```bash
 cd application\test
 py -3 -m pytest --deselect all_in_one/test_e2e_playwright.py
 ```
 
-预期：**44 passed**（39 个 all_in_one 后端 + 5 个 4 应用烟雾测试），约 25 s。
+- Demo 版预期：**50 passed**（39 all_in_one + 11 smoke 含功能开关）
+- Release 版预期：**49 passed**（同上，减 1 个下载端点测试）
 
-### 跑 Playwright E2E
+### Playwright 浏览器 E2E
 
 ```bash
 cd application\test\all_in_one
 py -3 test_e2e_playwright.py --quick
 ```
 
-预期：**42/42 通过**，约 45 s。
+预期：**42/42 通过**
 
-首次使用前需要安装：
 ```bash
 py -3 -m pip install pytest-playwright psutil
 py -3 -m playwright install chromium
 ```
 
-### 只跑某个子应用
+### 版本更新仿真
 
 ```bash
-cd application\test
-py -3 -m pytest portal              # portal 烟雾
-py -3 -m pytest all_in_one          # all_in_one 全部后端
-py -3 -m pytest all_in_one/test_hostname_all.py   # 某一组用例
+py -3 tools\simulate_customer.py
 ```
 
----
-
-## 端口规划
-
-| 端口 | 用途 |
-| :---: | --- |
-| 5000 | portal（统一入口） |
-| 5739 | domain_capture |
-| 5740 | test_report |
-| 5741 | all_in_one |
-| 5742 | config_analyzer |
-
-启动前会自动清理这 5 个端口上的旧进程，所以不用担心残留。
+模拟 6 个场景：版本相同、有新版本、服务器宕机、客户版本更高、缓存生效等。预期 **24/24 通过**。
 
 ---
 
-## 发布新版本（下载通道）
+## 在线更新（Release 版）
 
-客户拿到的是一个解压即用的 zip 包：解压一次得到 `帮你节省5分钟/` 文件夹，双击里面的 `start_all.bat` 就能跑起整套工具。
+### 客户端
 
-包内包含：源码 + 启动脚本 + `framework` + `runtime/python`（便携 Python + 运行时依赖）。
-因此最终 zip 体积约 **70MB~80MB**（随依赖变动）。
+Release 版启动后自动检查更新。检测到新版本时顶部出现橙色横幅，点击**「在线升级」**按钮自动下载、替换文件、重启 portal。用户数据不受影响。
 
-包内不包含：`log/`、`application/test/`、`经历.md`、`plan/`、`.git/`、`editor_workspace/` 等开发期内容。
+### 服务端
 
-### 路径 1：本地打包（手动）
+1. 把新 zip 放到 `dist/` 目录
+2. `/api/update/manifest` 自动识别最新 zip 并返回版本信息
+3. 无需重启 portal
 
-在项目根运行：
+### 打包时预置更新源
+
+```bash
+py -3 tools/build_release.py --version v1.0.0 --mirror-url http://外部IP:6000/api/update/manifest
+```
+
+客户包内的 `update_config.json` 会自动写入 `mirror_url`，解压即用。
+
+---
+
+## 发布新版本
+
+### 本地打包
 
 ```bash
 py -3 tools/build_release.py --version v1.0.0
 ```
 
-产出 `dist/帮你节省5分钟-1.0.0.zip`。
+产出 `dist/帮你节省5分钟-1.0.0.zip`（约 70-80 MB，含便携 Python 运行时）。
 
-补充：
-- 不传 `--version` 时按 `git describe --tags --always --dirty` 推导，没 tag 时落到 `dev`
-- `--list-only` 可以先看源码部分会被打进去的文件清单，**不实际写 zip**
-- 构建时会自动执行 `tools/prepare_runtime.py`，把便携 Python 放进 zip 的 `runtime/python/`
-- portal 首页（http://localhost:5000）侧栏底部会自动出现一个「下载完整应用」按钮，连到 `dist/` 里最新一份合法 zip。本地没有包时按钮自动隐藏
+更多选项：
+- `--no-runtime`：不打包 Python 运行时，仅源码（约 3 MB，本地测试用）
+- `--mirror-url <url>`：注入更新源地址到客户包
+- `--list-only`：预览文件清单，不实际写 zip
 
-### 路径 2：GitHub Release（自动）
+### GitHub Release（自动）
 
-推一个 `v*` tag，CI 自动打包并发布到对应 Release：
+在 release 分支推 tag：
 
 ```bash
+git checkout release
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-`.github/workflows/release.yml`（Windows runner）会做：
-1. 跑 `tools/build_release.py --version v1.0.0`
-2. 把 zip 上传为 workflow artifact
-3. 把 zip 挂到 `v1.0.0` 这个 GitHub Release（Release notes 自动生成）
-
-也可以在 GitHub Actions 页面手动触发 `release` workflow（带版本号），用于演练或试发；这种情况下只产出 artifact，不创建 git tag、不发 Release。
-
-### 严谨性约束
-
-按项目"不允许猜测"原则，portal 端的 `/api/download/latest` 只承认**zip 内含 `RELEASE_INFO.json`** 的合法包。把别的来路 zip 丢进 `dist/` 不会被识别——必须用 `tools/build_release.py` 产出。
+CI 自动跑测试 → 打包 → 发布 GitHub Release。
 
 ---
 
 ## 开发须知
 
-- **永远不要用兜底逻辑**：用户输入决定输出，输出必须可重现，不允许任何"猜一下"的行为。
-- **修代码前先看 / 跑测试**：每个子应用的测试目录都是入口。
-- **每次有动作要记一笔**：根目录 `log/` 和每个 app 自己的 `log/` 都存变动记录。
+- **永远不要用兜底逻辑**：输出必须可重现，不允许猜测
+- **TDD**：先写测试，再写实现
+- **每次有动作记一笔**：`log/` 目录存变动记录
+- **审查意见不进客户包**：`审查意见-*.md` 已在 build_release.py 排除
 
 ---
 
