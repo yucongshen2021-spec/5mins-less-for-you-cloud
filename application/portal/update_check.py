@@ -68,7 +68,7 @@ def load_config(config_path: Path | None = None) -> dict[str, Any]:
     path = config_path or (_HERE / CONFIG_FILENAME)
     if path.is_file():
         try:
-            user_cfg = json.loads(path.read_text(encoding="utf-8"))
+            user_cfg = json.loads(path.read_text(encoding="utf-8-sig"))
             if isinstance(user_cfg, dict):
                 cfg.update({k: v for k, v in user_cfg.items() if k in DEFAULT_CONFIG})
         except (OSError, json.JSONDecodeError):
@@ -86,7 +86,7 @@ def get_local_version() -> str | None:
     if not _LOCAL_RELEASE_INFO.is_file():
         return None
     try:
-        meta = json.loads(_LOCAL_RELEASE_INFO.read_text(encoding="utf-8"))
+        meta = json.loads(_LOCAL_RELEASE_INFO.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError):
         return None
     v = meta.get("version")
@@ -246,7 +246,7 @@ def _load_disk_cache() -> tuple[float, dict] | None:
     if not p.is_file():
         return None
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
+        data = json.loads(p.read_text(encoding="utf-8-sig"))
         ts = float(data.get("timestamp"))
         result = data.get("result")
         if isinstance(result, dict):
