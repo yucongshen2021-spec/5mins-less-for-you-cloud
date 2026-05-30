@@ -56,6 +56,10 @@
   }
   .ver-badge.demo { background: rgba(245, 78, 0, 0.12); color: var(--primary); }
   .ver-badge.release { background: rgba(31, 138, 101, 0.12); color: var(--success); }
+  .topbar .brand-sub {
+    font-size: 11px; font-weight: 400; color: var(--muted);
+    margin-left: 2px; white-space: nowrap;
+  }
   .topbar .brand-dot {
     width: 6px; height: 6px; border-radius: 50%; background: var(--primary);
     flex-shrink: 0;
@@ -262,12 +266,13 @@
 <header class="topbar">
   <span class="brand-dot"></span>
   <span class="brand">帮你节省5分钟 <span class="ver-badge demo">DEMO</span></span>
+  <span class="brand-sub">demo试用版，左下角可下载正式版本</span>
+  <button class="hdr-btn" id="toggleSidebar" title="侧栏">&#9776;</button>
+  <button class="hdr-btn" id="toggleHelp" title="帮助">?</button>
   <span class="sep"></span>
   <span class="current-app" id="bannerAppName"><em>选择应用</em></span>
   <span class="live-dot"></span>
   <span class="live-label">Live</span>
-  <button class="hdr-btn" id="toggleSidebar" title="侧栏">&#9776;</button>
-  <button class="hdr-btn" id="toggleHelp" title="帮助">?</button>
 </header>
 
 <!-- ═══════════ Help Overlay ═══════════ -->
