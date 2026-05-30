@@ -63,11 +63,21 @@ def _find_latest_release():
     }
 
 
+def _local_version():
+    try:
+        info = json.loads((Path(__file__).resolve().parents[2] / "RELEASE_INFO.json").read_text(encoding="utf-8"))
+        v = info.get("version")
+        return v if isinstance(v, str) and v.strip() else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
 @app.route("/")
 def index():
     apps = process_manager.get_apps_status()
     online_count = sum(1 for a in apps if a["reachable"])
-    return render_template("index.html", apps=apps, online_count=online_count, total_count=len(apps))
+    return render_template("index.html", apps=apps, online_count=online_count, total_count=len(apps),
+                           local_version=_local_version())
 
 
 @app.route("/api/status")
