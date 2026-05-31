@@ -2,6 +2,8 @@
 
 > 2026-05-30
 
+> ⚠️ **现状勘误（2026-05-31）**：实际实现采用 release 端口 **7000-7004**（避开 6xxx 段常见占用）。本文正文保留原设计稿以追溯改动，所有 `6000` 应读作 `7000`、`6001` 读作 `7001`、依此类推。当前真实实现以 `start_all.bat`、`application/portal/process_manager.py`、`application/portal/app.py` 为准。
+
 ## 概述
 
 将应用拆分为 demo 版（测试先行，永远最新）和 release 版（稳定，客户使用）。

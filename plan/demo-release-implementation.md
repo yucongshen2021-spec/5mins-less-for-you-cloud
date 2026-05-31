@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> ⚠️ **现状勘误（2026-05-31）**：实际实现采用 release 端口 **7000-7004**（避开 6xxx 段常见占用）。本文正文保留原计划稿以追溯改动，所有 `6000` 应读作 `7000`、`6001` 读作 `7001`、依此类推。当前真实实现以 `start_all.bat`、`application/portal/process_manager.py`、`application/portal/app.py` 为准。
+
 **Goal:** 将应用拆分为 demo 版（main 分支，port 5000-5004，有下载无更新）和 release 版（release 分支，port 6000-6004，有更新无下载），两套端口互不冲突。
 
 **Architecture:** 两份独立代码分别在 `main` 和 `release` 分支，目录结构相同但端口和功能开关不同。main 分支永远最新；release 通过 merge main 获得稳定版本。

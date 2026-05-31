@@ -594,7 +594,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
 </div>
 
 <div class="footer">
-  Domain Capture · 本机 <span>127.0.0.1:5739</span> · 抓取引擎: {{ browser_name }} · 局域网访问需防火墙放行端口 5739
+  Domain Capture · 本机 <span>127.0.0.1:5001</span> · 抓取引擎: {{ browser_name }} · 局域网访问需防火墙放行端口 5001
 </div>
 
 <div class="toast" id="toast"></div>
@@ -676,7 +676,7 @@ async function doCapture() {
   } catch(e) {
     const msg = e.message || '网络错误';
     if (msg === 'Failed to fetch' || msg.includes('fetch')) {
-      showError('无法连接后端服务，请确认程序已启动（端口 5739 未被占用）');
+      showError('无法连接后端服务，请确认程序已启动（端口 5001 未被占用）');
     } else {
       showError(msg);
     }

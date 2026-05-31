@@ -13,11 +13,11 @@
 | | Demo 版（`main`） | Release 版（`release`） |
 |---|---|---|
 | **定位** | 测试先行，永远最新 | 稳定交付，客户使用 |
-| **Portal** | 5000 | 6000 |
-| **域名抓取** | 5001 | 6001 |
-| **测试报告** | 5002 | 6002 |
-| **配置生成** | 5003 | 6003 |
-| **配置梳理** | 5004 | 6004 |
+| **Portal** | 5000 | 7000 |
+| **域名抓取** | 5001 | 7001 |
+| **测试报告** | 5002 | 7002 |
+| **配置生成** | 5003 | 7003 |
+| **配置梳理** | 5004 | 7004 |
 | **下载按钮** | 有 | 无 |
 | **更新横幅** | 无 | 有 |
 | **在线升级** | 无 | 有 |
@@ -63,7 +63,7 @@ start_all.bat            # 一键启动，打开 http://localhost:5000
 ### Release 版
 
 ```bat
-start_all.bat            # 一键启动，打开 http://localhost:6000
+start_all.bat            # 一键启动，打开 http://localhost:7000
 ```
 
 Ctrl+C 退出，portal 会把所有子应用一并清理。
@@ -160,7 +160,7 @@ Release 版启动后自动检查更新。检测到新版本时顶部出现橙色
 ### 打包时预置更新源
 
 ```bash
-py -3 tools/build_release.py --version v1.0.0 --mirror-url http://外部IP:6000/api/update/manifest
+py -3 tools/build_release.py --version v1.0.0 --mirror-url http://外部IP:7000/api/update/manifest
 ```
 
 客户包内的 `update_config.json` 会自动写入 `mirror_url`，解压即用。
