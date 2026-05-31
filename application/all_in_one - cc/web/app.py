@@ -921,9 +921,13 @@ def generate_epoch_fastip5():
                     return jsonify({"ok": False, "error": "非香港 IPSec builder 或模板未找到"}), 500
                 result = build_fn(hdr_text)
                 if isinstance(result, tuple):
+                    if result[0] is None:
+                        return jsonify({"ok": False, "error": _humanize_error(result[1], variant)}), 400
                     d, warning = result
                 else:
                     d, warning = result, ""
+                if not isinstance(d, dict):
+                    return jsonify({"ok": False, "error": "IPSec builder 返回格式异常"}), 500
                 if hostname_override and isinstance(d, dict):
                     d["hostname"] = hostname_override
                 output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)

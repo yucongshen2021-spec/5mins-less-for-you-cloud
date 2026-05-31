@@ -2510,11 +2510,21 @@ def build_epoch5_us_ipsec_format_dict(hdr_text: str):
     d["bypass_gre"] = ""
     d["lan_net"] = "192.168.5.0/24"
 
+    d.setdefault("ce_loip", d.get("CE Docking", d.get("ce_loip", "10.22.242.223")))
     d.setdefault("main_ce_loip", d.get("ce_loip", ""))
     d.setdefault("bk_ce_loip", d.get("ce_loip", ""))
     d.setdefault("_lan_net_block", "")
     d.setdefault("fw_options_block", "")
     d.setdefault("wan_gw_force", "")
+
+    # ── 9. 确保所有模板占位符都有默认值 ──
+    d.setdefault("main_dial_pe", d.get("main_us_pe", "szd-upe3"))
+    d.setdefault("main_docking_ip", d.get("main_us_docking", "10.200.200.37"))
+    d.setdefault("main_secret", "both-win")
+    d.setdefault("bk_dial_pe", d.get("bk_us_pe", "szc-upe1"))
+    d.setdefault("bk_dial_ip", "120.133.134.72")
+    d.setdefault("bk_loop_ip", d.get("main_loop_ip", "10.50.118.76").replace("86.74", "118.76"))
+    d.setdefault("bk_docking_ip", "10.200.200.27")
 
     return d, warning
 
