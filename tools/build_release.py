@@ -70,6 +70,7 @@ EXCLUDE_FILE_GLOBS = [
     "mistake.txt",
     "经历.md",
     "DESIGN.md",
+    "AGENTS.md",  # 给 AI agent 看的工作守则，客户包不需要
     "user_init_placeholders.json",
     # 单元测试不发客户（开发期跑用，已通过严格命名约定区分）
     "test_*.py",

@@ -69,3 +69,9 @@ credentials.json
 # ---- 运行期缓存（portal 更新检查、临时数据）----
 .update_cache.json
 **/.update_cache.json
+
+# ---- AI 助手错误记录（仅本机维护，不进 git）----
+mistake.txt
+**/mistake.txt
+log/mistake/
+**/log/mistake/
