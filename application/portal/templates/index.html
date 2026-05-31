@@ -154,23 +154,37 @@
   .sidebar-ft .ft-status { padding: 0 4px; }
   .sidebar-ft .cnt { color: var(--primary); font-weight: 600; }
 
-  /* ── Download card (sidebar bottom) ── */
+  /* ── Download card (sidebar bottom)：永驻 + 状态机 ── */
   .dl-card {
-    display: none;
+    display: block;
     text-decoration: none;
     color: var(--ink);
     background: var(--canvas);
     border: 1px solid var(--hairline);
     border-radius: 8px;
     padding: 9px 10px 8px;
-    transition: border-color .12s, background .12s, transform .12s;
+    transition: border-color .12s, background .12s, transform .12s, opacity .12s;
   }
-  .dl-card.visible { display: block; }
-  .dl-card:hover {
+  /* 状态：还没向后端确认 / 后端确认无可下载 zip → 灰色不可点 */
+  .dl-card.is-empty {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  .dl-card.is-empty .dl-icon {
+    background: var(--hairline);
+    color: var(--muted);
+  }
+  .dl-card.is-empty:hover {
+    border-color: var(--hairline);
+    background: var(--canvas);
+  }
+  /* 状态：可下载 → 高亮可点 */
+  .dl-card.is-ready { cursor: pointer; }
+  .dl-card.is-ready:hover {
     border-color: var(--primary);
     background: #fffaf6;
   }
-  .dl-card:active { transform: translateY(1px); }
+  .dl-card.is-ready:active { transform: translateY(1px); }
   .dl-row {
     display: flex; align-items: center; gap: 8px;
     font-size: 12px; font-weight: 500; color: var(--ink);
@@ -315,11 +329,12 @@
       {% endfor %}
     </nav>
     <div class="sidebar-ft">
-      <a class="dl-card" id="dlCard" href="/download/latest.zip" download
-         title="下载整个工具套件的 zip 包">
+      <a class="dl-card is-empty" id="dlCard" download
+         title="检测可下载的发布包中…"
+         aria-live="polite">
         <div class="dl-row">
           <span class="dl-icon">↓</span>
-          <span>下载完整应用</span>
+          <span class="dl-label" id="dlLabel">检测可下载版本…</span>
         </div>
         <div class="dl-meta"><span id="dlVersion">—</span> · <span id="dlSize">—</span></div>
       </a>
@@ -455,19 +470,72 @@
       }).catch(function() {});
   }, 10000);
 
-  // ── 下载入口：仅当本地 dist/ 内有合法 zip 时显示 ──
+  // ── 下载入口：左下角永驻按钮，状态机严格不猜测 ──
+  // - 后端 /api/download/latest 明确 available=true → 亮色可点，赋 href 触发下载
+  // - 后端明确 available=false → 灰色不可点 "暂无可下载版本"，移除 href
+  // - fetch 异常（断网/后端崩溃）→ 灰色但 title 标明原因，仍不可下载
+  var dlCard = document.getElementById('dlCard');
+  var dlLabel = document.getElementById('dlLabel');
+  var dlVersion = document.getElementById('dlVersion');
+  var dlSize = document.getElementById('dlSize');
+
+  function setDownloadState(state, opts) {
+    opts = opts || {};
+    dlCard.classList.remove('is-empty', 'is-ready');
+    dlCard.classList.add('is-' + state);
+    dlLabel.textContent = opts.label || '';
+    if (opts.version) {
+      dlVersion.textContent = 'v' + String(opts.version).replace(/^v/, '');
+    } else {
+      dlVersion.textContent = '—';
+    }
+    if (typeof opts.size_mb === 'number') {
+      dlSize.textContent = opts.size_mb.toFixed(2) + ' MB';
+    } else {
+      dlSize.textContent = '—';
+    }
+    if (opts.title) {
+      dlCard.title = opts.title;
+    } else {
+      dlCard.removeAttribute('title');
+    }
+    if (state === 'ready') {
+      dlCard.setAttribute('href', '/download/latest.zip');
+    } else {
+      dlCard.removeAttribute('href');
+    }
+  }
+
+  // 灰态下点击不应该触发任何行为（a 没有 href 浏览器本身就不会跳转，这里再兜一层）
+  dlCard.addEventListener('click', function(e) {
+    if (!dlCard.classList.contains('is-ready')) {
+      e.preventDefault();
+    }
+  });
+
   fetch('/api/download/latest')
     .then(function(r) { return r.json(); })
     .then(function(info) {
-      if (!info || !info.available) return;
-      var card = document.getElementById('dlCard');
-      var ver = document.getElementById('dlVersion');
-      var size = document.getElementById('dlSize');
-      if (info.version) ver.textContent = 'v' + String(info.version).replace(/^v/, '');
-      if (typeof info.size_mb === 'number') size.textContent = info.size_mb.toFixed(2) + ' MB';
-      card.classList.add('visible');
+      if (info && info.available === true) {
+        setDownloadState('ready', {
+          label: '下载完整应用',
+          version: info.version,
+          size_mb: info.size_mb,
+          title: '下载整个工具套件的 zip 包'
+        });
+      } else {
+        setDownloadState('empty', {
+          label: '暂无可下载版本',
+          title: '本地 dist/ 内尚未生成发布包，请先运行 tools/build_release.py'
+        });
+      }
     })
-    .catch(function() {});
+    .catch(function() {
+      setDownloadState('empty', {
+        label: '暂无可下载版本',
+        title: '检查下载源失败，请稍后重试'
+      });
+    });
 
   // ── 版本更新提醒 ──
   // 严守"不允许猜测"：只有 status==ok 且 has_update==true 才显示横幅；
