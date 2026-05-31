@@ -163,9 +163,10 @@
     border: 1px solid var(--hairline);
     border-radius: 8px;
     padding: 9px 10px 8px;
+    /* 关键：文字必须完整可见。按钮高度由内容自然撑开。 */
+    overflow: visible;
     transition: border-color .12s, background .12s, transform .12s, opacity .12s;
   }
-  /* 状态：还没向后端确认 / 后端确认无可下载 zip → 灰色不可点 */
   .dl-card.is-empty {
     cursor: not-allowed;
     opacity: 0.7;
@@ -178,7 +179,8 @@
     border-color: var(--hairline);
     background: var(--canvas);
   }
-  /* 状态：可下载 → 高亮可点 */
+  /* is-empty 时不显示版本/大小元信息（避免显示 "— · —" 噪声） */
+  .dl-card.is-empty .dl-meta { display: none; }
   .dl-card.is-ready { cursor: pointer; }
   .dl-card.is-ready:hover {
     border-color: var(--primary);
@@ -186,22 +188,30 @@
   }
   .dl-card.is-ready:active { transform: translateY(1px); }
   .dl-row {
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: flex-start; gap: 8px;
+    /* min-width:0 让 flex 子项可在窄列中收缩，文字才能换行而不被截断 */
+    min-width: 0;
     font-size: 12px; font-weight: 500; color: var(--ink);
-    line-height: 1.2;
+    line-height: 1.35;
   }
   .dl-icon {
     width: 18px; height: 18px; flex-shrink: 0;
+    margin-top: 1px;
     border-radius: 5px; background: var(--primary); color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px; font-weight: 700;
+  }
+  .dl-label {
+    flex: 1 1 auto; min-width: 0;
+    word-break: break-word; white-space: normal;
   }
   .dl-meta {
     margin-top: 4px; padding-left: 26px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px; color: var(--muted);
     letter-spacing: 0.2px;
+    word-break: break-all;
   }
 
   .nav-item {
