@@ -1016,7 +1016,7 @@ def build_wan_lan_blocks(wan_if, wan_dhcp, wan_ip_cidr, wan_gw,
     else:
         wan_addr = wan_ip_cidr if wan_ip_cidr else DEFAULT_WAN_CIDR
         gw = wan_gw if wan_gw else DEFAULT_WAN_GW
-        wan_route_block = (f"set protocols static route 0.0.0.0/0 next-hop {gw} distance '222'\n"
+        wan_route_block = (f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
                            f"set protocols static route 1.1.1.1/32 next-hop {gw}")
     if bypass:
         return {"wan_addr": wan_addr, "wan_if": wan_if,

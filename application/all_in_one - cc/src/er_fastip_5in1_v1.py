@@ -1680,7 +1680,7 @@ def build_epoch5_hk_format_dict(hdr_text):
         )
     else:
         d["default_route_block"] = (
-            f"set protocols static route 0.0.0.0/0 next-hop '{wan_gw}' distance '220'\n"
+            f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '220'\n"
             f"set protocols static route 1.1.1.1/32 next-hop '{wan_gw}'"
         )
 
@@ -1991,7 +1991,7 @@ def build_epoch5_us_format_dict(hdr_text):
         )
     else:
         d["default_route_block"] = (
-            f"set protocols static route 0.0.0.0/0 next-hop '{wan_gw}' distance '220'\n"
+            f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '220'\n"
             f"set protocols static route 1.1.1.1/32 next-hop '{wan_gw}'"
         )
 
@@ -2134,6 +2134,91 @@ US5_EXAMPLE = (
     "海外出口ip：103.48.141.158\n"
 )
 
+US5_IPSEC_EXAMPLE = (
+    "LineID:609430B1\n"
+    "PE:szd-upe3\n"
+    "Tunnel:Tunnel0/0/2013\n"
+    "wanip:10.40.129.148/30\n"
+    "PE 对接:10.200.200.37\n"
+    "CE 对接:10.50.86.74\n"
+    "PE AS号:65510\n"
+    "客户内网路由:10.22.242.223\n"
+    "\n"
+    "拨号PE:szd-upe3\n"
+    "对接IP:10.200.200.37\n"
+    "LoopIP:10.50.86.74\n"
+    "拨号ip:183.56.161.86\n"
+    "秘钥:both-win\n"
+    "\n"
+    "--- IKE (ike-peer IPSEC) ---\n"
+    "key-exchange: ikev1/ikev2\n"
+    "proposal 1:\n"
+    "  dh-group: 2\n"
+    "  encryption: aes128 3des\n"
+    "  hash: sha1\n"
+    "  prf: hmac-sha2-256\n"
+    "dead-peer-detection: no\n"
+    "\n"
+    "--- IPsec proposal (IPSEC) ---\n"
+    "proposal 1:\n"
+    "  encryption: aes128 3des\n"
+    "  hash: sha1\n"
+    "\n"
+    "\n"
+    "\n"
+    "LineID:609430B2\n"
+    "PE:szc-upe1\n"
+    "Tunnel:Tunnel0/0/1163\n"
+    "wanip:10.30.37.168/30\n"
+    "PE 对接:10.200.200.27\n"
+    "CE 对接:10.50.118.76\n"
+    "PE AS号:65107\n"
+    "客户内网路由:10.22.242.223\n"
+    "\n"
+    "拨号PE:szc-upe1\n"
+    "对接IP:10.200.200.27\n"
+    "LoopIP:10.50.118.76\n"
+    "拨号ip:120.133.134.72\n"
+    "秘钥:both-win\n"
+    "\n"
+    "--- IKE (ike-peer IPSEC) ---\n"
+    "key-exchange: ikev1/ikev2\n"
+    "proposal 1:\n"
+    "  dh-group: 2\n"
+    "  encryption: aes128 3des\n"
+    "  hash: sha1\n"
+    "  prf: hmac-sha2-256\n"
+    "dead-peer-detection: yes\n"
+    "  type: ondemand\n"
+    "  idle-time: 10\n"
+    "\n"
+    "--- IPsec proposal (IPSEC) ---\n"
+    "proposal 1:\n"
+    "  encryption: aes128 3des\n"
+    "  hash: sha1\n"
+    "\n"
+    "\n"
+    "LineID:609430B5\n"
+    "PE： lax1-natpe7\n"
+    "WANIP: 10.22.113.36/30\n"
+    "TUNNEL: tun2209\n"
+    "PE Docking：192.168.215.12\n"
+    "CE Docking：: 10.22.242.223\n"
+    "BGPSERVER IP：103.252.19.25,43.229.117.226\n"
+    "海外出口ip：\n"
+    "10.60.52.46-8.3.6.111\n"
+    "\n"
+    "LineID:609430B6\n"
+    "PE： sjc1-natpe3\n"
+    "WANIP: 10.22.115.28/30\n"
+    "TUNNEL: tun1080\n"
+    "PE Docking：10.33.54.118\n"
+    "CE Docking：: 10.22.242.223\n"
+    "BGPSERVER IP：103.252.19.99,43.229.119.251\n"
+    "海外出口ip：\n"
+    "10.60.79.99-172.16.212.58\n"
+)
+
 HK5_EXAMPLE = (
     "MAIN\n"
     "lineid: 603642Ar3\n"
@@ -2189,94 +2274,211 @@ def _visual_merge_er5_init(variant: str, updates: dict) -> None:
 
 
 # =====================================================================
-# IPSec 隧道类型 — 5.0 非香港出口
+# IPSec 隧道类型 — 5.0 非香港出口（v2：恒定 4 LineID = 2 IPSec + 2 NAT/GRE）
 # =====================================================================
 
-def _parse_ipsec_params(hdr_text: str):
-    """从数据头提取 IKE / IPSec proposal 参数。
+_IPSEC_MTU_DEFAULT = "1400"  # tunnel MTU 无法从数据头推算，用统一值；UI 告知人工核对
+_TUN_PE_HOSTNUM = 1   # /30 hosts[0] 给 PE 端
+_TUN_CE_HOSTNUM = 2   # /30 hosts[1] 给 CE 端
 
-    提取不到任何参数时返回空 dict，调用方应提示用户"使用默认参数"。
-    """
-    params: dict[str, str] = {}
 
-    # ── IKE 块 ──
+def _ipsec_get(pat: str, text: str, default: str = "") -> str:
+    """提取一行字段。兼容半角/全角冒号。"""
+    m = re.search(pat, text, re.IGNORECASE | re.MULTILINE)
+    if not m:
+        return default
+    return m.group(1).strip()
+
+
+def _wan_pair(wan_cidr: str):
+    """从 wanip CIDR(/30) 推算 (PE 端 IP, CE 端 IP)；无效返回 (None, None)。"""
+    try:
+        net = ipaddress.ip_network(wan_cidr.strip(), strict=False)
+        hosts = list(net.hosts())
+        if len(hosts) < 2:
+            return None, None
+        return str(hosts[0]), str(hosts[1])
+    except (ValueError, TypeError):
+        return None, None
+
+
+def _parse_ipsec_lineid_block(block: str) -> dict:
+    """解析单个 IPSec 拨号 LineID 块。"""
+    d: dict = {"_kind": "ipsec"}
+    d["lineid"] = _ipsec_get(r'^LineID\s*[:：]\s*(\S+)', block)
+    d["pe"] = _ipsec_get(r'^PE\s*[:：]\s*(\S+)', block)
+    tun_raw = _ipsec_get(r'^Tunnel\s*[:：]\s*(\S+)', block)
+    d["tun_id"] = normalize_tun(tun_raw)
+    d["tun_num"] = re.sub(r'\D', '', d["tun_id"])
+    d["wanip"] = _ipsec_get(r'^wanip\s*[:：]\s*(\S+)', block)
+    d["pe_docking"] = (
+        _ipsec_get(r'^PE\s*对接\s*[:：]\s*(\S+)', block)
+        or _ipsec_get(r'^PE\s*Docking\s*[:：]\s*(\S+)', block)
+    )
+    d["ce_docking"] = (
+        _ipsec_get(r'^CE\s*对接\s*[:：]\s*(\S+)', block)
+        or _ipsec_get(r'^CE\s*Docking\s*[:：]\s*(\S+)', block)
+    )
+    d["pe_as"] = _ipsec_get(r'^PE\s*AS\s*号\s*[:：]\s*(\S+)', block)
+    d["ce_loip"] = _ipsec_get(r'^客户内网路由\s*[:：]\s*(\S+)', block)
+    d["dial_pe"] = _ipsec_get(r'^拨号PE\s*[:：]\s*(\S+)', block) or d["pe"]
+    d["dial_ip"] = _ipsec_get(r'^拨号ip\s*[:：]\s*(\S+)', block)
+    d["loop_ip"] = _ipsec_get(r'^LoopIP\s*[:：]\s*(\S+)', block)
+    d["docking_ip"] = (
+        _ipsec_get(r'^对接IP\s*[:：]\s*(\S+)', block) or d["pe_docking"]
+    )
+    d["secret"] = _ipsec_get(r'^秘钥\s*[:：]\s*(\S+)', block)
+
+    # tunnel 地址：CE 端用 wanip /30 的第二个 host
+    pe_ip, ce_ip = _wan_pair(d["wanip"])
+    d["tun_pe_ip"] = pe_ip or ""
+    d["tun_ce_ip"] = ce_ip or ""
+
+    # IKE 块
     ike_m = re.search(
-        r'---\s*IKE\s*\(ike-peer\s+IPSEC\)\s*---\s*\n(.*?)(?=\n\s*---|\n\s*$)',
-        hdr_text, re.IGNORECASE | re.DOTALL,
+        r'---\s*IKE\s*\(ike-peer[^)]*\)\s*---\s*\n(.*?)(?=\n\s*---|\nLineID|\Z)',
+        block, re.IGNORECASE | re.DOTALL,
     )
     if ike_m:
-        ike_block = ike_m.group(1)
-        params["ike_key_exchange"] = _get(r'key-exchange\s*[：:]\s*(\S+)', ike_block)
-        params["ike_dh_group"] = _get(r'dh-group\s*[：:]\s*(\S+)', ike_block)
-        params["ike_encryption"] = _get(r'encryption\s*[：:]\s*(\S+)', ike_block).replace(" ", "-")
-        params["ike_hash"] = _get(r'hash\s*[：:]\s*(\S+)', ike_block)
-        params["ike_prf"] = _get(r'prf\s*[：:]\s*(\S+)', ike_block)
-        params["ike_lifetime"] = _get(r'lifetime\s*[：:]\s*(\S+)', ike_block) or "28800"
-        dpd = _get(r'dead-peer-detection\s*[：:]\s*(\S+)', ike_block)
-        params["ike_dpd"] = dpd
-        # DPD interval + timeout
-        params["ike_dpd_interval"] = _get(r'idle-time\s*[：:]\s*(\S+)', ike_block) or "10"
-        params["ike_dpd_timeout"] = _get(r'timeout\s*[：:]\s*(\S+)', ike_block) or "30"
+        b = ike_m.group(1)
+        d["ike_key_exchange"] = _ipsec_get(r'key-exchange\s*[:：]\s*(\S+)', b)
+        d["ike_dh_group"] = _ipsec_get(r'dh-group\s*[:：]\s*(\S+)', b)
+        d["ike_encryption"] = _ipsec_get(r'encryption\s*[:：]\s*(\S+)', b).replace(" ", "-")
+        d["ike_hash"] = _ipsec_get(r'^\s*hash\s*[:：]\s*(\S+)', b)
+        d["ike_prf"] = _ipsec_get(r'prf\s*[:：]\s*(\S+)', b)
+        d["ike_dpd"] = _ipsec_get(r'dead-peer-detection\s*[:：]\s*(\S+)', b)
+        d["ike_dpd_idle"] = _ipsec_get(r'idle-time\s*[:：]\s*(\S+)', b)
+    else:
+        d["ike_key_exchange"] = d["ike_dh_group"] = d["ike_encryption"] = ""
+        d["ike_hash"] = d["ike_prf"] = d["ike_dpd"] = d["ike_dpd_idle"] = ""
 
-    # ── IPsec proposal 块 ──
-    ipsec_m = re.search(
-        r'---\s*IPsec\s*proposal\s*\(IPSEC\)\s*---\s*\n(.*?)(?=\n\s*---|\n\s*$)',
-        hdr_text, re.IGNORECASE | re.DOTALL,
+    # IPsec proposal 块
+    esp_m = re.search(
+        r'---\s*IPsec\s*proposal[^-]*---\s*\n(.*?)(?=\n\s*---|\nLineID|\Z)',
+        block, re.IGNORECASE | re.DOTALL,
     )
-    if ipsec_m:
-        ipsec_block = ipsec_m.group(1)
-        params["esp_encryption"] = _get(r'encryption\s*[：:]\s*(\S+)', ipsec_block).replace(" ", "-")
-        params["esp_hash"] = _get(r'hash\s*[：:]\s*(\S+)', ipsec_block)
-        params["esp_lifetime"] = _get(r'lifetime\s*[：:]\s*(\S+)', ipsec_block) or "3600"
-
-    return params
-
-
-def _parse_ipsec_us(hdr_text: str):
-    """解析 IPSec 非香港数据头 — 在现有 parse_epoch_us 基础上增加 IPSec 特有字段。"""
-    d = parse_epoch_us(hdr_text)
-
-    # ── 拨号 PE 信息（IPSec 特有）──
-    main_block = ""
-    bk_block = ""
-    parts = re.split(r'\n\s*(?=BACKUP|LineID)', hdr_text, flags=re.IGNORECASE)
-    for i, p in enumerate(parts):
-        if i == 0:
-            main_block = p
-        elif re.search(r'BACKUP', p, re.IGNORECASE) and i == 1:
-            bk_block = p
-
-    # 主线 IPSec 参数
-    d["main_dial_pe"] = _get(r'拨号PE\s*[：:]\s*(.+)', main_block) or d.get("main_us_pe", "")
-    d["main_dial_ip"] = _get(r'拨号ip\s*[：:]\s*(.+)', main_block)
-    d["main_loop_ip"] = _get(r'LoopIP\s*[：:]\s*(.+)', main_block)
-    d["main_docking_ip"] = _get(r'对接IP\s*[：:]\s*(.+)', main_block)
-    d["main_secret"] = _get(r'秘钥\s*[：:]\s*(.+)', main_block) or "both-win"
-
-    # 备线 IPSec 参数
-    if bk_block:
-        d["bk_dial_pe"] = _get(r'拨号PE\s*[：:]\s*(.+)', bk_block) or d.get("bk_us_pe", "")
-        d["bk_dial_ip"] = _get(r'拨号ip\s*[：:]\s*(.+)', bk_block)
-        d["bk_loop_ip"] = _get(r'LoopIP\s*[：:]\s*(.+)', bk_block)
-        d["bk_docking_ip"] = _get(r'对接IP\s*[：:]\s*(.+)', bk_block)
-        d["bk_secret"] = _get(r'秘钥\s*[：:]\s*(.+)', bk_block) or "both-win"
-
-    # ── IKE / IPsec 参数 ──
-    ipsec = _parse_ipsec_params(hdr_text)
-    d.update(ipsec)
-
+    if esp_m:
+        b = esp_m.group(1)
+        d["esp_encryption"] = _ipsec_get(r'encryption\s*[:：]\s*(\S+)', b).replace(" ", "-")
+        d["esp_hash"] = _ipsec_get(r'^\s*hash\s*[:：]\s*(\S+)', b)
+    else:
+        d["esp_encryption"] = d["esp_hash"] = ""
     return d
 
 
-# ── IPSec 模板 placeholder — 正在开发中 ──
+def _parse_nat_lineid_block(block: str) -> dict:
+    """解析单个 NAT/GRE LineID 块。"""
+    d: dict = {"_kind": "nat"}
+    d["lineid"] = _ipsec_get(r'^LineID\s*[:：]\s*(\S+)', block)
+    d["pe"] = _ipsec_get(r'^PE\s*[:：]\s*(\S+)', block)
+    d["wanip"] = _ipsec_get(r'^WANIP\s*[:：]\s*(\S+)', block)
+    tun_raw = _ipsec_get(r'^TUNNEL\s*[:：]\s*(\S+)', block)
+    d["tun_id"] = normalize_tun(tun_raw)
+    d["tun_num"] = re.sub(r'\D', '', d["tun_id"])
+    d["pe_docking"] = _ipsec_get(r'^PE\s*Docking\s*[:：]+\s*(\S+)', block)
+    d["ce_docking"] = _ipsec_get(r'^CE\s*Docking\s*[:：]+\s*(\S+)', block)
+
+    # BGPSERVER IP: 逗号分隔
+    bgp_raw = _ipsec_get(r'^BGPSERVER\s*IP\s*[:：]\s*(.+?)$', block)
+    bgps = [x.strip() for x in re.split(r'[,，]', bgp_raw) if x.strip()]
+    d["bgp_servers"] = bgps
+    d["bgp1"] = bgps[0] if len(bgps) > 0 else ""
+    d["bgp2"] = bgps[1] if len(bgps) > 1 else ""
+
+    # 海外出口ip: 形如 "10.60.52.46-8.3.6.111"
+    m = re.search(r'海外出口ip\s*[:：]\s*\n?\s*(\S+)', block, re.MULTILINE)
+    if m:
+        pair = m.group(1).strip()
+        if "-" in pair:
+            usip, public = pair.split("-", 1)
+            d["usip"] = usip.strip()
+            d["public_ip"] = public.strip()
+        else:
+            d["usip"] = pair
+            d["public_ip"] = ""
+    else:
+        d["usip"] = d["public_ip"] = ""
+
+    # tunnel 地址：CE 端 = wanip /30 第二个 host
+    pe_ip, ce_ip = _wan_pair(d["wanip"])
+    d["tun_pe_ip"] = pe_ip or ""
+    d["tun_ce_ip"] = ce_ip or ""
+    return d
+
+
+def _parse_ipsec_us(hdr_text: str):
+    """解析 IPSec 数据头。
+
+    强制：恰好 2 个 IPSec 拨号块 + 2 个 NAT/GRE 块。
+    返回 ({ipsec_main, ipsec_bk, nat_main, nat_bk}, None) 或 (None, error_msg)。
+    """
+    raw = hdr_text.strip()
+    if not raw:
+        return None, "请输入业务数据（4 个 LineID 块：2 IPSec + 2 NAT/GRE）"
+
+    # 按 LineID 切块
+    parts = re.split(r'(?=^\s*LineID\s*[:：])', raw, flags=re.MULTILINE | re.IGNORECASE)
+    parts = [p.strip() for p in parts if re.match(r'^\s*LineID\s*[:：]', p, re.IGNORECASE)]
+
+    ipsec_blocks: list[dict] = []
+    nat_blocks: list[dict] = []
+    for p in parts:
+        is_ipsec = bool(re.search(r'拨号PE\s*[:：]', p)) and bool(re.search(r'LoopIP\s*[:：]', p))
+        is_nat = bool(re.search(r'BGPSERVER\s*IP\s*[:：]', p, re.IGNORECASE))
+        if is_ipsec:
+            ipsec_blocks.append(_parse_ipsec_lineid_block(p))
+        elif is_nat:
+            nat_blocks.append(_parse_nat_lineid_block(p))
+        # 既不是 IPSec 也不是 NAT 的 LineID 块直接忽略（不报错，因为只校验数量约束）
+
+    if len(ipsec_blocks) != 2:
+        return None, (
+            f"IPSec 数据头需要恰好 2 个 IPSec 拨号 LineID 块（含『拨号PE』『LoopIP』），"
+            f"当前发现 {len(ipsec_blocks)} 个"
+        )
+    if len(nat_blocks) != 2:
+        return None, (
+            f"IPSec 数据头需要恰好 2 个 NAT/GRE LineID 块（含『BGPSERVER IP』），"
+            f"当前发现 {len(nat_blocks)} 个"
+        )
+
+    return {
+        "ipsec_main": ipsec_blocks[0],
+        "ipsec_bk": ipsec_blocks[1],
+        "nat_main": nat_blocks[0],
+        "nat_bk": nat_blocks[1],
+    }, None
+
+def _ipsec_first_token(val: str, default: str = "") -> str:
+    if not val:
+        return default
+    return val.replace("/", " ").split()[0]
+
+
+def _ipsec_ike_dpd_lines(ike_dpd: str, idle: str) -> str:
+    if _ipsec_first_token(ike_dpd).lower() in ("no", "false", "0"):
+        return ""
+    interval = idle or "10"
+    return (
+        "set vpn ipsec ike-group IKE-FNET-2 dead-peer-detection action 'restart'\n"
+        f"set vpn ipsec ike-group IKE-FNET-2 dead-peer-detection interval '{interval}'\n"
+        "set vpn ipsec ike-group IKE-FNET-2 dead-peer-detection timeout '30'\n"
+    )
+
+
+def _require_fields(block: dict, fields: list[tuple[str, str]], label: str):
+    missing = [cn for key, cn in fields if not block.get(key)]
+    if missing:
+        return f"{label} 缺少字段：{', '.join(missing)}"
+    return ""
+
+
 TEMPLATE_EPOCH5_HK_IPSEC = ""
 
 
-# ── IPSec 非香港出口模板（基于用户提供的 VyOS 配置）──
 TEMPLATE_EPOCH5_US_IPSEC = (
     "# Epoch 5.0 非香港出口配置 (IPSec)  Hostname: {hostname}\n"
-    "# ═══════════════════════════════════════════════════\n"
-    "# 隧道类型: IPSec  |  生成时间: 自动生成，请自行检查\n"
+    "# MTU/MSS：IPSec(upe) GRE = 1476/1300，NAT(natpe) GRE = 1452/1300。请按链路实测调整\n"
     "\n"
     "# start\n"
     "set firewall group address-group DNS-NET address '8.8.8.8'\n"
@@ -2287,11 +2489,9 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set firewall group network-group GROUP-FNET-Whitelist network '100.64.0.0/10'\n"
     "set firewall group network-group GROUP-FNET-Whitelist network '224.0.0.0/4'\n"
     "set firewall group network-group GROUP-FNET-Whitelist network '127.0.0.0/8'\n"
-    "set firewall group network-group GROUP-FNET-Whitelist network '{main_bgp_server}/32'\n"
-    "set firewall group network-group GROUP-FNET-Whitelist network '{bk_bgp_server}/32'\n"
-    "set firewall group network-group LAN-NET network '10.0.0.0/8'\n"
-    "set firewall group network-group LAN-NET network '172.16.0.0/12'\n"
-    "set firewall group network-group LAN-NET network '192.168.0.0/16'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '{nat_main_bgp2}/32'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '{nat_bk_bgp2}/32'\n"
+    "{lan_net_block}\n"
     "set firewall ipv4 input filter default-action 'accept'\n"
     "set firewall ipv4 input filter rule 100 action 'jump'\n"
     "set firewall ipv4 input filter rule 100 jump-target 'WAN2LOCAL'\n"
@@ -2309,31 +2509,47 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set firewall ipv4 name WAN2LOCAL rule 1230 protocol 'esp'\n"
     "set interfaces dummy dum0 address '{ce_loip}/32'\n"
     "set interfaces dummy dum0 description 'loopback'\n"
-    "set interfaces dummy dum100 address '{main_loop_ip}/32'\n"
-    "set interfaces dummy dum100 description 'ipsec main'\n"
-    "set interfaces dummy dum101 address '{bk_loop_ip}/32'\n"
-    "set interfaces dummy dum101 description 'ipsec backup'\n"
-    "set interfaces ethernet eth{wan_if} address '{wan_ip}/{wan_cidr_prefix}'\n"
-    "set interfaces ethernet eth{wan_if} description 'WAN1'\n"
-    "set interfaces ethernet eth{lan_if} address '{lan_ip}/{lan_cidr_prefix}'\n"
-    "set interfaces ethernet eth{lan_if} description 'LAN1'\n"
+    "set interfaces dummy dum1 address '{main_ipsec_loop_ip}/32'\n"
+    "set interfaces dummy dum1 description 'ipsec main'\n"
+    "set interfaces dummy dum2 address '{bk_ipsec_loop_ip}/32'\n"
+    "set interfaces dummy dum2 description 'ipsec backup'\n"
+    "set interfaces dummy dum101 address '{main_nat_usip}/32'\n"
+    "set interfaces dummy dum101 description 'USIP-Main:{main_nat_usip}-{main_nat_public_ip}'\n"
+    "set interfaces dummy dum201 address '{bk_nat_usip}/32'\n"
+    "set interfaces dummy dum201 description 'USIP-BK:{bk_nat_usip}-{bk_nat_public_ip}'\n"
+    "set interfaces ethernet {wan_if} address '{wan_ip}/{wan_cidr_prefix}'\n"
+    "set interfaces ethernet {wan_if} description 'WAN1'\n"
+    "set interfaces ethernet {lan_if} address '{lan_ip}/{lan_cidr_prefix}'\n"
+    "set interfaces ethernet {lan_if} description 'LAN1'\n"
     "set interfaces loopback lo\n"
-    "set interfaces tunnel {main_tun_id} address '{main_tun_local}/30'\n"
-    "set interfaces tunnel {main_tun_id} description 'main-{main_dial_pe}-{main_tun_num}'\n"
-    "set interfaces tunnel {main_tun_id} encapsulation 'gre'\n"
-    "set interfaces tunnel {main_tun_id} ip adjust-mss '1100'\n"
-    "set interfaces tunnel {main_tun_id} mtu '1302'\n"
-    "set interfaces tunnel {main_tun_id} remote '{main_docking_ip}'\n"
-    "set interfaces tunnel {main_tun_id} source-address '{main_loop_ip}'\n"
-    "set interfaces tunnel {bk_tun_id} address '{bk_tun_local}/30'\n"
-    "set interfaces tunnel {bk_tun_id} description 'backup-{bk_dial_pe}-{bk_tun_num}'\n"
-    "set interfaces tunnel {bk_tun_id} encapsulation 'gre'\n"
-    "set interfaces tunnel {bk_tun_id} ip adjust-mss '1100'\n"
-    "set interfaces tunnel {bk_tun_id} mtu '1476'\n"
-    "set interfaces tunnel {bk_tun_id} remote '{bk_docking_ip}'\n"
-    "set interfaces tunnel {bk_tun_id} source-address '{bk_loop_ip}'\n"
-    "\n"
-    "# NAT\n"
+    "set interfaces tunnel {main_nat_tun_id} address '{main_nat_tun_ce_ip}/30'\n"
+    "set interfaces tunnel {main_nat_tun_id} description 'main-{main_nat_pe}-{main_nat_tun_num}'\n"
+    "set interfaces tunnel {main_nat_tun_id} encapsulation 'gre'\n"
+    "set interfaces tunnel {main_nat_tun_id} ip adjust-mss '1300'\n"
+    "set interfaces tunnel {main_nat_tun_id} mtu '1452'\n"
+    "set interfaces tunnel {main_nat_tun_id} remote '{main_nat_pe_docking}'\n"
+    "set interfaces tunnel {main_nat_tun_id} source-address '{ce_loip}'\n"
+    "set interfaces tunnel {bk_nat_tun_id} address '{bk_nat_tun_ce_ip}/30'\n"
+    "set interfaces tunnel {bk_nat_tun_id} description 'back-{bk_nat_pe}-{bk_nat_tun_num}'\n"
+    "set interfaces tunnel {bk_nat_tun_id} encapsulation 'gre'\n"
+    "set interfaces tunnel {bk_nat_tun_id} ip adjust-mss '1300'\n"
+    "set interfaces tunnel {bk_nat_tun_id} mtu '1452'\n"
+    "set interfaces tunnel {bk_nat_tun_id} remote '{bk_nat_pe_docking}'\n"
+    "set interfaces tunnel {bk_nat_tun_id} source-address '{ce_loip}'\n"
+    "set interfaces tunnel {main_ipsec_tun_id} address '{main_ipsec_tun_ce_ip}/30'\n"
+    "set interfaces tunnel {main_ipsec_tun_id} description 'main-{main_ipsec_pe}-{main_ipsec_tun_num}'\n"
+    "set interfaces tunnel {main_ipsec_tun_id} encapsulation 'gre'\n"
+    "set interfaces tunnel {main_ipsec_tun_id} ip adjust-mss '1300'\n"
+    "set interfaces tunnel {main_ipsec_tun_id} mtu '1476'\n"
+    "set interfaces tunnel {main_ipsec_tun_id} remote '{main_ipsec_docking_ip}'\n"
+    "set interfaces tunnel {main_ipsec_tun_id} source-address '{main_ipsec_loop_ip}'\n"
+    "set interfaces tunnel {bk_ipsec_tun_id} address '{bk_ipsec_tun_ce_ip}/30'\n"
+    "set interfaces tunnel {bk_ipsec_tun_id} description 'backup-{bk_ipsec_pe}-{bk_ipsec_tun_num}'\n"
+    "set interfaces tunnel {bk_ipsec_tun_id} encapsulation 'gre'\n"
+    "set interfaces tunnel {bk_ipsec_tun_id} ip adjust-mss '1300'\n"
+    "set interfaces tunnel {bk_ipsec_tun_id} mtu '1476'\n"
+    "set interfaces tunnel {bk_ipsec_tun_id} remote '{bk_ipsec_docking_ip}'\n"
+    "set interfaces tunnel {bk_ipsec_tun_id} source-address '{bk_ipsec_loop_ip}'\n"
     "set nat destination rule 20 destination port '53'\n"
     "set nat destination rule 20 inbound-interface name '{wan_if}'\n"
     "set nat destination rule 20 protocol 'tcp_udp'\n"
@@ -2342,67 +2558,28 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set nat destination rule 25 inbound-interface name '{lan_if}'\n"
     "set nat destination rule 25 protocol 'tcp_udp'\n"
     "set nat destination rule 25 translation address '{lan_ip}'\n"
-    "set nat source rule 10 destination address '{main_docking_ip}'\n"
+    "set nat source rule 10 destination address '{main_ipsec_docking_ip}'\n"
     "set nat source rule 10 exclude\n"
     "set nat source rule 10 outbound-interface name '{wan_if}'\n"
-    "set nat source rule 20 destination address '{bk_docking_ip}'\n"
+    "set nat source rule 20 destination address '{bk_ipsec_docking_ip}'\n"
     "set nat source rule 20 exclude\n"
     "set nat source rule 20 outbound-interface name '{wan_if}'\n"
     "set nat source rule 50 outbound-interface name '{wan_if}'\n"
     "set nat source rule 50 source group network-group 'LAN-NET'\n"
     "set nat source rule 50 translation address 'masquerade'\n"
-    "\n"
-    "# VPN IPSec\n"
-    "set vpn ipsec authentication psk ipsec id '0.0.0.0'\n"
-    "set vpn ipsec authentication psk ipsec secret '{main_secret}'\n"
-    "set vpn ipsec esp-group ESP-FNET-1 lifetime '{esp_lifetime}'\n"
-    "set vpn ipsec esp-group ESP-FNET-1 mode 'tunnel'\n"
-    "set vpn ipsec esp-group ESP-FNET-1 proposal 1 encryption '{esp_encryption}'\n"
-    "set vpn ipsec esp-group ESP-FNET-1 proposal 1 hash '{esp_hash}'\n"
-    "set vpn ipsec esp-group ESP-FNET-2 lifetime '{esp_lifetime}'\n"
-    "set vpn ipsec esp-group ESP-FNET-2 mode 'tunnel'\n"
-    "set vpn ipsec esp-group ESP-FNET-2 proposal 1 encryption '{esp_encryption}'\n"
-    "set vpn ipsec esp-group ESP-FNET-2 proposal 1 hash '{esp_hash}'\n"
-    "set vpn ipsec ike-group IKE-FNET-1 disable-mobike\n"
-    "set vpn ipsec ike-group IKE-FNET-1 key-exchange '{ike_key_exchange}'\n"
-    "set vpn ipsec ike-group IKE-FNET-1 lifetime '{ike_lifetime}'\n"
-    "set vpn ipsec ike-group IKE-FNET-1 proposal 1 dh-group '{ike_dh_group}'\n"
-    "set vpn ipsec ike-group IKE-FNET-1 proposal 1 encryption '{ike_encryption}'\n"
-    "set vpn ipsec ike-group IKE-FNET-1 proposal 1 hash '{ike_hash}'\n"
-    "set vpn ipsec ike-group IKE-FNET-2 dead-peer-detection action 'restart'\n"
-    "set vpn ipsec ike-group IKE-FNET-2 dead-peer-detection interval '{ike_dpd_interval}'\n"
-    "set vpn ipsec ike-group IKE-FNET-2 dead-peer-detection timeout '{ike_dpd_timeout}'\n"
-    "set vpn ipsec ike-group IKE-FNET-2 disable-mobike\n"
-    "set vpn ipsec ike-group IKE-FNET-2 key-exchange '{ike_key_exchange}'\n"
-    "set vpn ipsec ike-group IKE-FNET-2 lifetime '{ike_lifetime}'\n"
-    "set vpn ipsec ike-group IKE-FNET-2 proposal 1 dh-group '{ike_dh_group}'\n"
-    "set vpn ipsec ike-group IKE-FNET-2 proposal 1 encryption '{ike_encryption}'\n"
-    "set vpn ipsec ike-group IKE-FNET-2 proposal 1 hash '{ike_hash}'\n"
-    "set vpn ipsec interface '{wan_if}'\n"
-    "set vpn ipsec options retransmission base '1'\n"
-    "set vpn ipsec options retransmission timeout '4'\n"
-    "set vpn ipsec site-to-site peer backup authentication mode 'pre-shared-secret'\n"
-    "set vpn ipsec site-to-site peer backup connection-type 'initiate'\n"
-    "set vpn ipsec site-to-site peer backup default-esp-group 'ESP-FNET-2'\n"
-    "set vpn ipsec site-to-site peer backup force-udp-encapsulation\n"
-    "set vpn ipsec site-to-site peer backup ike-group 'IKE-FNET-2'\n"
-    "set vpn ipsec site-to-site peer backup ikev2-reauth 'inherit'\n"
-    "set vpn ipsec site-to-site peer backup local-address '{wan_ip}'\n"
-    "set vpn ipsec site-to-site peer backup remote-address '{bk_dial_ip}'\n"
-    "set vpn ipsec site-to-site peer backup tunnel 1 local prefix '{bk_loop_ip}/32'\n"
-    "set vpn ipsec site-to-site peer backup tunnel 1 remote prefix '{bk_docking_ip}/32'\n"
-    "set vpn ipsec site-to-site peer main authentication mode 'pre-shared-secret'\n"
-    "set vpn ipsec site-to-site peer main connection-type 'initiate'\n"
-    "set vpn ipsec site-to-site peer main default-esp-group 'ESP-FNET-1'\n"
-    "set vpn ipsec site-to-site peer main force-udp-encapsulation\n"
-    "set vpn ipsec site-to-site peer main ike-group 'IKE-FNET-1'\n"
-    "set vpn ipsec site-to-site peer main ikev2-reauth 'inherit'\n"
-    "set vpn ipsec site-to-site peer main local-address '{wan_ip}'\n"
-    "set vpn ipsec site-to-site peer main remote-address '{main_dial_ip}'\n"
-    "set vpn ipsec site-to-site peer main tunnel 1 local prefix '{main_loop_ip}/32'\n"
-    "set vpn ipsec site-to-site peer main tunnel 1 remote prefix '{main_docking_ip}/32'\n"
-    "\n"
-    "# BGP community-lists\n"
+    "set nat source rule 1001 outbound-interface name '{main_nat_tun_id}'\n"
+    "set nat source rule 1001 source group network-group 'LAN-NET'\n"
+    "set nat source rule 1001 translation address '{main_nat_usip}'\n"
+    "set nat source rule 2001 outbound-interface name '{bk_nat_tun_id}'\n"
+    "set nat source rule 2001 source group network-group 'LAN-NET'\n"
+    "set nat source rule 2001 translation address '{bk_nat_usip}'\n"
+    "set nat source rule 5001 destination group address-group 'DNS-NET'\n"
+    "set nat source rule 5001 outbound-interface name '{main_nat_tun_id}'\n"
+    "set nat source rule 5001 translation address '{main_nat_usip}'\n"
+    "set nat source rule 6001 destination group address-group 'DNS-NET'\n"
+    "set nat source rule 6001 outbound-interface name '{bk_nat_tun_id}'\n"
+    "set nat source rule 6001 translation address '{bk_nat_usip}'\n"
+    "{pki_block}"
     "set policy community-list 80 rule 10 action 'permit'\n"
     "set policy community-list 80 rule 10 description 'to_hk'\n"
     "set policy community-list 80 rule 10 regex '65000:9939'\n"
@@ -2424,11 +2601,13 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set policy community-list 91 rule 10 action 'permit'\n"
     "set policy community-list 91 rule 10 description 'to_Microsoft'\n"
     "set policy community-list 91 rule 10 regex '65000:9009'\n"
-    "\n"
-    "# Route-maps\n"
+    "set policy local-route rule 2180 set table '180'\n"
+    "set policy local-route rule 2180 source address '{main_nat_tun_ce_ip}'\n"
+    "set policy local-route rule 2181 set table '181'\n"
+    "set policy local-route rule 2181 source address '{bk_nat_tun_ce_ip}'\n"
     "set policy route-map bgp-from--RSVR rule 80 action 'permit'\n"
     "set policy route-map bgp-from--RSVR rule 80 match community community-list '80'\n"
-    "set policy route-map bgp-from--RSVR rule 80 set ip-next-hop '{main_us_route_next_hop}'\n"
+    "set policy route-map bgp-from--RSVR rule 80 set ip-next-hop '{main_nat_tun_pe_ip}'\n"
     "set policy route-map bgp-from--RSVR rule 80 set local-preference '200'\n"
     "set policy route-map bgp-from--RSVR rule 81 action 'permit'\n"
     "set policy route-map bgp-from--RSVR rule 81 match community community-list '81'\n"
@@ -2444,7 +2623,7 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set policy route-map bgp-from--RSVR rule 83 set local-preference '200'\n"
     "set policy route-map bgp-from--RSVR2 rule 80 action 'permit'\n"
     "set policy route-map bgp-from--RSVR2 rule 80 match community community-list '80'\n"
-    "set policy route-map bgp-from--RSVR2 rule 80 set ip-next-hop '{bk_us_route_next_hop}'\n"
+    "set policy route-map bgp-from--RSVR2 rule 80 set ip-next-hop '{bk_nat_tun_pe_ip}'\n"
     "set policy route-map bgp-from--RSVR2 rule 80 set local-preference '50'\n"
     "set policy route-map bgp-from--RSVR2 rule 81 action 'permit'\n"
     "set policy route-map bgp-from--RSVR2 rule 81 match community community-list '81'\n"
@@ -2460,57 +2639,45 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set policy route-map bgp-from--RSVR2 rule 83 set local-preference '50'\n"
     "set policy route-map deny-any-out rule 1000 action 'deny'\n"
     "set policy route-map deny-any-out rule 1000 description 'to_bgpserver'\n"
-    "\n"
-    "# BGP\n"
-    "set protocols bgp neighbor {main_bgp_server} peer-group 'RSVR'\n"
-    "set protocols bgp neighbor {bk_bgp_server} peer-group 'RSVR2'\n"
-    "set protocols bgp neighbor {main_bgp_server2} peer-group 'RSVR'\n"
-    "set protocols bgp neighbor {bk_bgp_server2} peer-group 'RSVR2'\n"
-    "set protocols bgp parameters router-id '{ce_loip}'\n"
+    "set protocols bgp neighbor {nat_main_bgp2} peer-group 'RSVR'\n"
+    "set protocols bgp neighbor {nat_bk_bgp2} peer-group 'RSVR2'\n"
+    "set protocols bgp neighbor {nat_main_bgp1} peer-group 'RSVR'\n"
+    "set protocols bgp neighbor {nat_bk_bgp1} peer-group 'RSVR2'\n"
+    "set protocols bgp parameters router-id '{router_id}'\n"
     "set protocols bgp peer-group RSVR address-family ipv4-unicast route-map export 'deny-any-out'\n"
     "set protocols bgp peer-group RSVR address-family ipv4-unicast route-map import 'bgp-from--RSVR'\n"
     "set protocols bgp peer-group RSVR address-family ipv4-unicast soft-reconfiguration inbound\n"
     "set protocols bgp peer-group RSVR remote-as '65000'\n"
-    "set protocols bgp peer-group RSVR update-source '{main_us_snat_ip1}'\n"
+    "set protocols bgp peer-group RSVR update-source '{main_nat_usip}'\n"
     "set protocols bgp peer-group RSVR2 address-family ipv4-unicast route-map export 'deny-any-out'\n"
     "set protocols bgp peer-group RSVR2 address-family ipv4-unicast route-map import 'bgp-from--RSVR2'\n"
     "set protocols bgp peer-group RSVR2 address-family ipv4-unicast soft-reconfiguration inbound\n"
     "set protocols bgp peer-group RSVR2 remote-as '65000'\n"
-    "set protocols bgp peer-group RSVR2 update-source '{bk_us_snat_ip1}'\n"
+    "set protocols bgp peer-group RSVR2 update-source '{bk_nat_usip}'\n"
     "set protocols bgp system-as '65000'\n"
     "set protocols bgp timers holdtime '15'\n"
     "set protocols bgp timers keepalive '5'\n"
-    "\n"
-    "# Failover + static routes\n"
-    "set protocols failover2 route {main_bgp_server}/32 next-hop {main_tun_remote} track 'tomain'\n"
-    "set protocols failover2 track tomain source-address '{main_tun_local}'\n"
-    "set protocols failover2 track tomain target '{main_tun_remote}'\n"
+    "set protocols failover2 track tomain source-address '{main_ipsec_tun_ce_ip}'\n"
+    "set protocols failover2 track tomain target '{main_ipsec_tun_pe_ip}'\n"
     "set protocols failover2 track tomain type 'icmp'\n"
-    "set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '220'\n"
-    "set protocols static route 1.1.1.1/32 next-hop {wan_gw}\n"
-    "set protocols static route 4.2.2.1/32 next-hop {main_us_route_next_hop}\n"
-    "set protocols static route 10.0.0.0/8 next-hop 1.1.1.1\n"
-    "set protocols static route {ce_loip}/32 next-hop {bk_tun_remote}\n"
-    "set protocols static route {bk_docking_ip}/32 next-hop {bk_tun_remote}\n"
-    "set protocols static route {main_docking_ip}/32 next-hop 1.1.1.1\n"
-    "set protocols static route {main_bgp_server}/32 blackhole distance '10'\n"
-    "set protocols static route {main_bgp_server}/32 next-hop {main_us_route_next_hop}\n"
-    "set protocols static route {bk_bgp_server}/32 blackhole distance '10'\n"
-    "set protocols static route {bk_bgp_server}/32 next-hop {bk_us_route_next_hop}\n"
-    "set protocols static route {main_bgp_server2}/32 blackhole distance '10'\n"
-    "set protocols static route {main_bgp_server2}/32 next-hop {main_us_route_next_hop}\n"
-    "set protocols static route {bk_bgp_server2}/32 blackhole distance '10'\n"
-    "set protocols static route {bk_bgp_server2}/32 next-hop {bk_us_route_next_hop}\n"
-    "set protocols static route {main_dial_ip}/32 next-hop 1.1.1.1\n"
-    "set protocols static route {bk_dial_ip}/32 next-hop {wan_gw}\n"
-    "set protocols static route 172.16.0.0/12 next-hop 1.1.1.1\n"
-    "set protocols static route 192.168.0.0/16 next-hop 1.1.1.1\n"
-    "set protocols static route {main_docking_ip}/32 next-hop {main_tun_remote}\n"
-    "set protocols static route {bk_docking_ip}/32 next-hop {bk_tun_remote}\n"
-    "set protocols static table 180 route 0.0.0.0/0 next-hop {main_us_route_next_hop}\n"
-    "set protocols static table 181 route 0.0.0.0/0 next-hop {bk_us_route_next_hop}\n"
     "\n"
-    "# DNS / NTP / SSH / SNMP / System\n"
+    "# ── 默认路由 ──\n"
+    "{default_route_block}\n"
+    "\n"
+    "# ── IPSec 上游路由（拨号 IP / docking / CE loopback）──\n"
+    "{ipsec_routes_block}\n"
+    "\n"
+    "# ── NAT/GRE 上游路由（NAT PE docking / 探测点）──\n"
+    "{nat_routes_block}\n"
+    "\n"
+    "# ── BGP 服务器路由（next-hop + blackhole 保护）──\n"
+    "{bgp_server_routes_block}\n"
+    "\n"
+    "# ── 内网防泄漏（来自 WAN/LAN 内网段配置）──\n"
+    "{bypass_block}\n"
+    "\n"
+    "# ── PBR 分表默认路由 ──\n"
+    "{pbr_tables_block}\n"
     "set service dns forwarding allow-from '0.0.0.0/0'\n"
     "set service dns forwarding cache-size '20000'\n"
     "set service dns forwarding dnssec 'off'\n"
@@ -2525,6 +2692,10 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set service dns forwarding listen-address '0.0.0.0'\n"
     "set service dns forwarding name-server 8.8.4.4\n"
     "set service dns forwarding name-server 8.8.8.8\n"
+    "set service file-sync task 1 local '/config/user-data/cn.txt'\n"
+    "set service file-sync task 1 remote 'http://183.56.161.82:1909/f32x/domainlist/cn_domainlist.last'\n"
+    "set service file-sync task 2 local '/config/user-data/oversea.txt'\n"
+    "set service file-sync task 2 remote 'http://183.56.161.82:1909/f32x/domainlist/oversea_domainlist.last'\n"
     "set service ntp allow-client address '127.0.0.0/8'\n"
     "set service ntp allow-client address '169.254.0.0/16'\n"
     "set service ntp allow-client address '10.0.0.0/8'\n"
@@ -2540,6 +2711,7 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set service ssh port '2707'\n"
     "set system config-management commit-revisions '100'\n"
     "set system console device ttyS0 speed '115200'\n"
+    "set system host-name '{hostname}'\n"
     "set system login operator-group default command-policy allow '*'\n"
     "set system login user bothwin plain Tfe28@w%\n"
     "set system name-server '127.0.0.1'\n"
@@ -2548,166 +2720,291 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set system syslog local facility all level 'info'\n"
     "set system syslog local facility local7 level 'debug'\n"
     "set system time-zone 'Asia/Hong_Kong'\n"
-    "set system host-name '{hostname}'\n"
+    "set vpn ipsec authentication psk ipsec id '0.0.0.0'\n"
+    "set vpn ipsec authentication psk ipsec secret '{main_ipsec_secret}'\n"
+    "set vpn ipsec esp-group ESP-FNET-1 lifetime '{esp_lifetime}'\n"
+    "set vpn ipsec esp-group ESP-FNET-1 mode 'tunnel'\n"
+    "set vpn ipsec esp-group ESP-FNET-1 proposal 1 encryption '{esp_encryption}'\n"
+    "set vpn ipsec esp-group ESP-FNET-1 proposal 1 hash '{esp_hash}'\n"
+    "set vpn ipsec esp-group ESP-FNET-2 lifetime '{esp_lifetime}'\n"
+    "set vpn ipsec esp-group ESP-FNET-2 mode 'tunnel'\n"
+    "set vpn ipsec esp-group ESP-FNET-2 proposal 1 encryption '{esp_encryption}'\n"
+    "set vpn ipsec esp-group ESP-FNET-2 proposal 1 hash '{esp_hash}'\n"
+    "set vpn ipsec ike-group IKE-FNET-1 disable-mobike\n"
+    "set vpn ipsec ike-group IKE-FNET-1 key-exchange '{ike_key_exchange}'\n"
+    "set vpn ipsec ike-group IKE-FNET-1 lifetime '{ike_lifetime}'\n"
+    "set vpn ipsec ike-group IKE-FNET-1 proposal 1 dh-group '{ike_dh_group}'\n"
+    "set vpn ipsec ike-group IKE-FNET-1 proposal 1 encryption '{ike_encryption}'\n"
+    "set vpn ipsec ike-group IKE-FNET-1 proposal 1 hash '{ike_hash}'\n"
+    "{bk_ike_dpd_block}"
+    "set vpn ipsec ike-group IKE-FNET-2 disable-mobike\n"
+    "set vpn ipsec ike-group IKE-FNET-2 key-exchange '{ike_key_exchange}'\n"
+    "set vpn ipsec ike-group IKE-FNET-2 lifetime '{ike_lifetime}'\n"
+    "set vpn ipsec ike-group IKE-FNET-2 proposal 1 dh-group '{ike_dh_group}'\n"
+    "set vpn ipsec ike-group IKE-FNET-2 proposal 1 encryption '{ike_encryption}'\n"
+    "set vpn ipsec ike-group IKE-FNET-2 proposal 1 hash '{ike_hash}'\n"
+    "set vpn ipsec interface '{wan_if}'\n"
+    "set vpn ipsec options retransmission base '1'\n"
+    "set vpn ipsec options retransmission timeout '4'\n"
+    "set vpn ipsec site-to-site peer backup authentication mode 'pre-shared-secret'\n"
+    "set vpn ipsec site-to-site peer backup connection-type 'initiate'\n"
+    "set vpn ipsec site-to-site peer backup default-esp-group 'ESP-FNET-2'\n"
+    "set vpn ipsec site-to-site peer backup force-udp-encapsulation\n"
+    "set vpn ipsec site-to-site peer backup ike-group 'IKE-FNET-2'\n"
+    "set vpn ipsec site-to-site peer backup ikev2-reauth 'inherit'\n"
+    "set vpn ipsec site-to-site peer backup local-address '{wan_ip}'\n"
+    "set vpn ipsec site-to-site peer backup remote-address '{bk_ipsec_dial_ip}'\n"
+    "set vpn ipsec site-to-site peer backup tunnel 1 local prefix '{bk_ipsec_loop_ip}/32'\n"
+    "set vpn ipsec site-to-site peer backup tunnel 1 remote prefix '{bk_ipsec_docking_ip}/32'\n"
+    "set vpn ipsec site-to-site peer main authentication mode 'pre-shared-secret'\n"
+    "set vpn ipsec site-to-site peer main connection-type 'initiate'\n"
+    "set vpn ipsec site-to-site peer main default-esp-group 'ESP-FNET-1'\n"
+    "set vpn ipsec site-to-site peer main force-udp-encapsulation\n"
+    "set vpn ipsec site-to-site peer main ike-group 'IKE-FNET-1'\n"
+    "set vpn ipsec site-to-site peer main ikev2-reauth 'inherit'\n"
+    "set vpn ipsec site-to-site peer main local-address '{wan_ip}'\n"
+    "set vpn ipsec site-to-site peer main remote-address '{main_ipsec_dial_ip}'\n"
+    "set vpn ipsec site-to-site peer main tunnel 1 local prefix '{main_ipsec_loop_ip}/32'\n"
+    "set vpn ipsec site-to-site peer main tunnel 1 remote prefix '{main_ipsec_docking_ip}/32'\n"
     "# end\n"
 )
 
 
 def build_epoch5_us_ipsec_format_dict(hdr_text: str):
-    """组装 TEMPLATE_EPOCH5_US_IPSEC.format(**d) 所需的 dict。
-
-    成功返回 (d, warning_str)；警告为空字符串表示正常。
-    """
+    """组装 TEMPLATE_EPOCH5_US_IPSEC.format(**d) 所需的 dict。"""
     g = globals()
-
-    # ── 0. 校验网络参数 ──
     wan_cidr = str(g.get("DEFAULT_WAN_CIDR", "")).strip()
     lan_cidr = str(g.get("DEFAULT_LAN_CIDR", "")).strip()
     wan_gw = str(g.get("DEFAULT_WAN_GW", "")).strip()
+    wan_dhcp = bool(g.get("DEFAULT_WAN_DHCP", False))
+    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "")).strip()
 
     ok_wan, msg_wan = _validate_cidr(wan_cidr, "WAN IP")
     ok_lan, msg_lan = _validate_cidr(lan_cidr, "LAN IP")
+    inner_nets, inner_errors = _validate_inner_nets(inner_nets_raw)
     errs = []
     if not ok_wan:
         errs.append(msg_wan)
     if not ok_lan:
         errs.append(msg_lan)
+    if not wan_gw and not wan_dhcp:
+        errs.append("WAN 网关不能为空（除非启用 WAN DHCP）")
+    for frag, reason in inner_errors:
+        errs.append(f"内网段「{frag}」不符合网络标准：{reason}")
+    if not inner_nets:
+        errs.append("内网段不能为空：默认应包含 10.0.0.0/8、172.16.0.0/12、192.168.0.0/16")
     if errs:
         return None, ("network", errs)
 
-    # ── 1. 解析 IPSec 数据头 ──
-    raw = hdr_text.strip()
-    if not raw:
-        return None, ("parse", "请输入业务数据（LineID 数据头）")
-    d = _parse_ipsec_us(raw)
+    parsed, perr = _parse_ipsec_us(hdr_text)
+    if perr:
+        return None, ("parse", perr)
 
-    # ── 2. 网络参数 ──
-    wan_eth = str(g.get("DEFAULT_WAN_ETH", "0")).strip() or "0"
-    lan_eth = str(g.get("DEFAULT_LAN_ETH", "5")).strip() or "5"
+    im = parsed["ipsec_main"]
+    ib = parsed["ipsec_bk"]
+    nm = parsed["nat_main"]
+    nb = parsed["nat_bk"]
 
-    # ── 3. IPSec 参数检测 ──
-    has_ike = bool(d.get("ike_key_exchange"))
-    has_esp = bool(d.get("esp_encryption"))
+    for label, block, fields in (
+        ("IPSec 主线", im, [
+            ("lineid", "LineID"), ("pe", "PE"), ("tun_id", "Tunnel"),
+            ("wanip", "wanip"), ("pe_docking", "PE 对接"), ("loop_ip", "LoopIP"),
+            ("dial_ip", "拨号ip"), ("secret", "秘钥"), ("tun_ce_ip", "wanip(/30 CE)"),
+            ("tun_pe_ip", "wanip(/30 PE)"),
+        ]),
+        ("IPSec 备线", ib, [
+            ("lineid", "LineID"), ("pe", "PE"), ("tun_id", "Tunnel"),
+            ("wanip", "wanip"), ("pe_docking", "PE 对接"), ("loop_ip", "LoopIP"),
+            ("dial_ip", "拨号ip"), ("secret", "秘钥"), ("tun_ce_ip", "wanip(/30 CE)"),
+            ("tun_pe_ip", "wanip(/30 PE)"),
+        ]),
+        ("NAT 主线", nm, [
+            ("lineid", "LineID"), ("pe", "PE"), ("tun_id", "TUNNEL"),
+            ("wanip", "WANIP"), ("pe_docking", "PE Docking"), ("usip", "海外出口ip"),
+            ("bgp1", "BGPSERVER IP[1]"), ("bgp2", "BGPSERVER IP[2]"),
+            ("tun_ce_ip", "WANIP(/30 CE)"), ("tun_pe_ip", "WANIP(/30 PE)"),
+        ]),
+        ("NAT 备线", nb, [
+            ("lineid", "LineID"), ("pe", "PE"), ("tun_id", "TUNNEL"),
+            ("wanip", "WANIP"), ("pe_docking", "PE Docking"), ("usip", "海外出口ip"),
+            ("bgp1", "BGPSERVER IP[1]"), ("bgp2", "BGPSERVER IP[2]"),
+            ("tun_ce_ip", "WANIP(/30 CE)"), ("tun_pe_ip", "WANIP(/30 PE)"),
+        ]),
+    ):
+        msg = _require_fields(block, fields, label)
+        if msg:
+            return None, ("parse", msg)
+
+    ce_loip = im.get("ce_loip") or ""
+    if not ce_loip:
+        return None, ("parse", "IPSec 主线缺少字段：客户内网路由")
+
     warning = ""
+    has_ike = bool(im.get("ike_key_exchange") or ib.get("ike_key_exchange"))
+    has_esp = bool(im.get("esp_encryption") or ib.get("esp_encryption"))
     if not has_ike and not has_esp:
         warning = "未检测到IKE/IPSec参数，已按默认参数生成，请自行检查。"
 
-    # 设置默认值
-    d.setdefault("ike_key_exchange", "ikev1")
-    d.setdefault("ike_dh_group", "2")
-    d.setdefault("ike_encryption", "aes128")
-    d.setdefault("ike_hash", "sha1")
-    d.setdefault("ike_prf", "hmac-sha2-256")
-    d.setdefault("ike_lifetime", "28800")
-    d.setdefault("ike_dpd", "yes")
-    d.setdefault("ike_dpd_interval", "10")
-    d.setdefault("ike_dpd_timeout", "30")
-    d.setdefault("esp_encryption", "aes128")
-    d.setdefault("esp_hash", "sha1")
-    d.setdefault("esp_lifetime", "3600")
+    src = im if im.get("ike_key_exchange") else ib
+    ike_key_exchange = _ipsec_first_token(src.get("ike_key_exchange"), "ikev1")
+    ike_dh_group = src.get("ike_dh_group") or "2"
+    ike_encryption = _ipsec_first_token(src.get("ike_encryption"), "aes128")
+    ike_hash = src.get("ike_hash") or "sha1"
+    esp_encryption = _ipsec_first_token(
+        im.get("esp_encryption") or ib.get("esp_encryption"), "aes128"
+    )
+    esp_hash = (im.get("esp_hash") or ib.get("esp_hash") or "sha1")
 
-    # ── 4. 必要字段校验 ──
-    if not d.get("main_loop_ip"):
-        d["main_loop_ip"] = d.get("ce_loip", "10.50.86.74")
-    if not d.get("main_dial_ip"):
-        return None, ("parse", "未找到主线 IPSec 拨号 IP，请检查数据头")
+    wan_eth = str(g.get("DEFAULT_WAN_ETH", "0")).strip() or "0"
+    lan_eth = str(g.get("DEFAULT_LAN_ETH", "5")).strip() or "5"
+    wan_ip = wan_cidr.split("/")[0]
+    lan_ip = lan_cidr.split("/")[0]
+    wan_cidr_prefix = str(ipaddress.ip_network(wan_cidr, strict=False).prefixlen)
+    lan_cidr_prefix = str(ipaddress.ip_network(lan_cidr, strict=False).prefixlen)
+    wan_if = f"eth{wan_eth}" if not wan_eth.startswith("eth") else wan_eth
+    lan_if = f"eth{lan_eth}" if not lan_eth.startswith("eth") else lan_eth
 
-    # ── 5. 隧道命名 ──
-    main_tun = d.get("main_us_gre_id") or d.get("main_tunnel") or ""
-    bk_tun = d.get("bk_us_gre_id") or d.get("bk_tunnel") or ""
-    d["main_tun_id"] = normalize_tun(main_tun) if main_tun else "tun2013"
-    d["bk_tun_id"] = normalize_tun(bk_tun) if bk_tun else "tun2018"
-    d["main_tun_num"] = re.sub(r'\D', '', d["main_tun_id"]) if d.get("main_tun_id") else "2013"
-    d["bk_tun_num"] = re.sub(r'\D', '', d["bk_tun_id"]) if d.get("bk_tun_id") else "2018"
-
-    # 隧道地址
-    try:
-        wan_net = ipaddress.ip_network(wan_cidr, strict=False)
-        hosts = list(wan_net.hosts())
-        if hosts:
-            d["main_tun_local"] = str(hosts[0])
-            d["bk_tun_local"] = str(hosts[1]) if len(hosts) > 1 else str(hosts[0])
-        else:
-            d["main_tun_local"] = d["bk_tun_local"] = "10.0.0.1"
-    except Exception:
-        d["main_tun_local"] = d["bk_tun_local"] = "10.0.0.1"
-
-    # WAN IP/LAN IP
-    d["wan_ip"], d["lan_ip"] = wan_cidr.split("/")[0] if "/" in wan_cidr else wan_cidr, lan_cidr.split("/")[0] if "/" in lan_cidr else lan_cidr
-    try:
-        d["wan_cidr_prefix"] = str(ipaddress.ip_network(wan_cidr, strict=False).prefixlen)
-    except Exception:
-        d["wan_cidr_prefix"] = "24"
-    try:
-        d["lan_cidr_prefix"] = str(ipaddress.ip_network(lan_cidr, strict=False).prefixlen)
-    except Exception:
-        d["lan_cidr_prefix"] = "24"
-
-    d["wan_if"] = f"eth{wan_eth}" if not wan_eth.startswith("eth") else wan_eth
-    d["lan_if"] = f"eth{lan_eth}" if not lan_eth.startswith("eth") else lan_eth
-
-    # ── 6. Hostname ──
-    hn = d.get("hostname", "").strip()
+    hn = str(g.get("DEFAULT_HOSTNAME", "")).strip()
     if not hn:
-        hn = _extract_lineid(raw) or "请填写Hostname"
-    d["hostname"] = hn if hn else "请填写Hostname"
+        hn = _extract_lineid(hdr_text) or "请填写Hostname"
 
-    # ── 7. BGP servers ──
-    d.setdefault("main_bgp_server", "103.252.19.25")
-    d.setdefault("bk_bgp_server", "43.229.117.226")
+    if _EPOCH5_PKI_SECRET_KEY:
+        pki_block = (
+            f"set pki openvpn shared-secret openvpn_secret key '{_EPOCH5_PKI_SECRET_KEY}'\n"
+            "set pki openvpn shared-secret openvpn_secret version '1'\n"
+        )
+    else:
+        pki_block = ""
 
-    # ── 8. SNAT / BGP / DNS blocks — 使用现有 block 常量 ──
-    d["wan_gw"] = wan_gw
-    d["return_routes_block"] = ""
-    d["us_bgp_routes"] = ""
-    d["dns1"] = str(g.get("HK_DEFAULT_DNS1", "8.8.8.8"))
-    d["dns2"] = str(g.get("HK_DEFAULT_DNS2", "8.8.4.4"))
-    d["ssh_port"] = "2707"
-    d["snmp_community"] = "both-win"
-    d["bypass_block"] = ""
-    d["bypass_gre"] = ""
-    d["lan_net"] = "192.168.5.0/24"
+    # ── LAN-NET：来自统一的内网段配置 ──
+    lan_net_block = "\n".join(
+        f"set firewall group network-group LAN-NET network '{net}'"
+        for net in inner_nets
+    )
 
-    d.setdefault("ce_loip", d.get("CE Docking", d.get("ce_loip", "10.22.242.223")))
-    d.setdefault("main_ce_loip", d.get("ce_loip", ""))
-    d.setdefault("bk_ce_loip", d.get("ce_loip", ""))
-    d.setdefault("_lan_net_block", "")
-    d.setdefault("fw_options_block", "")
-    d.setdefault("wan_gw_force", "")
+    # ── 默认路由（受 WAN DHCP 影响）──
+    if wan_dhcp:
+        default_route_block = "# WAN DHCP 模式 — 不生成默认静态路由"
+    else:
+        default_route_block = (
+            f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '220'\n"
+            f"set protocols static route 1.1.1.1/32 next-hop {wan_gw}"
+        )
 
-    # ── 9. 确保所有模板占位符都有默认值 ──
-    d.setdefault("main_dial_pe", d.get("main_us_pe", "szd-upe3"))
-    d.setdefault("main_docking_ip", d.get("main_us_docking", "10.200.200.37"))
-    d.setdefault("main_secret", "both-win")
-    d.setdefault("bk_dial_pe", d.get("bk_us_pe", "szc-upe1"))
-    d.setdefault("bk_dial_ip", "120.133.134.72")
-    d.setdefault("bk_loop_ip", d.get("main_loop_ip", "10.50.118.76").replace("86.74", "118.76"))
-    d.setdefault("bk_docking_ip", "10.200.200.27")
-    # Tunnel remote address (the GRE peer's local tunnel IP — derived from wanip)
-    try:
-        wan_net = ipaddress.ip_network(wan_cidr, strict=False)
-        hosts = list(wan_net.hosts())
-        d.setdefault("main_tun_remote", str(hosts[1]) if len(hosts) > 1 else str(hosts[0]))
-        d.setdefault("bk_tun_remote", str(hosts[2]) if len(hosts) > 2 else (str(hosts[1]) if len(hosts) > 1 else str(hosts[0])))
-    except Exception:
-        d.setdefault("main_tun_remote", "10.40.129.149")
-        d.setdefault("bk_tun_remote", "10.30.37.169")
-    # BGP route next-hops
-    d.setdefault("main_us_route_next_hop", "10.22.113.37")
-    d.setdefault("bk_us_route_next_hop", "10.22.115.29")
-    # SNAT IPs for BGP update-source
-    d.setdefault("main_us_snat_ip1", d.get("main_us_nat_ip", "10.60.52.46"))
-    d.setdefault("bk_us_snat_ip1", d.get("bk_us_nat_ip", "10.60.79.99"))
-    # Second BGP server
-    bgp_raw = d.get("main_us_bgp_all", "")
-    bgps = [x.strip() for x in bgp_raw.replace("，", ",").split(",") if x.strip()]
-    d.setdefault("main_bgp_server", bgps[0] if len(bgps) > 0 else "103.252.19.25")
-    d.setdefault("main_bgp_server2", bgps[1] if len(bgps) > 1 else "103.252.19.99")
-    d.setdefault("bk_bgp_server", bgps[2] if len(bgps) > 2 else "43.229.117.226")
-    d.setdefault("bk_bgp_server2", bgps[3] if len(bgps) > 3 else "43.229.119.251")
-    # WAN gateway
-    d.setdefault("wan_gw", wan_gw)
+    # ── IPSec 上游路由（拨号、docking、CE loopback）──
+    ipsec_route_lines = [
+        f"set protocols static route {ce_loip}/32 next-hop {ib['tun_pe_ip']}",
+        f"set protocols static route {im['docking_ip']}/32 next-hop 1.1.1.1",
+        f"set protocols static route {ib['docking_ip']}/32 next-hop 1.1.1.1",
+        f"set protocols static route {im['dial_ip']}/32 next-hop 1.1.1.1",
+    ]
+    if wan_gw:
+        ipsec_route_lines.append(
+            f"set protocols static route {ib['dial_ip']}/32 next-hop {wan_gw}"
+        )
+    else:
+        ipsec_route_lines.append(
+            f"set protocols static route {ib['dial_ip']}/32 next-hop 1.1.1.1"
+        )
+    ipsec_routes_block = "\n".join(ipsec_route_lines)
 
+    # ── NAT/GRE 上游路由（NAT PE docking 走对应 IPSec PE；4.2.2.1 探测）──
+    nat_routes_block = "\n".join([
+        f"set protocols static route {nm['pe_docking']}/32 next-hop {im['tun_pe_ip']}",
+        f"set protocols static route {nb['pe_docking']}/32 next-hop {ib['tun_pe_ip']}",
+        f"set protocols static route 4.2.2.1/32 next-hop {nm['tun_pe_ip']}",
+    ])
+
+    # ── BGP 服务器路由（每个 BGP IP 一组 next-hop + blackhole 保护）──
+    bgp_lines = []
+    for bgp in (nm["bgp1"], nm["bgp2"]):
+        if bgp:
+            bgp_lines.append(f"set protocols static route {bgp}/32 next-hop {nm['tun_pe_ip']}")
+            bgp_lines.append(f"set protocols static route {bgp}/32 blackhole distance '10'")
+    for bgp in (nb["bgp1"], nb["bgp2"]):
+        if bgp:
+            bgp_lines.append(f"set protocols static route {bgp}/32 next-hop {nb['tun_pe_ip']}")
+            bgp_lines.append(f"set protocols static route {bgp}/32 blackhole distance '10'")
+    bgp_server_routes_block = "\n".join(bgp_lines)
+
+    # ── 内网防泄漏：与 LAN-NET 用相同的内网段集合 ──
+    bypass_block = "\n".join(
+        f"set protocols static route {net} next-hop 1.1.1.1"
+        for net in inner_nets
+    )
+
+    # ── PBR 分表默认路由 ──
+    pbr_tables_block = "\n".join([
+        f"set protocols static table 180 route 0.0.0.0/0 next-hop {nm['tun_pe_ip']}",
+        f"set protocols static table 181 route 0.0.0.0/0 next-hop {nb['tun_pe_ip']}",
+    ])
+
+    d = {
+        "hostname": hn,
+        "ce_loip": ce_loip,
+        "main_ipsec_loop_ip": im["loop_ip"],
+        "bk_ipsec_loop_ip": ib["loop_ip"],
+        "main_nat_usip": nm["usip"],
+        "bk_nat_usip": nb["usip"],
+        "main_nat_public_ip": nm.get("public_ip", ""),
+        "bk_nat_public_ip": nb.get("public_ip", ""),
+        "wan_if": wan_if,
+        "lan_if": lan_if,
+        "wan_ip": wan_ip,
+        "lan_ip": lan_ip,
+        "wan_cidr_prefix": wan_cidr_prefix,
+        "lan_cidr_prefix": lan_cidr_prefix,
+        "wan_gw": wan_gw,
+        "main_ipsec_tun_id": im["tun_id"],
+        "main_ipsec_tun_num": im["tun_num"],
+        "main_ipsec_tun_ce_ip": im["tun_ce_ip"],
+        "main_ipsec_tun_pe_ip": im["tun_pe_ip"],
+        "main_ipsec_pe": im["dial_pe"],
+        "main_ipsec_docking_ip": im["docking_ip"],
+        "main_ipsec_dial_ip": im["dial_ip"],
+        "main_ipsec_secret": im["secret"],
+        "bk_ipsec_tun_id": ib["tun_id"],
+        "bk_ipsec_tun_num": ib["tun_num"],
+        "bk_ipsec_tun_ce_ip": ib["tun_ce_ip"],
+        "bk_ipsec_tun_pe_ip": ib["tun_pe_ip"],
+        "bk_ipsec_pe": ib["dial_pe"],
+        "bk_ipsec_docking_ip": ib["docking_ip"],
+        "bk_ipsec_dial_ip": ib["dial_ip"],
+        "main_nat_tun_id": nm["tun_id"],
+        "main_nat_tun_num": nm["tun_num"],
+        "main_nat_tun_ce_ip": nm["tun_ce_ip"],
+        "main_nat_tun_pe_ip": nm["tun_pe_ip"],
+        "main_nat_pe": nm["pe"],
+        "main_nat_pe_docking": nm["pe_docking"],
+        "bk_nat_tun_id": nb["tun_id"],
+        "bk_nat_tun_num": nb["tun_num"],
+        "bk_nat_tun_ce_ip": nb["tun_ce_ip"],
+        "bk_nat_tun_pe_ip": nb["tun_pe_ip"],
+        "bk_nat_pe": nb["pe"],
+        "bk_nat_pe_docking": nb["pe_docking"],
+        "nat_main_bgp1": nm["bgp1"],
+        "nat_main_bgp2": nm["bgp2"],
+        "nat_bk_bgp1": nb["bgp1"],
+        "nat_bk_bgp2": nb["bgp2"],
+        "router_id": nm["usip"],
+        "ike_key_exchange": ike_key_exchange,
+        "ike_dh_group": ike_dh_group,
+        "ike_encryption": ike_encryption,
+        "ike_hash": ike_hash,
+        "ike_lifetime": "28800",
+        "esp_encryption": esp_encryption,
+        "esp_hash": esp_hash,
+        "esp_lifetime": "3600",
+        "bk_ike_dpd_block": _ipsec_ike_dpd_lines(ib.get("ike_dpd", ""), ib.get("ike_dpd_idle", "")),
+        "pki_block": pki_block,
+        "lan_net_block": lan_net_block,
+        "default_route_block": default_route_block,
+        "ipsec_routes_block": ipsec_routes_block,
+        "nat_routes_block": nat_routes_block,
+        "bgp_server_routes_block": bgp_server_routes_block,
+        "bypass_block": bypass_block,
+        "pbr_tables_block": pbr_tables_block,
+    }
     return d, warning
 
 

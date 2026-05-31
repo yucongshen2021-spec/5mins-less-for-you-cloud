@@ -161,6 +161,20 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 
 /* ═══════════════════════════════════════════════════ scrollbar ═══════════════════════════════════════════════════ */
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--hls2);border-radius:3px}
+
+/* ═══════════ 级联场景菜单 ═══════════ */
+.cascade-menu{display:flex;align-items:flex-start;gap:0;position:relative;margin-bottom:10px}
+.cascade-label{font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.8px;padding:6px 10px 6px 0;white-space:nowrap;flex-shrink:0}
+.cascade-col{list-style:none;padding:0;margin:0;min-width:170px;background:var(--sf);border:1px solid var(--hl);border-radius:var(--rp);overflow:hidden}
+.cascade-col li{position:relative}
+.cascade-col li a{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;font-size:13px;font-weight:500;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;transition:background .12s}
+.cascade-col li a:hover,.cascade-col li a.active{background:linear-gradient(135deg,rgba(245,78,0,.15),rgba(255,160,110,.06))}
+.cascade-col li a .arr{font-size:10px;color:var(--mu);margin-left:12px}
+.cascade-col .cascade-col{position:absolute;left:100%;top:0;display:none;z-index:5}
+.cascade-col li:hover>.cascade-col{display:block}
+.cascade-col li a.leaf .arr{display:none}
+.cascade-col li a.leaf:hover,.cascade-col li a.leaf.selected{background:var(--ink);color:var(--cv)}
+.cascade-col li a.leaf.selected::before{content:'✓ ';font-size:11px}
 </style>
 </head>
 <body>
@@ -386,7 +400,10 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <!-- ═══ 我来定模板 ═══ -->
 <section class="tool-panel" id="panel-templates">
 <div class="panel-header"><h1 class="panel-title">我来定模板</h1><p class="panel-subtitle">可视化编辑：数据头 · 变量映射 · 生成模板 · 预览效果</p></div>
-<div class="sel"><select class="fs" id="scenario-select" onchange="loadSc()"><option value="">选择场景…</option></select></div>
+<div class="cascade-menu" id="tpl-cascade">
+  <span class="cascade-label">场景选择</span>
+  <ul class="cascade-col" id="tpl-col1"></ul>
+</div>
 <div class="card" style="margin-bottom:10px"><div class="card-h" onclick="tg(this)"><span>初始化默认</span><span class="carr">▼</span></div>
 <div class="card-b" id="tpl-init-body"><span style="color:var(--mu);font-size:12px">选择场景后加载初始化参数…</span></div></div>
 <div class="tgrid">
@@ -430,8 +447,10 @@ function onER5TunnelTypeChange(){
   else{l1.classList.add('active');l2.classList.remove('active')}
   // re-init defaults when switching tunnel type
   ldInitForm('epoch-fastip');
+  ldEx('epoch-fastip');
 }
-function getER5TunnelType(){let v=document.querySelector('input[name="er5-tunnel-type"]:checked');return v?v.value:'openvpn'}
+function isER5UsIPSecAvailable(){return erVersion==='5'&&gv('epoch-fastip')==='us'}
+function getER5TunnelType(){if(!isER5UsIPSecAvailable())return 'openvpn';let v=document.querySelector('input[name="er5-tunnel-type"]:checked');return v?v.value:'openvpn'}
 function switchERVersion(ver){
   erVersion=ver;
   $('er-ver-4').classList.toggle('active',ver==='4');
@@ -469,6 +488,16 @@ function showNetPanel(tp,v){
     let a5=panels5[v];if(a5){let el=$(a5);if(el){el.style.display='block';el.classList.add('active')}}
   }else{
     let active=(map[tp]||{})[v];if(active){let el=$(active);if(el){el.style.display='block';el.classList.add('active')}}
+  }
+  // IPSec 隧道类型按钮：仅在 ER 5.0 + 非香港出口（us）时可见，其他情况强制 OpenVPN
+  let ttBox=document.querySelector('.er5-tunnel-type');
+  if(ttBox){
+    let canIpsec=tp==='epoch-fastip'&&isV5&&v==='us';
+    ttBox.style.display=canIpsec?'':'none';
+    if(!canIpsec){
+      let ov=document.querySelector('input[name="er5-tunnel-type"][value="openvpn"]');
+      if(ov&&!ov.checked){ov.checked=true;onER5TunnelTypeChange()}
+    }
   }
 }
 // USG DNS switching: HK = 10.255.108.5/6, US = 10.255.108.7/58
@@ -663,7 +692,7 @@ async function ldInitForm(tp){
   }catch(e){}
 }
 async function ldNotes(tp){let el=$(tp+'-notes');if(!el)return;let v=tp==='ar-sdwan'?'default':gv(tp);if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/notes/'+tm+'?variant='+v+'&_='+Date.now());let d=await r.json();el.value=d.ok?d.notes:''}catch(e){}}
-async function ldEx(tp){let el=$(tp+'-example');if(!el)return;let v=tp==='ar-sdwan'?'single_ops':gv(tp);if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/examples/'+tm+'/'+v+'?_='+Date.now());let d=await r.json();el.value=d.ok?d.example:''}catch(e){}}
+async function ldEx(tp){let el=$(tp+'-example');if(!el)return;let v=tp==='ar-sdwan'?'single_ops':gv(tp);if(tp==='epoch-fastip'&&erVersion==='5'&&v==='us'&&getER5TunnelType()==='ipsec')v='us_ipsec';if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/examples/'+tm+'/'+v+'?_='+Date.now());let d=await r.json();el.value=d.ok?d.example:''}catch(e){}}
 
 function fsToggle(btn,taId){let card=btn.closest('.card');card.classList.toggle('fs-panel');let ta=$(taId);if(ta)ta.focus();let t=card.classList.contains('fs-panel')?'[−]':'[⛶]';btn.textContent=t}
 async function gen(tp){let api=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp],v=tp==='ar-sdwan'?arVariant():gv(tp),ht=$(tp+'-header')?.value||'',net=tp==='ar-sdwan'?arNet():(tp==='epoch-fastip'&&erVersion==='5'?gn5(tp):gn(tp)),se=$(tp+'-status');se.textContent='生成中…';se.className='status';if(!api)return;try{let r=await fetch('/api/generate/'+api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({variant:v,header_text:ht,network:net})});let d=await r.json();if(tp==='ar-sdwan'){let oe=$('ar-sdwan-ops-output'),fe=$('ar-sdwan-factory-output');if(d.ok){oe.value=d.ops_output||d.output||'';fe.value=d.factory_output||'# Factory 暂无'}else{oe.value='// '+d.error;fe.value='// '+d.error}se.textContent=d.ok?'成功 · '+(d.ops_output||d.output||'').split('\n').length+' 行':('错误: '+d.error);se.className=d.ok?'status status-ok':'status status-err'}else{let oe=$(tp+'-output');if(!oe)return;if(d.ok){oe.value=d.output;se.textContent='成功 · '+d.output.split('\n').length+' 行';se.className='status status-ok'}else{oe.value='// '+d.error;se.textContent='错误: '+d.error;se.className='status status-err'}}}catch(e){['ar-sdwan-ops-output','ar-sdwan-factory-output',tp+'-output'].forEach(id=>{let el=$(id);if(el)el.value='// Error: '+e.message});se.textContent='网络错误';se.className='status status-err'}}
@@ -686,8 +715,42 @@ function toast(m){let t=$('toast');t.textContent=m;t.classList.add('show');setTi
 
 /* Template Editor */
 let ck='';
-async function ldScens(){let sel=$('scenario-select');if(sel.options.length>1)return;try{let r=await fetch('/api/scenarios');let d=await r.json();if(d.ok)d.scenarios.forEach(s=>{let o=document.createElement('option');o.value=s.key;o.textContent=s.key;sel.appendChild(o)})}catch(e){}}
-async function loadSc(){let key=$('scenario-select').value;if(!key)return;ck=key;$('template-status').textContent='加载中…';$('template-status').className='status';try{let r=await fetch('/api/template/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});let d=await r.json();if(d.ok){$('tpl-header').value=d.header;$('tpl-mapping').value=d.mapping;$('tpl-template').value=d.template;$('tpl-preview').value='# 请点击【预览模板】按钮生成完整预览\n';$('template-status').textContent='已切换: '+key;$('template-status').className='status status-ok'}loadInitDefaults(key)}catch(e){$('template-status').textContent='加载失败';$('template-status').className='status status-err'}}
+let _tplTree=null;
+function _renderCascadeCol(parentUl, nodes, depth){
+  let ul=document.createElement('ul');ul.className='cascade-col';
+  nodes.forEach(n=>{
+    let li=document.createElement('li');
+    let a=document.createElement('a');
+    a.textContent=n.label;
+    if(n.children&&n.children.length){
+      a.innerHTML+= '<span class=arr>▸</span>';
+      li.appendChild(a);
+      _renderCascadeCol(li, n.children, depth+1);
+    }else if(n.key){
+      a.className='leaf';a.href='#';
+      a.addEventListener('click',e=>{e.preventDefault();
+        // highlight selected
+        ul.querySelectorAll('a.leaf').forEach(x=>x.classList.remove('selected'));
+        a.classList.add('selected');
+        loadSc(n.key);
+      });
+      li.appendChild(a);
+    }
+    ul.appendChild(li);
+  });
+  parentUl.appendChild(ul);
+}
+async function ldScens(){
+  if(_tplTree)return;
+  try{
+    let r=await fetch('/api/scenarios');let d=await r.json();
+    if(d.ok&&d.tree){_tplTree=d.tree;
+      let col1=$('tpl-col1');col1.innerHTML='';
+      _renderCascadeCol(col1, d.tree, 0);
+    }
+  }catch(e){}
+}
+async function loadSc(key){if(!key)return;ck=key;$('template-status').textContent='加载中…';$('template-status').className='status';try{let r=await fetch('/api/template/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});let d=await r.json();if(d.ok){$('tpl-header').value=d.header;$('tpl-mapping').value=d.mapping;$('tpl-template').value=d.template;$('tpl-preview').value='# 请点击【预览模板】按钮生成完整预览\n';$('template-status').textContent='已切换: '+key;$('template-status').className='status status-ok'}loadInitDefaults(key)}catch(e){$('template-status').textContent='加载失败';$('template-status').className='status status-err'}}
 async function loadInitDefaults(key){try{let r=await fetch('/api/init-defaults/'+encodeURIComponent(key));let d=await r.json();if(d.ok&&d.values){let vs=d.values;let h='<div class=fr2 style=gap:8px>';let i=0;for(let[k,v]of Object.entries(vs)){let val=typeof v==='boolean'?(v?'true':'false'):String(v);let labelMap={'DEFAULT_WAN_ETH':'WAN 接口号','DEFAULT_LAN_ETH':'LAN 接口号','DEFAULT_WAN_CIDR':'WAN IP / CIDR','DEFAULT_LAN_CIDR':'LAN IP / CIDR','DEFAULT_WAN_GW':'WAN 网关','DEFAULT_LAN_GW':'LAN 网关','DEFAULT_WAN_DHCP':'WAN DHCP','DEFAULT_LAN_DHCP':'LAN DHCP','DEFAULT_INNER_NETS':'内网段','DEFAULT_GEN_RETURN_ROUTE':'生成回程路由','DEFAULT_DNS1':'首选 DNS','DEFAULT_DNS2':'备选 DNS','DEFAULT_WAN_IP':'WAN IP / CIDR','DEFAULT_LAN_IP':'LAN IP / CIDR','ER_FL_MAIN_NH_DEFAULT':'主回程下一跳','ER_FL_BACKUP_NH_DEFAULT':'备回程下一跳','ER_NE_MAIN_PE_NH_DEFAULT':'主 PE 对接下一跳','ER_NE_BK_PE_NH_DEFAULT':'备 PE 对接下一跳','ER_NE_MAIN_DUM_DEFAULT':'主新增 IP dum 起始号','ER_NE_BK_DUM_DEFAULT':'备新增 IP dum 起始号','ER_NE_MAIN_NAT_RULE_DEFAULT':'主 NAT rule 起始号','ER_NE_BK_NAT_RULE_DEFAULT':'备 NAT rule 起始号','ER_NE_NAT_SOURCE_CIDR_DEFAULT':'NAT 源网段 CIDR','ER_NE_FNET_PROBE_DEFAULT':'100.100 探测 IP','ER_NE_FNET_EXIT_TUNNEL_DEFAULT':'NAT 出口 Tunnel','ER_NE_FNET_NAT_RULE_DEFAULT':'NAT Rule 号','ER_DS_DOMAINS_DEFAULT':'域名列表','ER_DS_ADDR_GROUP_DEFAULT':'Address Group','ER_DS_RULE_NUM_DEFAULT':'LAN-MAP Rule','ER_DS_TABLE_NUM_DEFAULT':'Static Table 号','ER_DS_SOURCE_CIDR_DEFAULT':'源网段 CIDR','ER_DS_ETH_DEFAULT':'应用接口','ER_DS_DNS1_DEFAULT':'首选 DNS','ER_DS_DNS2_DEFAULT':'备选 DNS','ER_DS_TABLE_NH_PRIMARY_DEFAULT':'递归下一跳','ER_DS_STATIC32_PRIMARY_NH_DEFAULT':'主下一跳 /32','ER_DS_TRACK_NAME_DEFAULT':'Track 名称','ER_DS_STATIC32_BACKUP_NH_DEFAULT':'备下一跳 /32','ER_DS_FNET_PROBE_DEFAULT':'探测 IP','ER_DS_FNET_NAT_RULE_DEFAULT':'NAT Rule','ER_DS_EXIT_TUNNEL_DEFAULT':'出口 Tunnel','ER_DS_EXIT_SNAT_IP_DEFAULT':'主线出口 IP','USG_FL_MAIN_TUN_DEFAULT':'主 Tunnel 号','USG_FL_BK_TUN_DEFAULT':'备 Tunnel 号','USG_NE_MAIN_TUN_DEFAULT':'主 Tunnel 号','USG_NE_BK_TUN_DEFAULT':'备 Tunnel 号','USG_NE_MAIN_LOOP_START_DEFAULT':'主 LoopBack 起始','USG_NE_BK_LOOP_START_DEFAULT':'备 LoopBack 起始','USG_NE_MAIN_NQA_DEFAULT':'主 NQA 名称','USG_NE_BK_NQA_DEFAULT':'备 NQA 名称','DEFAULT_WAN1_PORT':'WAN1 端口 (G口)','DEFAULT_WAN2_PORT':'WAN2 端口 (G口)','DEFAULT_WAN1_IP':'WAN1 IP / CIDR','DEFAULT_WAN2_IP':'WAN2 IP / CIDR','DEFAULT_WAN1_GW':'WAN1 网关','DEFAULT_WAN2_GW':'WAN2 网关','DEFAULT_ZIHUAN_PORT':'自环端口 (G口)','DEFAULT_IPSEC_PORT':'IPSec 端口 (G口)','DJ_WAN1_PORT':'主 WAN 端口 (G口)','DJ_WAN1_IP':'主 WAN IP / CIDR','DJ_WAN1_GW':'主 WAN 网关','DJ_WAN2_PORT':'备 WAN 端口 (G口)','DJ_WAN2_IP':'备 WAN IP / CIDR','DJ_WAN2_GW':'备 WAN 网关','DJ_ZIHUAN1_PORT':'主 自环端口 (G口)','DJ_ZIHUAN2_PORT':'备 自环端口 (G口)','DJ_IPSEC1_PORT':'主 IPSec 端口 (G口)','DJ_IPSEC2_PORT':'备 IPSec 端口 (G口)',
 'ER5_FL_MAIN_NH_DEFAULT':'主回程下一跳','ER5_FL_BACKUP_NH_DEFAULT':'备回程下一跳',
 'ER5_NE_MAIN_PE_NH_DEFAULT':'主 PE 对接下一跳','ER5_NE_BK_PE_NH_DEFAULT':'备 PE 对接下一跳',

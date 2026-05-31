@@ -1368,6 +1368,7 @@ _EXAMPLE_MAP = {
     ("ar_sdwan", "dual_ops_bak"): ("ar_sdwan_zihuan_v4.py", "ZH_EXAMPLE"),
     ("epoch_fastip5", "hk"): ("er_fastip_5in1_v1.py", "HK5_EXAMPLE"),
     ("epoch_fastip5", "us"): ("er_fastip_5in1_v1.py", "US5_EXAMPLE"),
+    ("epoch_fastip5", "us_ipsec"): ("er_fastip_5in1_v1.py", "US5_IPSEC_EXAMPLE"),
     ("epoch_fastip5", "flink"): ("er_fastip_5in1_v1.py", "ER5_FLINK_EXAMPLE"),
     ("epoch_fastip5", "new_exit"): ("er_fastip_5in1_v1.py", "ER5_NEW_EXIT_EXAMPLE"),
     ("epoch_fastip5", "domain_split"): ("er_fastip_5in1_v1.py", "HK5_EXAMPLE"),
@@ -1607,12 +1608,15 @@ _VAR_DESC_SMALL = {
 
 _SCENARIO_LIST = [
     {"key": "Epoch FastIP · HK 香港出口", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_EPOCH_HK"},
+    {"key": "Epoch FastIP · HK 香港出口 · IPSec", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_EPOCH_HK_IPSEC"},
     {"key": "Epoch FastIP · 非香港出口", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_EPOCH_US"},
+    {"key": "Epoch FastIP · 非香港出口 · IPSec", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_EPOCH_US_IPSEC"},
     {"key": "Epoch FastIP · ER 飞连", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_ER_FLINK_VISUAL"},
     {"key": "Epoch FastIP · ER 新增出口", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_ER_NEW_EXIT_VISUAL"},
     {"key": "Epoch FastIP · ER 域名分流", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_ER_DOMAIN_SPLIT_VISUAL"},
     {"key": "Epoch FastIP 5.0 · HK 香港出口", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_HK"},
     {"key": "Epoch FastIP 5.0 · 非香港出口", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_US"},
+    {"key": "Epoch FastIP 5.0 · 非香港出口 · IPSec", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_US_IPSEC"},
     {"key": "Epoch FastIP 5.0 · ER 飞连", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_FLINK"},
     {"key": "Epoch FastIP 5.0 · ER 新增出口", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_NEW_EXIT"},
     {"key": "Epoch FastIP 5.0 · ER 域名分流", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_DOMAIN_SPLIT"},
@@ -1634,9 +1638,116 @@ _SCENARIO_LIST = [
 ]
 
 
+_SCENARIO_TREE = [
+    {
+        "label": "Epoch FastIP",
+        "children": [
+            {
+                "label": "4.0",
+                "children": [
+                    {"label": "HK · OpenVPN",   "key": "Epoch FastIP · HK 香港出口"},
+                    {"label": "HK · IPSec",     "key": "Epoch FastIP · HK 香港出口 · IPSec"},
+                    {"label": "非香港 · OpenVPN", "key": "Epoch FastIP · 非香港出口"},
+                    {"label": "非香港 · IPSec",   "key": "Epoch FastIP · 非香港出口 · IPSec"},
+                ],
+            },
+            {
+                "label": "5.0",
+                "children": [
+                    {"label": "HK · OpenVPN",   "key": "Epoch FastIP 5.0 · HK 香港出口"},
+                    {"label": "非香港 · OpenVPN", "key": "Epoch FastIP 5.0 · 非香港出口"},
+                    {"label": "非香港 · IPSec",   "key": "Epoch FastIP 5.0 · 非香港出口 · IPSec"},
+                ],
+            },
+            {
+                "label": "小应用",
+                "children": [
+                    {"label": "4.0 · ER 飞连",     "key": "Epoch FastIP · ER 飞连"},
+                    {"label": "5.0 · ER 飞连",     "key": "Epoch FastIP 5.0 · ER 飞连"},
+                    {"label": "4.0 · ER 新增出口", "key": "Epoch FastIP · ER 新增出口"},
+                    {"label": "5.0 · ER 新增出口", "key": "Epoch FastIP 5.0 · ER 新增出口"},
+                    {"label": "4.0 · ER 域名分流", "key": "Epoch FastIP · ER 域名分流"},
+                    {"label": "5.0 · ER 域名分流", "key": "Epoch FastIP 5.0 · ER 域名分流"},
+                ],
+            },
+        ],
+    },
+    {
+        "label": "USG FastIP",
+        "children": [
+            {"label": "HK 香港出口", "key": "USG FastIP · HK 香港出口"},
+            {"label": "非香港出口",  "key": "USG FastIP · 非香港出口"},
+            {"label": "飞连",        "key": "USG FastIP · 飞连"},
+            {"label": "新增出口",    "key": "USG FastIP · 新增出口"},
+        ],
+    },
+    {
+        "label": "Epoch MPLS",
+        "children": [
+            {"label": "国内配置", "key": "Epoch MPLS · 国内配置"},
+            {"label": "海外配置", "key": "Epoch MPLS · 海外配置"},
+            {"label": "IPSec",    "key": "Epoch MPLS · IPSec"},
+        ],
+    },
+    {
+        "label": "AR SD-WAN",
+        "children": [
+            {
+                "label": "单机单 WAN",
+                "children": [
+                    {"label": "OPS",     "key": "AR SD-WAN · 单机单WAN · OPS"},
+                    {"label": "Factory", "key": "AR SD-WAN · 单机单WAN · Factory"},
+                ],
+            },
+            {
+                "label": "单机双 WAN",
+                "children": [
+                    {"label": "OPS",     "key": "AR SD-WAN · 单机双WAN · OPS"},
+                    {"label": "Factory", "key": "AR SD-WAN · 单机双WAN · Factory"},
+                ],
+            },
+            {
+                "label": "双机",
+                "children": [
+                    {"label": "主 OPS",     "key": "AR SD-WAN · 双机主 OPS"},
+                    {"label": "备 OPS",     "key": "AR SD-WAN · 双机备 OPS"},
+                    {"label": "主 Factory", "key": "AR SD-WAN · 双机主 Factory"},
+                    {"label": "备 Factory", "key": "AR SD-WAN · 双机备 Factory"},
+                ],
+            },
+        ],
+    },
+]
+
+
+def _scenario_tree_leaf_keys(tree):
+    """递归收集树中所有叶子的 scenario key。"""
+    keys = []
+    for node in tree:
+        if "children" in node:
+            keys.extend(_scenario_tree_leaf_keys(node["children"]))
+        elif "key" in node:
+            keys.append(node["key"])
+    return keys
+
+
+def _validate_scenario_tree():
+    """启动期校验：树中每个 leaf key 必须能在 _SCENARIO_LIST 找到对应模板配置。"""
+    flat_keys = {s["key"] for s in _SCENARIO_LIST}
+    missing = [k for k in _scenario_tree_leaf_keys(_SCENARIO_TREE) if k not in flat_keys]
+    if missing:
+        raise RuntimeError(
+            "_SCENARIO_TREE 中存在 _SCENARIO_LIST 未注册的场景 key："
+            + ", ".join(missing)
+        )
+
+
+_validate_scenario_tree()
+
+
 @app.route("/api/scenarios")
 def api_scenarios():
-    return jsonify({"ok": True, "scenarios": _SCENARIO_LIST})
+    return jsonify({"ok": True, "scenarios": _SCENARIO_LIST, "tree": _SCENARIO_TREE})
 
 
 @app.route("/api/template/load", methods=["POST"])
@@ -1687,6 +1798,7 @@ def api_template_load():
             "TEMPLATE_EPOCH_US": "US_EXAMPLE",
             "TEMPLATE_EPOCH5_HK": "HK5_EXAMPLE",
             "TEMPLATE_EPOCH5_US": "US5_EXAMPLE",
+            "TEMPLATE_EPOCH5_US_IPSEC": "US5_IPSEC_EXAMPLE",
             "TEMPLATE_EPOCH5_FLINK": "ER5_FLINK_EXAMPLE",
             "TEMPLATE_EPOCH5_NEW_EXIT": "ER5_NEW_EXIT_EXAMPLE",
             "TEMPLATE_EPOCH_HK_IPSEC": "HK_EXAMPLE_IPSEC",
