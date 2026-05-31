@@ -875,6 +875,7 @@ def generate_epoch_fastip5():
     variant = data.get("variant", "hk")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
+    tunnel_type = str(network.get("tunnel_type") or "openvpn").strip()
     tool_id = "epoch_fastip5"
 
     er5 = _get_er5()
@@ -883,6 +884,20 @@ def generate_epoch_fastip5():
     try:
         hostname_override = str(network.get("hostname") or "").strip()
         if variant == "hk":
+            if tunnel_type == "ipsec":
+                tpl = er5.get("TEMPLATE_EPOCH5_HK_IPSEC", "")
+                if not tpl:
+                    return jsonify({"ok": False, "error": "HK IPSec — 正在开发中，暂不支持。请使用 OpenVPN。"}), 400
+                build_fn = er5.get("build_epoch5_hk_ipsec_format_dict")
+                if build_fn:
+                    result = build_fn(hdr_text)
+                    d = result if not isinstance(result, tuple) else result[0]
+                else:
+                    d = {}
+                if hostname_override and isinstance(d, dict):
+                    d["hostname"] = hostname_override
+                output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)
+                return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
             build_fn = er5.get("build_epoch5_hk_format_dict")
             tpl = er5.get("TEMPLATE_EPOCH5_HK", "")
             if not build_fn:
@@ -899,6 +914,22 @@ def generate_epoch_fastip5():
             output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)
             return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
         elif variant == "us":
+            if tunnel_type == "ipsec":
+                build_fn = er5.get("build_epoch5_us_ipsec_format_dict")
+                tpl = er5.get("TEMPLATE_EPOCH5_US_IPSEC", "")
+                if not build_fn or not tpl:
+                    return jsonify({"ok": False, "error": "非香港 IPSec builder 或模板未找到"}), 500
+                result = build_fn(hdr_text)
+                if isinstance(result, tuple):
+                    d, warning = result
+                else:
+                    d, warning = result, ""
+                if hostname_override and isinstance(d, dict):
+                    d["hostname"] = hostname_override
+                output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)
+                if warning:
+                    output = "# " + warning + "\n" + output
+                return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
             build_fn = er5.get("build_epoch5_us_format_dict")
             tpl = er5.get("TEMPLATE_EPOCH5_US", "")
             if not build_fn:

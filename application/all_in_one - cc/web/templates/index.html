@@ -98,6 +98,11 @@ body{font-family:var(--f-body);background:var(--cv);color:var(--ink);line-height
 .cb input[type=checkbox]{accent-color:var(--p);width:15px;height:15px;margin:0;flex-shrink:0;cursor:pointer}
 .cb label{font-size:12px;color:var(--body);cursor:pointer}
 .net-panel{display:none}
+.tunnel-type-group{display:flex;gap:12px}
+.tunnel-radio{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:var(--rp);font-size:12px;font-weight:500;color:var(--mu);cursor:pointer;border:1px solid var(--hl);background:var(--sf);font-family:var(--f-body);transition:all .15s;user-select:none}
+.tunnel-radio:hover{border-color:var(--hls2);color:var(--ink)}
+.tunnel-radio.active{background:var(--ink);color:var(--cv);border-color:var(--ink)}
+.tunnel-radio input[type=radio]{display:none}
 .net-panel.active{display:block}
 
 /* ═══════════════════════════════════════════════════ buttons ═══════════════════════════════════════════════════ */
@@ -211,6 +216,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <div class="fg"><label class="fl">NAT Rule 号（可空）</label><input class="fi" id="epoch-fastip-ne-fnet-nat-rule" placeholder="可空"></div>
 </div>
 <div class="net-panel" id="er5-panel-hk-us" style="display:none">
+<div class="fg er5-tunnel-type"><label class="fl">隧道类型</label><div class="tunnel-type-group"><label class="tunnel-radio active" id="er5-tt-openvpn-lbl"><input type="radio" name="er5-tunnel-type" value="openvpn" checked onchange="onER5TunnelTypeChange()"> OpenVPN</label><label class="tunnel-radio" id="er5-tt-ipsec-lbl"><input type="radio" name="er5-tunnel-type" value="ipsec" onchange="onER5TunnelTypeChange()"> IPSec</label></div></div>
 <div class="fg"><label class="fl">Hostname</label><input class="fi" id="epoch-fastip5-hostname" placeholder="从数据头自动提取"></div>
 <div class="fr2"><div class="fg"><label class="fl">WAN 接口号</label><div class="field-row"><input class="fi" id="epoch-fastip5-wan-eth" value="0"><div class="cb"><input type="checkbox" id="epoch-fastip5-wan-dhcp" onchange="dhcpToggle('epoch-fastip5')"><label for="epoch-fastip5-wan-dhcp">DHCP</label></div></div></div>
 <div class="fg"><label class="fl">LAN 接口号</label><div class="field-row"><input class="fi" id="epoch-fastip5-lan-eth" value="1"><div class="cb"><input type="checkbox" id="epoch-fastip5-lan-dhcp" checked onchange="dhcpToggle('epoch-fastip5')"><label for="epoch-fastip5-lan-dhcp">DHCP</label></div></div></div></div>
@@ -417,6 +423,15 @@ all_in_one<span style="margin:0 6px;color:#4a4038">·</span>Config Generator<spa
 /* ═══════════════════════════════════════════════════════════════════ all_in_one web ═══════════════════════════════════════════════════════════════════ */
 const TM={'epoch-fastip':'epoch_fastip','epoch-fastip5':'epoch_fastip5','usg-fastip':'usg_fastip','epoch-mpls':'epoch_mpls','ar-sdwan':'ar_sdwan'};
 let erVersion='4';
+function onER5TunnelTypeChange(){
+  let v=document.querySelector('input[name="er5-tunnel-type"]:checked');
+  let l1=$('er5-tt-openvpn-lbl'),l2=$('er5-tt-ipsec-lbl');
+  if(v&&v.value==='ipsec'){l1.classList.remove('active');l2.classList.add('active')}
+  else{l1.classList.add('active');l2.classList.remove('active')}
+  // re-init defaults when switching tunnel type
+  ldInitForm('epoch-fastip');
+}
+function getER5TunnelType(){let v=document.querySelector('input[name="er5-tunnel-type"]:checked');return v?v.value:'openvpn'}
 function switchERVersion(ver){
   erVersion=ver;
   $('er-ver-4').classList.toggle('active',ver==='4');
@@ -585,6 +600,7 @@ function gn5(tp){
   let v=gv(tp),g=id=>$(tp+'5-'+id),cb=id=>$(tp+'5-'+id)?.checked||false,n={};
   if(v==='hk'||v==='us'){
     n={hostname:g('hostname')?.value||'',
+       tunnel_type: getER5TunnelType(),
        wan_eth:g('wan-eth')?.value||'',wan_cidr:g('wan-cidr')?.value||'',wan_gw:g('wan-gw')?.value||'',
        lan_eth:g('lan-eth')?.value||'',lan_cidr:g('lan-cidr')?.value||'',lan_gw:g('lan-gw')?.value||'',
        wan_dhcp:cb('wan-dhcp'),lan_dhcp:cb('lan-dhcp'),inner_nets:g('inner-nets')?.value||'',
