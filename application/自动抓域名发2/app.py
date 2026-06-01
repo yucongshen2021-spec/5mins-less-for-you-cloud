@@ -770,9 +770,28 @@ function copyDomains() {
     }
   });
   if (lines.length) {
-    navigator.clipboard.writeText(lines.join('\n'));
-    toast('已复制（仅展开项）');
+    var text = lines.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function() {
+        toast('已复制（仅展开项）');
+      }).catch(function() {
+        _fallbackCopy(text);
+      });
+    } else {
+      _fallbackCopy(text);
+    }
   }
+}
+
+function _fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); toast('已复制（仅展开项）'); }
+  catch (e) { toast('复制失败，请手动选择复制'); }
+  document.body.removeChild(ta);
 }
 
 /* ── Export: always full data ── */

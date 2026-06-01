@@ -282,6 +282,20 @@
   }
   .toast.show { opacity: 1; }
 
+  /* ── Header update button (release only) ── */
+  .hdr-update-btn {
+    font-family: inherit; font-size: 10px; font-weight: 500;
+    letter-spacing: 0.2px; white-space: nowrap;
+    padding: 3px 10px; border-radius: 4px; cursor: pointer;
+    background: none; border: 1px solid var(--hairline); color: var(--muted);
+    transition: background .12s, color .12s, border-color .12s;
+    vertical-align: middle; margin-left: 4px;
+  }
+  .hdr-update-btn:hover { background: var(--canvas); color: var(--ink); border-color: var(--hairline-strong); }
+  .hdr-update-btn:disabled { cursor: default; }
+  .hdr-update-btn.is-latest { color: var(--success); border-color: var(--success); cursor: default; }
+  .hdr-update-btn.is-error { color: var(--error); border-color: var(--error); }
+
 .update-banner.visible{display:block !important}
 .update-banner a:hover{opacity:0.8}
 </style>
@@ -292,8 +306,9 @@
 <header class="topbar">
   <div class="hdr-row">
     <span class="brand-dot"></span>
-    <span class="brand">帮你节省5分钟{% if not is_release %} <span class="ver-badge demo">DEMO</span>{% endif %}</span>
-    <span class="brand-sub">v{{ local_version or "—" }} · {% if is_release %}正式版{% else %}demo试用版，左下角可下载正式版本{% endif %}</span> <button id="btnCheckUpdate" title="检查更新" style="background:none;border:1px solid var(--hairline);color:var(--muted);font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;vertical-align:middle;">⟔</button>
+    <span class="brand">帮你节省5分钟{% if not is_release %} <span class="ver-badge demo">DEMO</span>{% else %} <span class="ver-badge release">RELEASE</span>{% endif %}</span>
+    <span class="brand-sub">v{{ local_version or "—" }} · {% if is_release %}正式版{% else %}demo试用版，左下角可下载正式版本{% endif %}</span>
+    {% if is_release %}<button id="btnCheckUpdate" class="hdr-update-btn" title="手动检查版本更新">手动检查版本</button>{% endif %}
   </div>
   <div class="hdr-row">
     <button class="hdr-btn" id="toggleSidebar" title="侧栏">&#9776;</button>
@@ -569,9 +584,7 @@
   var btnCheck = document.getElementById('btnCheckUpdate');
   if (btnCheck) {
     btnCheck.addEventListener('click', function() {
-      if (btnCheck.disabled) return;
-      btnCheck.disabled = true;
-      btnCheck.textContent = '...';
+      if (btnCheck.disabled && btnCheck.classList.contains('is-latest')) return;
       fetch('/api/update/check?force=1')
         .then(function(r) { return r.json(); })
         .then(function(info) {
@@ -579,24 +592,44 @@
           var now = new Date();
           btnCheck.title = '上次检查: ' + now.toLocaleTimeString();
           if (info.status === 'ok' && !info.has_update) {
+            setBtnCheckState('latest');
             showToast('已是最新版本');
           } else if (info.status !== 'ok') {
+            setBtnCheckState('error');
             showToast('检查失败: ' + (info.message || info.status));
+          } else {
+            setBtnCheckState('normal');
           }
         })
-        .catch(function() { showToast('网络错误，无法检查更新'); })
-        .finally(function() {
-          btnCheck.disabled = false;
-          btnCheck.textContent = '\u27d4';
+        .catch(function() {
+          showToast('网络错误，无法检查更新');
+          setBtnCheckState('error');
         });
     });
+  }
+
+  function setBtnCheckState(state) {
+    if (!btnCheck) return;
+    btnCheck.classList.remove('is-latest', 'is-error');
+    if (state === 'checking') {
+      btnCheck.textContent = '\u68c0\u67e5\u4e2d\u2026'; btnCheck.disabled = true;
+    } else if (state === 'latest') {
+      btnCheck.textContent = '\u5df2\u662f\u6700\u65b0\u7248\u672c \u2713'; btnCheck.classList.add('is-latest'); btnCheck.disabled = true;
+    } else if (state === 'error') {
+      btnCheck.textContent = '\u68c0\u67e5\u5931\u8d25\uff0c\u70b9\u51fb\u91cd\u8bd5'; btnCheck.classList.add('is-error'); btnCheck.disabled = false;
+    } else {
+      btnCheck.textContent = '\u624b\u52a8\u68c0\u67e5\u7248\u672c'; btnCheck.disabled = false;
+    }
   }
 
   function checkUpdate() {
     fetch('/api/update/check')
       .then(function(r) { return r.json(); })
-      .then(showUpdateBanner)
-      .catch(function() {});  // silent fail
+      .then(function(info) {
+        showUpdateBanner(info);
+        if (info.status === 'ok' && !info.has_update) setBtnCheckState('latest');
+      })
+      .catch(function() {});
   }
 
   // First check after 5s, then every hour

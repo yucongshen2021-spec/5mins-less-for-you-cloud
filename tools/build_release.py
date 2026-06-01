@@ -262,7 +262,8 @@ def build(version: str, output_dir: Path, include_runtime: bool, mirror_url: str
                 if matched:
                     text = src.read_text(encoding="utf-8")
                     text = _apply_release_ports(text, dst_normalized)
-                    zf.writestr(dst, text.encode("utf-8"))
+                    encoding = "utf-8-sig" if dst.endswith(".bat") else "utf-8"
+                    zf.writestr(dst, text.encode(encoding))
                 else:
                     zf.write(src, dst)
         zf.writestr(
