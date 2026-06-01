@@ -23,6 +23,7 @@ import datetime
 import fnmatch
 import json
 import os
+import re
 import subprocess
 import sys
 import zipfile
@@ -241,10 +242,11 @@ def build(version: str, output_dir: Path, include_runtime: bool, mirror_url: str
 
     def _apply_release_ports(text: str, dst: str) -> str:
         for rel_path in _RELEASE_PORT_FILES:
-            # dst uses / from zip paths, rel_path also uses /
             if dst == rel_path or dst.endswith("/" + rel_path):
                 for old, new in _RELEASE_PORT_MAP.items():
-                    text = text.replace(old, new)
+                    # Word-boundary regex prevents corrupting numbers like
+                    # chcp 65001 → chcp 67001 (5001 → 7001 inside 65001).
+                    text = re.sub(r"\b" + old + r"\b", new, text)
                 return text
         return text
 
@@ -262,8 +264,7 @@ def build(version: str, output_dir: Path, include_runtime: bool, mirror_url: str
                 if matched:
                     text = src.read_text(encoding="utf-8")
                     text = _apply_release_ports(text, dst_normalized)
-                    encoding = "utf-8-sig" if dst.endswith(".bat") else "utf-8"
-                    zf.writestr(dst, text.encode(encoding))
+                    zf.writestr(dst, text.encode("utf-8"))
                 else:
                     zf.write(src, dst)
         zf.writestr(
