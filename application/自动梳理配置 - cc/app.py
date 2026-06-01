@@ -1,5 +1,6 @@
-"""Config Analyzer — serve er_config_analyzer.html via Flask (consistent with other sub-apps)."""
+"""Config Analyzer — serve er_config_analyzer.html via Flask."""
 import os
+import sys
 import threading
 import webbrowser
 
@@ -20,7 +21,7 @@ def static_file(filename):
 
 
 def main():
-    port = 5004
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5004
     threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 

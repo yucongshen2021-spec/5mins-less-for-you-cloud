@@ -7,55 +7,51 @@ import atexit
 import threading
 import os
 
-# portal/process_manager.py 位于 <BASE>/application/portal/，向上三级即项目根
 _HERE = os.path.dirname(os.path.abspath(__file__))
 BASE = os.path.dirname(os.path.dirname(_HERE))
-# sys.executable 由启动脚本（start_*.bat）决定：客户解压包内是 runtime/python/python.exe，
-# 开发机上是系统 py。子进程沿用同一个解释器，保证依赖一致。
 PYTHON = sys.executable
 LOG_DIR = os.path.join(_HERE, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
-# Prevent sub-apps from auto-opening browser windows.
-# "echo" is NOT an exe on Windows — GenericBrowser fails silently, then
-# webbrowser falls back to os.startfile() which opens the real browser.
-# Point BROWSER to a real .cmd file that exits immediately.
 _NOOP_BROWSER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "noop.cmd")
 _SUB_ENV = os.environ.copy()
 _SUB_ENV["BROWSER"] = _NOOP_BROWSER
 
+# ── Runtime port switching: RELEASE_MODE=1 → 700x, otherwise → 500x ──
+_RELEASE = os.environ.get("RELEASE_MODE", "").strip() == "1"
+_BASE = 7000 if _RELEASE else 5000
 
 APPS = [
     {
         "id": "all_in_one",
         "name": "配置生成",
         "cwd": os.path.join(BASE, "application", "all_in_one - cc", "web"),
-        "cmd": [PYTHON, "app.py"],
-        "port": 5003,
+        "cmd": [PYTHON, "app.py", str(_BASE + 3)],
+        "port": _BASE + 3,
         "url": "/app/all_in_one/",
     },
     {
         "id": "test_report",
         "name": "测试报告",
         "cwd": os.path.join(BASE, "application", "自动做测试报告 - cc"),
-        "cmd": [PYTHON, "app.py"],
-        "port": 5002,
+        "cmd": [PYTHON, "app.py", str(_BASE + 2)],
+        "port": _BASE + 2,
         "url": "/app/test_report/",
     },
     {
         "id": "domain_capture",
         "name": "域名抓取",
         "cwd": os.path.join(BASE, "application", "自动抓域名发2"),
-        "cmd": [PYTHON, "app.py"],
-        "port": 5001,
+        "cmd": [PYTHON, "app.py", str(_BASE + 1)],
+        "port": _BASE + 1,
         "url": "/app/domain_capture/",
     },
     {
         "id": "config_analyzer",
         "name": "配置梳理",
         "cwd": os.path.join(BASE, "application", "自动梳理配置 - cc"),
-        "cmd": [PYTHON, "app.py"],
-        "port": 5004,
+        "cmd": [PYTHON, "app.py", str(_BASE + 4)],
+        "port": _BASE + 4,
         "url": "/app/config_analyzer/",
     },
 ]

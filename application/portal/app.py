@@ -13,12 +13,12 @@ from flask import Flask, abort, jsonify, render_template, request, send_file
 import process_manager
 import proxy
 
-# ── Release mode (title only; ports changed at build time) ──
+# ── Release mode ──
 _RELEASE = os.environ.get("RELEASE_MODE", "").strip() == "1"
+_PORT = 7000 if _RELEASE else 5000
 
 app = Flask(__name__)
 
-# Build port map from process_manager APPS
 _PORT_MAP = {a["id"]: a["port"] for a in process_manager.APPS}
 
 # ── 下载通道：扫描项目根 dist/*.zip ──────────────────────────────────────
@@ -135,9 +135,10 @@ def proxy_route(app_id, subpath):
 
 def main():
     process_manager.start_all()
-    threading.Timer(2.5, lambda: webbrowser.open("http://localhost:5000")).start()
+    port = 7000 if _RELEASE else 5000
+    threading.Timer(2.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
     try:
-        app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         pass
     finally:
