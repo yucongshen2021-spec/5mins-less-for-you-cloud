@@ -622,6 +622,88 @@ X4  Demo/Release 切换 分别启动 demo (500x) 和 release (700x)
                       → 两者功能一致（除版本特有功能外）
 ```
 
+### 4.7 Release 版本专项测试 — 更新/升级链路
+
+Release 版本 (port 700x) 独有功能：更新检查、在线升级、升级横幅。必须用 Playwright 验证完整链路。
+
+#### 4.7.1 更新检查链路
+
+```
+R1  更新检查 API      GET /api/update/check
+                      → 返回 json {status, has_update, local_version, remote_version, ...}
+
+R2  mirror 可达性     如果配置了 mirror_url → status="ok"
+                      → 如果 mirror 不可达 → status="network_error"（不崩溃）
+
+R3  本地版本号        页面顶部显示正确的版本号（从 RELEASE_INFO.json 读取）
+
+R4  手动检查按钮      点击 ⟔ 按钮 → 强制检查更新
+                      → 按钮显示 loading → 返回后显示 toast
+```
+
+#### 4.7.2 升级横幅
+
+```
+R5  有新版本时        检查返回 has_update=true
+                      → 顶部橙色横幅出现
+                      → 显示新版本号
+                      → 显示当前版本号
+
+R6  无新版本时        检查返回 has_update=false
+                      → 横幅不出现
+                      → 左下角按钮显示「已是最新版本」
+
+R7  关闭横幅          点击横幅 × 按钮 → 横幅消失
+                      → 同版本不再弹出（localStorage 记录）
+
+R8  横幅「立即升级」   有 download_url 时 → 升级按钮可见
+                      → 无 download_url 时 → 只显示「查看说明」链接
+
+R9  横幅「查看说明」   链接指向 release_url（或 mirror 下载页）
+```
+
+#### 4.7.3 左下角升级按钮
+
+```
+R10 初始状态          页面加载 → 按钮显示「检查更新中…」 (is-checking)
+
+R11 已是最新          检查完成无更新 → « 已是最新版本 (v1.0.4) ✓ » (is-up-to-date)
+
+R12 有新版本          检查到新版本 → « 立即升级 → v1.0.5 ↑ » (is-available)
+                      → 按钮可点击
+
+R13 更新失败          网络错误/config 错误 → « 无法检查更新，点击重试 ! »
+                      → 鼠标悬停显示详细错误信息
+
+R14 升级中            点击升级 → « 升级中… » (is-busy)
+                      → 按钮不可点击
+
+R15 升级完成          成功后 → « 请重新启动 portal … »
+```
+
+#### 4.7.4 升级执行
+
+```
+R16 升级 API          POST /api/update/upgrade {download_url}
+                      → 返回 {ok: true} 或 {ok: false, error: "..."}
+
+R17 升级流程          下载 zip → 解压覆盖 → 保留用户模板
+                      → workspace_warning 提示（如有）
+
+R18 升级后            新版本文件到位
+                      → 用户重启 portal → 新版本生效
+```
+
+#### 4.7.5 重启功能
+
+```
+R19 关闭 API          POST /api/shutdown
+                      → 返回 {ok: true} → portal 进程退出
+
+R20 start_all.bat     手动双击 → portal 重新启动
+                      → 版本号更新为新版本
+```
+
 ---
 
 ## 5. 测试数据
