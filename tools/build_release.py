@@ -79,9 +79,9 @@ EXCLUDE_FILE_GLOBS = [
     "test_*.py",
     # 运行期产生的本地缓存（更新检查、数据缓存等）
     ".update_cache.json",
-    # 图片、文档等垃圾文件 — 客户包绝不应包含
+    # 图片等垃圾文件 — 客户包绝不应包含
+    # 注：*.docx 不能全局排除 — 测试报告应用的 script/*.docx 是合法模板
     "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico", "*.bmp", "*.webp",
-    "*.docx", "*.doc",
     # 用户活动记录 — 测试残留不应进客户包
     "record.json", "record.txt",
     # RELEASE_INFO 由构建脚本显式写入 zip，不随源码 walk 进入

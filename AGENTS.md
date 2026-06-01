@@ -40,7 +40,7 @@ py -3 -m pytest application/test/all_in_one/ -q
 - [ ] **配置生成** — 点击加载正常，无 502/代理错误
 - [ ] **配置生成** — cascade menu 场景选择正常显示和交互
 - [ ] **配置生成** — 生成配置功能正常
-- [ ] **测试报告** — 点击加载正常
+- [ ] **测试报告** — 点击加载正常，能正常生成报告（不报"读取不到模板"）
 - [ ] **域名抓取** — 点击加载正常
 - [ ] **配置梳理** — 点击加载正常，浏览器控制台无 JS 报错
 - [ ] **配置梳理** — 粘贴配置 → 点击「解析并梳理」→ 正常解析出结果
@@ -55,8 +55,9 @@ py -3 tools/build_release.py --version vX.X.X --mirror-url http://<IP>:8000/api/
 ```
 
 - [ ] 无 `Duplicate name` 警告
-- [ ] zip 内无 `.png` `.jpg` `.docx` `record.json` `record.txt`
+- [ ] zip 内无 `.png` `.jpg` `record.json` `record.txt`（注：`*.docx` 不能全局排除，测试报告 script/ 下有合法模板）
 - [ ] 解压后 `start_all.bat` 可正常启动
+- [ ] 解压后**全部 4 个子应用功能正常**（含测试报告生成）
 
 ## 跑测试的标准命令
 
