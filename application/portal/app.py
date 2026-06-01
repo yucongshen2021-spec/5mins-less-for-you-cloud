@@ -130,11 +130,6 @@ def download_latest_zip():
 @app.route("/app/<app_id>/<path:subpath>", methods=[
     "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 def proxy_route(app_id, subpath):
-    if app_id == "config_analyzer":
-        # Config analyzer is http.server; default page:
-        if not subpath:
-            from flask import redirect
-            return redirect(f"/app/{app_id}/er_config_analyzer.html")
     return proxy.proxy_to(app_id, subpath, _PORT_MAP)
 
 

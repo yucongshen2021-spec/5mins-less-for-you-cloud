@@ -234,7 +234,8 @@ def build(version: str, output_dir: Path, include_runtime: bool, mirror_url: str
         "application/all_in_one - cc/web/app.py",
         "application/自动做测试报告 - cc/app.py",
         "application/自动抓域名发2/app.py",
-        "application/自动梳理配置 - cc/start_配置梳理.bat",
+        "application/自动梳理配置 - cc/app.py",
+    "application/自动梳理配置 - cc/start_配置梳理.bat",
         "start_all.bat",
     }
 

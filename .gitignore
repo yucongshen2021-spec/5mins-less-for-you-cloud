@@ -34,6 +34,8 @@ htmlcov/
 
 # ---- 运行日志（保留 .md 变动记录）----
 *.log
+application/自动做测试报告 - cc/log/
+application/portal/logs/
 
 # ---- 浏览器自带二进制 ----
 chromium/

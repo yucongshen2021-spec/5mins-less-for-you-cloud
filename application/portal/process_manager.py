@@ -54,9 +54,9 @@ APPS = [
         "id": "config_analyzer",
         "name": "配置梳理",
         "cwd": os.path.join(BASE, "application", "自动梳理配置 - cc"),
-        "cmd": [PYTHON, "-m", "http.server", "5004"],
+        "cmd": [PYTHON, "app.py"],
         "port": 5004,
-        "url": "/app/config_analyzer/er_config_analyzer.html",
+        "url": "/app/config_analyzer/",
     },
 ]
 

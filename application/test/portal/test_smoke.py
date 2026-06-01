@@ -107,13 +107,12 @@ def test_demo_download_endpoint_exists(portal_running):
     assert "available" in data
 
 
-def test_demo_update_check_not_found(portal_running):
-    """Demo 版不应暴露 /api/update/check（不导入 update_check）。"""
-    try:
-        http_get(portal_running + "/api/update/check", timeout=10.0)
-        assert False, "demo 版不应有 /api/update/check"
-    except urllib.error.HTTPError as e:
-        assert e.code == 404, f"应 404, 实际 {e.code}"
+def test_demo_update_check_works(portal_running):
+    """Demo 版应有 /api/update/check 端点（并入主线）。"""
+    status, body = http_get(portal_running + "/api/update/check", timeout=10.0)
+    assert status == 200, f"demo 版 /api/update/check 应 200, 实际 {status}"
+    data = json.loads(body)
+    assert "status" in data, f"应返回 status 字段: {data}"
 
 
 def test_demo_update_upgrade_not_found(portal_running):
