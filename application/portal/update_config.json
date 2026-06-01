@@ -1,7 +1,11 @@
 {
   "github_repo": "",
   "mirror_url": "",
+  "mirror_urls": [
+    "http://192.168.72.219:8000/api/update/manifest",
+    "http://192.168.5.10:8000/api/update/manifest"
+  ],
   "timeout_seconds": 5,
   "cache_ttl_seconds": 3600,
-  "user_agent": "5mins-portal-demo"
+  "user_agent": "5mins-portal-release"
 }

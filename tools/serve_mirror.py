@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""镜像更新服务器 — 为客户 portal 提供 /api/update/manifest 和 zip 下载。
+
+用法：
+    python tools/serve_mirror.py                  # 默认端口 8000
+    python tools/serve_mirror.py --port 9000       # 自定义端口
+    python tools/serve_mirror.py --dist ./dist     # 自定义 zip 目录
+
+客户 portal 的 update_config.json 中 mirror_url 指向此服务器地址。
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import sys
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DIST_DIR = PROJECT_ROOT / "dist"
+BUNDLE_NAME = "帮你节省5分钟"
+
+
+def find_latest_zip(dist_dir: Path) -> Path | None:
+    """扫描 dist/ 目录，返回最新的 zip 文件路径。"""
+    if not dist_dir.is_dir():
+        return None
+    zips = sorted(
+        dist_dir.glob(f"{BUNDLE_NAME}-*.zip"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    return zips[0] if zips else None
+
+
+def build_manifest(zip_path: Path, base_url: str) -> dict:
+    """从 zip 文件构建 manifest 响应。"""
+    stat = zip_path.stat()
+    with open(zip_path, "rb") as f:
+        sha256 = hashlib.sha256(f.read()).hexdigest()
+
+    filename = zip_path.name
+    version = filename.removeprefix(f"{BUNDLE_NAME}-").removesuffix(".zip")
+
+    return {
+        "name": BUNDLE_NAME,
+        "version": version,
+        "size": stat.st_size,
+        "sha256": sha256,
+        "download_url": f"{base_url}/api/update/download/{filename}",
+        "release_url": f"{base_url}/api/update/manifest",
+    }
+
+
+class MirrorHandler(SimpleHTTPRequestHandler):
+    """处理 /api/update/manifest 和 /api/update/download/ 请求。"""
+
+    base_url: str = "http://127.0.0.1:8000"
+
+    def log_message(self, format, *args):
+        print(f"[mirror] {args[0]}")
+
+    def do_GET(self):
+        path = self.path.split("?")[0]
+
+        if path == "/api/update/manifest":
+            self._serve_manifest()
+        elif path.startswith("/api/update/download/"):
+            self._serve_download(path)
+        else:
+            super().do_GET()
+
+    def _serve_manifest(self):
+        zip_path = find_latest_zip(DIST_DIR)
+        if not zip_path:
+            self._json({"ok": False, "error": "未找到发布包"}, 404)
+            return
+
+        manifest = build_manifest(zip_path, self.base_url)
+        self._json({"ok": True, **manifest})
+
+    def _serve_download(self, path: str):
+        filename = os.path.basename(path)
+        filepath = DIST_DIR / filename
+
+        if not filepath.is_file():
+            self._json({"ok": False, "error": "文件不存在"}, 404)
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/zip")
+        self.send_header("Content-Disposition",
+                         f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(filepath.stat().st_size))
+        self.end_headers()
+
+        with open(filepath, "rb") as f:
+            self.wfile.write(f.read())
+
+    def _json(self, data: dict, status: int = 200):
+        body = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def main():
+    global DIST_DIR
+    parser = argparse.ArgumentParser(description="镜像更新服务器")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--dist", type=str, default=str(DIST_DIR))
+    parser.add_argument("--host", type=str, default="0.0.0.0")
+    args = parser.parse_args()
+
+    DIST_DIR = Path(args.dist)
+
+    if not DIST_DIR.is_dir():
+        print(f"[mirror] dist 目录不存在: {DIST_DIR}")
+        sys.exit(1)
+
+    latest = find_latest_zip(DIST_DIR)
+    if latest:
+        print(f"[mirror] 最新发布: {latest.name}")
+    else:
+        print("[mirror] WARNING: dist/ 中没有发布包")
+
+    MirrorHandler.base_url = f"http://{args.host}:{args.port}"
+
+    server = HTTPServer((args.host, args.port), MirrorHandler)
+    print(f"[mirror] 镜像服务启动: http://{args.host}:{args.port}")
+    print(f"[mirror] manifest: {MirrorHandler.base_url}/api/update/manifest")
+    print(f"[mirror] 按 Ctrl+C 停止")
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n[mirror] 已停止")
+        server.shutdown()
+
+
+if __name__ == "__main__":
+    main()

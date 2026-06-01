@@ -22,7 +22,7 @@ _ATTR_RE = re.compile(
 # Rewrite absolute-path string literals in JavaScript code.
 # Matches "/api/..." or '/api/...' but NOT "//cdn...", "/app/...", or "/" alone.
 _JS_STR_RE = re.compile(
-    r"""(["'])(/(?!/|app/)([^"']{1,}))\1""",
+    r"""(["'])(/(?!/|app/)(?=[^"'\s;]*[a-zA-Z])[^"'\s;]{2,})\1""",
 )
 
 

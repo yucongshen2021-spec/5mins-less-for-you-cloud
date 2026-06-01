@@ -84,6 +84,8 @@ EXCLUDE_FILE_GLOBS = [
     "*.docx", "*.doc",
     # 用户活动记录 — 测试残留不应进客户包
     "record.json", "record.txt",
+    # RELEASE_INFO 由构建脚本显式写入 zip，不随源码 walk 进入
+    "RELEASE_INFO.json",
 ]
 
 # 整段路径前缀（项目根的 POSIX 相对路径），命中即跳过
