@@ -343,6 +343,69 @@ Proxy 路由                                    /app/<id>/ 代理到对应子应
 子应用离线处理                                子应用未启动 → status 返回 reachable=false
 ```
 
+### 3.6 start_all.bat 启动测试 — 10+ cases
+
+**这是最高优先级的测试。bat 文件曾经反复出错（chcp 65001 被替换为 67001、PYTHONNOUSERSITE 全局崩、端口不一致等），每次 bat 错误都导致客户完全无法使用。**
+
+#### 3.6.1 源码 bat 内容验证 (`test/test_portal/test_bat.py` — 新建)
+
+直接读取源码 bat 文件内容做静态检查，不启动进程。
+
+```
+B1  chcp 65001 存在           start_all.bat 第 2 行必须是 "chcp 65001 >nul"
+                               → 不是 "chcp 67001" 或其他数字
+                               → 这是 mistake #33 的回归锁
+
+B2  PYTHONNOUSERSITE 有条件    start_all.bat 必须在便携 Python 存在时才 set
+                               → 不能在全局无条件设置（见 mistake #3）
+                               → 代码模式: if exist "%PYTHON%" ( set "PYTHONNOUSERSITE=1" )
+
+B3  RELEASE_MODE 正确设置      if exist "%PYTHON%" → set "RELEASE_MODE=1"
+                               → 便携 Python 存在 = 客户包 → release 模式
+
+B4  清理端口列表完整           "for %%p in (5003 5002 5001 5004 5000) do call :kill_port %%p"
+                               → 包含所有 5 个端口
+                               → 源码中端口为 500x
+
+B5  echo 信息中文无乱码        用 UTF-8 打开 → 所有中文 echo 语句可读
+                               → 含 "清理旧进程"、"启动所有服务" 等
+
+B6  子进程入口正确             cd /d "%~dp0application\portal" → %PYTHON% app.py
+                               → 路径和命令存在
+
+B7  UTF-8 无 BOM              文件编码为 UTF-8 without BOM
+                               → cmd.exe with chcp 65001 不需要 BOM
+                               → BOM 会导致 @echo off 首字节异常（某些 Windows 版本）
+```
+
+#### 3.6.2 构建后 bat 校验
+
+每次 `build_release.py` 完成后，从 zip 中解压 `start_all.bat` 验证：
+
+```
+B8  端口已替换为 700x         构建后 start_all.bat 中端口为 700x
+                               → "for %%p in (7003 7002 7001 7004 7000) do call :kill_port %%p"
+
+B9  chcp 65001 未被破坏        构建后 bat 的 chcp 行必须是 "chcp 65001 >nul"
+                               → 不得出现 "chcp 67001"（mistake #33 回归锁）
+                               → 不得出现任何其他被误伤的 chcp 值
+
+B10 中文 echo 未乱码           构建后 bat 的 echo 行中文可读
+                               → "清理旧进程"、"启动所有服务" 等完整显示
+```
+
+#### 3.6.3 Playwright 端到端起 portal
+
+```
+B11 双击 bat 启动             模拟用户双击 start_all.bat
+                               → portal 在预期端口启动（demo: 5000, release: 7000）
+                               → 30 秒内首页可访问
+
+B12 首页 4 应用 online         打开首页 → 4 个应用状态显示 online
+                               → 控制台无 Python 报错（ModuleNotFoundError 等）
+                               → 控制台无 ERR_UNSAFE_PORT
+```
+
 ---
 
 ## 4. Part 2: Playwright 用户行为测试
@@ -398,6 +461,12 @@ P10 Live 指示器      Live 圆点呼吸动画正常
 P11 刷新健康检查     等待 10 秒 → 状态自动刷新
 
 P12 控制台错误       加载页面 → 控制台无 JS 错误（favicon 404 除外）
+
+P13 bat 启动验证      解压 release zip → 双击 start_all.bat
+                      → portal 首页正常显示
+                      → chcp 65001 生效，中文无乱码
+                      → 4 个子应用全部 online
+                      → 控制台无 Python traceback
 ```
 
 ### 4.2 配置生成 (all_in_one) — 40+ 项检查
@@ -800,9 +869,11 @@ git status --short
 
 构建 release 之前，必须通过 **全量测试矩阵**：
 
-- [ ] pytest 全量：107+ cases 全部 PASS
-- [ ] Playwright Demo (500x)：所有 P/A/T/D/C/X 检查项
-- [ ] Playwright Release (700x)：P/A/T/D/C 检查项（release 特有功能）
+- [ ] pytest 全量：144+ cases 全部 PASS
+- [ ] bat 源码验证：B1-B7 全部通过（chcp 65001、PYTHONNOUSERSITE 条件、端口列表）
+- [ ] Playwright Demo (500x)：所有 P/A/T/D/C/X 检查项 + P13 bat 启动验证
+- [ ] Playwright Release (700x)：P/A/T/D/C/R/X 检查项（release 特有功能 + release bat 验证）
 - [ ] UI 合规：字体、颜色、间距符合 DESIGN.md
 - [ ] 控制台零错误
+- [ ] 构建后 bat 校验：B8-B10 (chcp 65001 未破坏、端口 700x、中文 echo 未乱码)
 - [ ] 构建后解压 zip → 端到端起 portal → 4 个子应用全部可访问
