@@ -20,7 +20,7 @@ echo   Python: %PYTHON%
 echo.
 echo   [1/2] Cleaning old processes...
 rem Sub-apps use fixed ports 5001-5004, portal uses 5000 (demo) or 7000 (release)
-for %%p in (5003 5002 5001 5004 5000 7000) do call :kill_port %%p
+for %%p in (5003 5002 5001 5004 5000 7003 7002 7001 7004 7000) do call :kill_port %%p
 echo   [2/2] Starting all services...
 echo.
 if defined RELEASE_MODE (
