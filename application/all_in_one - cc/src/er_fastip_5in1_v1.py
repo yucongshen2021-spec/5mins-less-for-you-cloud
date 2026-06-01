@@ -1618,8 +1618,7 @@ def build_epoch5_hk_format_dict(hdr_text):
     wan_dhcp = bool(g.get("DEFAULT_WAN_DHCP", False))
     lan_dhcp = bool(g.get("DEFAULT_LAN_DHCP", True))
     bypass = bool(g.get("DEFAULT_BYPASS", False))
-    # IPSec 默认使用三大内网段
-    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8")).strip()
+    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "")).strip()
 
     # ── 3. 校验必要字段 ──
     if not d.get("main_pe") and not d.get("main_wanip"):
@@ -2654,14 +2653,21 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set protocols failover2 track tomain target '{main_ipsec_tun_pe_ip}'\n"
     "set protocols failover2 track tomain type 'icmp'\n"
     "\n"
+    "# Track route: UPE (track tomain) / UPE (distance 10 fallback)\n"
+    "set protocols failover2 route 192.168.55.250/32 next-hop '{main_ipsec_tun_pe_ip}' track 'tomain'\n"
+    "set protocols static route 192.168.55.250/32 next-hop '{bk_ipsec_tun_pe_ip}' distance '10'\n"
+    "set protocols failover2 route 192.168.237.28/32 next-hop '{main_ipsec_tun_pe_ip}' track 'tomain'\n"
+    "set protocols static route 192.168.237.28/32 next-hop '{bk_ipsec_tun_pe_ip}' distance '10'\n"
+    "\n"
     "# ── 默认路由 ──\n"
     "{default_route_block}\n"
     "\n"
     "# ── IPSec 上游路由（拨号 IP / docking / CE loopback）──\n"
     "{ipsec_routes_block}\n"
     "\n"
-    "# ── NAT/GRE 上游路由（NAT PE docking 走对应 IPSec PE）──\\n"
-    "{nat_routes_block}\n"    "\n"
+    "# ── NAT/GRE 上游路由（NAT PE docking / 探测点）──\n"
+    "{nat_routes_block}\n"
+    "\n"
     "# ── BGP 服务器路由（next-hop + blackhole 保护）──\n"
     "{bgp_server_routes_block}\n"
     "\n"
@@ -2705,7 +2711,7 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set system console device ttyS0 speed '115200'\n"
     "set system host-name '{hostname}'\n"
     "set system login operator-group default command-policy allow '*'\n"
-    "set system login user bothwin plain Tfe28@w%\n"
+    "set system login user bothwin authentication plain Tfe28@w%\n"
     "set system name-server '127.0.0.1'\n"
     "set system option performance 'network-throughput'\n"
     "set system option reboot-on-upgrade-failure '5'\n"
@@ -2769,7 +2775,7 @@ def build_epoch5_us_ipsec_format_dict(hdr_text: str):
     lan_cidr = str(g.get("DEFAULT_LAN_CIDR", "")).strip()
     wan_gw = str(g.get("DEFAULT_WAN_GW", "")).strip()
     wan_dhcp = bool(g.get("DEFAULT_WAN_DHCP", False))
-    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8")).strip()
+    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "")).strip()
 
     ok_wan, msg_wan = _validate_cidr(wan_cidr, "WAN IP")
     ok_lan, msg_lan = _validate_cidr(lan_cidr, "LAN IP")
@@ -2899,10 +2905,10 @@ def build_epoch5_us_ipsec_format_dict(hdr_text: str):
         )
     ipsec_routes_block = "\n".join(ipsec_route_lines)
 
-    # NAT/GRE 上游路由（NAT PE docking）
+    # ── NAT/GRE 上游路由（NAT PE docking 走对应 IPSec PE；4.2.2.1 探测）──
     nat_routes_block = "\n".join([
-        f"set protocols static route {nm['pe_docking']}/32 next-hop 1.1.1.1",
-        f"set protocols static route {nb['pe_docking']}/32 next-hop 1.1.1.1",
+        f"set protocols static route {nm['pe_docking']}/32 next-hop {im['tun_pe_ip']}",
+        f"set protocols static route {nb['pe_docking']}/32 next-hop {ib['tun_pe_ip']}",
     ])
 
     # ── BGP 服务器路由（每个 BGP IP 一组 next-hop + blackhole 保护）──
