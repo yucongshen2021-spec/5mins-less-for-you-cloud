@@ -127,7 +127,13 @@ def main():
     else:
         print("[mirror] WARNING: dist/ 中没有发布包")
 
-    MirrorHandler.base_url = f"http://{args.host}:{args.port}"
+    # Auto-detect local IP for download URLs
+    import socket as _socket
+    try:
+        local_ip = _socket.gethostbyname(_socket.gethostname())
+    except Exception:
+        local_ip = "127.0.0.1"
+    MirrorHandler.base_url = f"http://{local_ip}:{args.port}"
 
     server = HTTPServer((args.host, args.port), MirrorHandler)
     print(f"[mirror] 镜像服务启动: http://{args.host}:{args.port}")
