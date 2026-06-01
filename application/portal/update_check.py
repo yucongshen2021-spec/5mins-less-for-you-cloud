@@ -45,7 +45,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # 自定义镜像 manifest.json 的公网地址，返回 JSON: {version, release_url, download_url}
     # 客户拿到包后只需把 update_config.json 的 mirror_url 改成你的地址即可启用更新提醒
 
-    "mirror_urls": [],    "mirror_url": "",
+    "mirror_urls": [],
+    "mirror_url": "",
     # 单源超时秒数
     "timeout_seconds": 5,
     # 缓存有效期，避免每次首页刷新都打外网
