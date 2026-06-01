@@ -198,4 +198,4 @@ def _run_worker(task_id: str, cmd: list[str], run_dir: Path, cfg: dict) -> None:
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5002 + (2000 if os.environ.get("RELEASE_MODE") == "1" else 0), debug=False)
+    app.run(host="0.0.0.0", port=5002, debug=False)

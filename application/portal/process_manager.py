@@ -24,10 +24,6 @@ _NOOP_BROWSER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "noop.c
 _SUB_ENV = os.environ.copy()
 _SUB_ENV["BROWSER"] = _NOOP_BROWSER
 
-_RELEASE = os.environ.get("RELEASE_MODE", "").strip() == "1"
-_POFF = 2000 if _RELEASE else 0  # release: 500x -> 700x
-if _RELEASE:
-    _SUB_ENV["RELEASE_MODE"] = "1"
 
 APPS = [
     {
@@ -35,7 +31,7 @@ APPS = [
         "name": "配置生成",
         "cwd": os.path.join(BASE, "application", "all_in_one - cc", "web"),
         "cmd": [PYTHON, "app.py"],
-        "port": 5003 + _POFF,
+        "port": 5003,
         "url": "/app/all_in_one/",
     },
     {
@@ -43,7 +39,7 @@ APPS = [
         "name": "测试报告",
         "cwd": os.path.join(BASE, "application", "自动做测试报告 - cc"),
         "cmd": [PYTHON, "app.py"],
-        "port": 5002 + _POFF,
+        "port": 5002,
         "url": "/app/test_report/",
     },
     {
@@ -51,15 +47,15 @@ APPS = [
         "name": "域名抓取",
         "cwd": os.path.join(BASE, "application", "自动抓域名发2"),
         "cmd": [PYTHON, "app.py"],
-        "port": 5001 + _POFF,
+        "port": 5001,
         "url": "/app/domain_capture/",
     },
     {
         "id": "config_analyzer",
         "name": "配置梳理",
         "cwd": os.path.join(BASE, "application", "自动梳理配置 - cc"),
-        "cmd": [PYTHON, "-m", "http.server", str(5004 + _POFF)],
-        "port": 5004 + _POFF,
+        "cmd": [PYTHON, "-m", "http.server", "5004"],
+        "port": 5004,
         "url": "/app/config_analyzer/er_config_analyzer.html",
     },
 ]

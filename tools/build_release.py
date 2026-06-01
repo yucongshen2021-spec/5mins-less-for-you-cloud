@@ -223,6 +223,30 @@ def build(version: str, output_dir: Path, include_runtime: bool, mirror_url: str
 
     update_config_dst = f"{BUNDLE_NAME}/application/portal/update_config.json"
 
+    # ── Release port mapping (500x → 700x) ──
+    _RELEASE_PORT_MAP = {
+        "5000": "7000", "5001": "7001", "5002": "7002", "5003": "7003", "5004": "7004",
+    }
+    _RELEASE_PORT_FILES = {
+        "application/portal/app.py",
+        "application/portal/process_manager.py",
+        "application/portal/start_all.bat",
+        "application/all_in_one - cc/web/app.py",
+        "application/自动做测试报告 - cc/app.py",
+        "application/自动抓域名发2/app.py",
+        "application/自动梳理配置 - cc/start_配置梳理.bat",
+        "start_all.bat",
+    }
+
+    def _apply_release_ports(text: str, dst: str) -> str:
+        for rel_path in _RELEASE_PORT_FILES:
+            # dst uses / from zip paths, rel_path also uses /
+            if dst == rel_path or dst.endswith("/" + rel_path):
+                for old, new in _RELEASE_PORT_MAP.items():
+                    text = text.replace(old, new)
+                return text
+        return text
+
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for src, dst in all_files:
             if mirror_url and dst == update_config_dst:
@@ -231,7 +255,15 @@ def build(version: str, output_dir: Path, include_runtime: bool, mirror_url: str
                 print(f"[build] mirror_url = {mirror_url}", flush=True)
                 zf.writestr(dst, json.dumps(cfg, ensure_ascii=False, indent=2))
             else:
-                zf.write(src, dst)
+                # Apply release port transform to text source files only
+                dst_normalized = dst.replace(BUNDLE_NAME + "/", "").replace(BUNDLE_NAME + "\\", "")
+                matched = any(dst_normalized == f or dst_normalized.endswith("/" + f) for f in _RELEASE_PORT_FILES)
+                if matched:
+                    text = src.read_text(encoding="utf-8")
+                    text = _apply_release_ports(text, dst_normalized)
+                    zf.writestr(dst, text.encode("utf-8"))
+                else:
+                    zf.write(src, dst)
         zf.writestr(
             f"{BUNDLE_NAME}/RELEASE_INFO.json",
             json.dumps(manifest, ensure_ascii=False, indent=2),

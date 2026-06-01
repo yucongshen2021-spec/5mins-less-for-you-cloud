@@ -848,7 +848,7 @@ def api_capture():
 # ═══════════════════════════════════════════════════════════════════
 
 def main():
-    port = 5001 + (2000 if os.environ.get("RELEASE_MODE") == "1" else 0)
+    port = 5001
     threading.Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
     app.run(host="0.0.0.0", port=port, debug=False)
 
