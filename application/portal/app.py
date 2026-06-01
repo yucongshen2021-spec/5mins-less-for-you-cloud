@@ -1,4 +1,4 @@
-"""Portal Flask app — unified shell + reverse proxy for all sub-apps on port 5000 (demo)."""
+"""Portal Flask app — unified shell + reverse proxy for all sub-apps."""
 import json
 import os
 import sys
@@ -12,6 +12,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from flask import Flask, abort, jsonify, render_template, request, send_file
 import process_manager
 import proxy
+
+# ── Release mode ──
+# env RELEASE_MODE=1 → port 7000, no demo badge
+_RELEASE = os.environ.get("RELEASE_MODE", "").strip() == "1"
+_PORTAL_PORT = 7000 if _RELEASE else 5000
 
 app = Flask(__name__)
 
@@ -77,7 +82,7 @@ def index():
     apps = process_manager.get_apps_status()
     online_count = sum(1 for a in apps if a["reachable"])
     return render_template("index.html", apps=apps, online_count=online_count, total_count=len(apps),
-                           local_version=_local_version())
+                           local_version=_local_version(), is_release=_RELEASE)
 
 
 @app.route("/api/status")
@@ -129,9 +134,9 @@ def proxy_route(app_id, subpath):
 
 def main():
     process_manager.start_all()
-    threading.Timer(2.5, lambda: webbrowser.open("http://localhost:5000")).start()
+    threading.Timer(2.5, lambda: webbrowser.open(f"http://localhost:{_PORTAL_PORT}")).start()
     try:
-        app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+        app.run(host="0.0.0.0", port=_PORTAL_PORT, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         pass
     finally:
