@@ -22,6 +22,42 @@
 - 验证 portal 模板内容用 `app.app.test_client()`，别真打 `Invoke-WebRequest /`（会被 sub-app 健康检查拖死）。
 - 文件下载断言走 RFC 5987：`f"filename*=UTF-8''{quote(name)}" in disposition`。
 
+## 测试铁律：禁止偷懒，必须从用户视角完整测试
+
+**修改任何代码后，必须完整走完以下流程，否则不得声称"已修复"。API 返回 200 不等于功能正常。**
+
+### 1. 全量自动化测试（必须全绿）
+
+```powershell
+py -3 -m pytest application/test/all_in_one/ -q
+```
+
+### 2. Portal 全应用冒烟（修改 portal / proxy / 子应用时必须手动 + Playwright）
+
+启动 portal：`cd application/portal && py -3 app.py`
+
+逐一验证：
+- [ ] **配置生成** — 点击加载正常，无 502/代理错误
+- [ ] **配置生成** — cascade menu 场景选择正常显示和交互
+- [ ] **配置生成** — 生成配置功能正常
+- [ ] **测试报告** — 点击加载正常
+- [ ] **域名抓取** — 点击加载正常
+- [ ] **配置梳理** — 点击加载正常，浏览器控制台无 JS 报错
+- [ ] **配置梳理** — 粘贴配置 → 点击「解析并梳理」→ 正常解析出结果
+- [ ] **配置梳理** — 控制台无 `Invalid regular expression flags` 等错误
+
+**修改 proxy.py 后必须验证以上所有 4 个子应用。proxy 路径重写可能破坏任意一个子应用的 JS 正则。**
+
+### 3. 构建后验证
+
+```bash
+py -3 tools/build_release.py --version vX.X.X --mirror-url http://<IP>:8000/api/update/manifest
+```
+
+- [ ] 无 `Duplicate name` 警告
+- [ ] zip 内无 `.png` `.jpg` `.docx` `record.json` `record.txt`
+- [ ] 解压后 `start_all.bat` 可正常启动
+
 ## 跑测试的标准命令
 
 ```powershell
