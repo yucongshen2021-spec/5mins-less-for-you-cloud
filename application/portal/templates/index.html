@@ -282,6 +282,8 @@
   }
   .toast.show { opacity: 1; }
 
+.update-banner.visible{display:block !important}
+.update-banner a:hover{opacity:0.8}
 </style>
 </head>
 <body>
@@ -547,11 +549,41 @@
       });
     });
 
-  // ── 版本更新提醒 ──
-  // 严守"不允许猜测"：只有 status==ok 且 has_update==true 才显示横幅；
-  // 任何其他情况（network_error / config_error / incomparable / same / newer）
+// -- Update check (every hour) --
+  var updateBanner = document.getElementById('updateBanner');
+  var updateBannerVer = document.getElementById('updateBannerVer');
+  var updateBannerLink = document.getElementById('updateBannerLink');
+
+  function showUpdateBanner(info) {
+    if (!info || info.status !== 'ok' || !info.has_update) return;
+    updateBannerVer.textContent = 'v' + String(info.remote_version).replace(/^v/, '');
+    if (info.download_url) {
+      updateBannerLink.href = info.download_url;
+    } else {
+      updateBannerLink.href = '/download/latest.zip';
+    }
+    updateBanner.classList.add('visible');
+  }
+
+  function checkUpdate() {
+    fetch('/api/update/check')
+      .then(function(r) { return r.json(); })
+      .then(showUpdateBanner)
+      .catch(function() {});  // silent fail
+  }
+
+  // First check after 5s, then every hour
+  setTimeout(checkUpdate, 5000);
+  setInterval(checkUpdate, 3600000);
 })();
 </script>
 
 </body>
-</html>
+</html>
+  <!-- Update banner (hidden by default) -->
+  <div class="update-banner" id="updateBanner" style="display:none;background:var(--primary);color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:500;">
+    <span>有新版本可用：</span>
+    <span id="updateBannerVer" style="font-weight:700;"></span>
+    <a id="updateBannerLink" href="#" style="color:#fff;margin-left:8px;text-decoration:underline;">立即下载</a>
+  </div>
+

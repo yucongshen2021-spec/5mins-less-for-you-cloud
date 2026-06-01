@@ -44,7 +44,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "github_repo": "",
     # 自定义镜像 manifest.json 的公网地址，返回 JSON: {version, release_url, download_url}
     # 客户拿到包后只需把 update_config.json 的 mirror_url 改成你的地址即可启用更新提醒
-    "mirror_url": "",
+
+    "mirror_urls": [],    "mirror_url": "",
     # 单源超时秒数
     "timeout_seconds": 5,
     # 缓存有效期，避免每次首页刷新都打外网
@@ -180,10 +181,16 @@ def _check_uncached(cfg: dict[str, Any]) -> dict[str, Any]:
     sources: list[tuple[str, callable]] = []
     repo = (cfg.get("github_repo") or "").strip()
     mirror = (cfg.get("mirror_url") or "").strip()
+    mirror_list: list[str] = []
+    if isinstance(cfg.get("mirror_urls"), list):
+        mirror_list.extend(str(u).strip() for u in cfg["mirror_urls"] if str(u).strip())
     if repo:
         sources.append(("github", lambda: fetch_github_latest(repo, timeout, ua)))
     if mirror:
         sources.append(("mirror", lambda: fetch_mirror_manifest(mirror, timeout, ua)))
+    for m in mirror_list:
+        if m != mirror:
+            sources.append(("mirror", lambda u=m: fetch_mirror_manifest(u, timeout, ua)))
 
     base: dict[str, Any] = {
         "local_version": local,

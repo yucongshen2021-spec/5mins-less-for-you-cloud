@@ -99,6 +99,14 @@ def api_download_latest():
     return jsonify(info)
 
 
+@app.route("/api/update/check")
+def api_update_check():
+    """版本更新检查。强制刷新时传 ?force=1 跳过缓存。"""
+    import update_check
+    force = request.args.get("force", "0") == "1"
+    return jsonify(update_check.check(force=force))
+
+
 @app.route("/download/latest.zip")
 def download_latest_zip():
     """下发最新可分发包；本地无包时 404。"""
