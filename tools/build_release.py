@@ -53,6 +53,9 @@ EXCLUDE_DIR_NAMES = {
     "测试用例",
     "agent-transcripts", "plan",
     "editor_workspace",  # 用户工作区 → 客户应拿到工厂态
+    "screenshots",  # 测试截图 — 客户包绝不应含图片
+    "raw",  # 测试原始数据
+    "user_activity",  # 运行时活动日志 — 不应含开发机测试记录
 }
 
 # 文件名 glob（与文件名比对，不含路径）
@@ -76,6 +79,11 @@ EXCLUDE_FILE_GLOBS = [
     "test_*.py",
     # 运行期产生的本地缓存（更新检查、数据缓存等）
     ".update_cache.json",
+    # 图片、文档等垃圾文件 — 客户包绝不应包含
+    "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico", "*.bmp", "*.webp",
+    "*.docx", "*.doc",
+    # 用户活动记录 — 测试残留不应进客户包
+    "record.json", "record.txt",
 ]
 
 # 整段路径前缀（项目根的 POSIX 相对路径），命中即跳过

@@ -168,6 +168,23 @@ def fill_text(page, selector, text):
     el.fill(text)
 
 
+
+def select_scenario_cascade(page, label_path):
+    """Select a scenario through the cascade hover menu.
+    label_path is a list of labels, e.g. ['Epoch FastIP', '4.0', 'HK · OpenVPN']
+    The last element is a leaf node that gets clicked.
+    """
+    for i, label in enumerate(label_path):
+        is_last = (i == len(label_path) - 1)
+        if is_last:
+            link = page.locator('#tpl-cascade a.leaf').filter(has_text=label.strip()).first
+            link.click()
+        else:
+            item = page.locator('#tpl-cascade .cascade-col li a').filter(has_text=label.strip()).first
+            item.hover()
+            page.wait_for_timeout(200)
+    page.wait_for_timeout(800)
+
 def click_nav(page, tab_text):
     """点击导航标签。"""
     tab = page.locator(".nav-tab", has_text=tab_text)
@@ -538,15 +555,15 @@ def test_template_editor(page):
     click_nav(page, "我来定模板")
     page.wait_for_timeout(500)
 
-    # Wait for scenario list to be fetched (ldScens called on nav tab click)
+    # Wait for cascade menu to be populated
     page.wait_for_function(
-        "document.querySelector('#scenario-select')?.options?.length > 1",
+        "document.querySelector('#tpl-col1')?.querySelector('.cascade-col')?.children?.length > 0",
         timeout=5000
     )
     page.wait_for_timeout(500)
 
-    # Select a scenario
-    page.select_option("#scenario-select", label="Epoch FastIP · HK 香港出口")
+    # Select a scenario via cascade menu
+    select_scenario_cascade(page, ["Epoch FastIP", "4.0", "HK · OpenVPN"])
     page.wait_for_timeout(1500)
 
     # Verify template loaded
@@ -575,8 +592,8 @@ def test_template_editor(page):
     # Template preview
     click_nav(page, "我来定模板")
     page.wait_for_timeout(300)
-    page.select_option("#scenario-select", label="Epoch FastIP · HK 香港出口")
-    page.wait_for_timeout(1000)
+    select_scenario_cascade(page, ["Epoch FastIP", "4.0", "HK · OpenVPN"])
+    page.wait_for_timeout(500)
     page.fill("#tpl-header", ER_HK_HDR)
     page.fill("#tpl-template", custom_tpl)
     page.locator("button", has_text="预览模板").click()
@@ -594,7 +611,7 @@ def test_template_reset(page):
 
     click_nav(page, "我来定模板")
     page.wait_for_timeout(300)
-    page.select_option("#scenario-select", label="Epoch FastIP · HK 香港出口")
+    select_scenario_cascade(page, ["Epoch FastIP", "4.0", "HK · OpenVPN"])
     page.wait_for_timeout(1000)
 
     # Save custom first
@@ -614,7 +631,7 @@ def test_template_reset(page):
     # Now reset via template editor
     click_nav(page, "我来定模板")
     page.wait_for_timeout(300)
-    page.select_option("#scenario-select", label="Epoch FastIP · HK 香港出口")
+    select_scenario_cascade(page, ["Epoch FastIP", "4.0", "HK · OpenVPN"])
     page.wait_for_timeout(1000)
 
     # Handle confirm dialog
@@ -642,7 +659,7 @@ def test_cross_scenario_isolation(page):
     # Save custom for HK
     click_nav(page, "我来定模板")
     page.wait_for_timeout(300)
-    page.select_option("#scenario-select", label="Epoch FastIP · HK 香港出口")
+    select_scenario_cascade(page, ["Epoch FastIP", "4.0", "HK · OpenVPN"])
     page.wait_for_timeout(1000)
 
     iso_tpl = f"# ISO_{MARKER}\nset system host-name ISO-HK\n"
@@ -673,7 +690,7 @@ def test_cross_scenario_isolation(page):
     # Clean up: reset HK template
     click_nav(page, "我来定模板")
     page.wait_for_timeout(300)
-    page.select_option("#scenario-select", label="Epoch FastIP · HK 香港出口")
+    select_scenario_cascade(page, ["Epoch FastIP", "4.0", "HK · OpenVPN"])
     page.wait_for_timeout(1000)
     page.once("dialog", lambda d: d.accept())
     page.locator("button", has_text="恢复最初模板").click()
@@ -703,7 +720,7 @@ def test_copy_export(page):
         page.locator(".tool-panel.active button.btn-s", has_text="导出脚本").click()
     download = dl_info.value
     t("导出-文件名非空", len(download.suggested_filename) > 0)
-    t("导出-文件非空", len(download.path() or "") > 0 or True)  # may not save
+    t("导出-文件非空", len(str(download.path()) or "") > 0 or True)  # may not save
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -717,7 +734,7 @@ def test_clear_header(page):
     click_variant(page, "HK 香港出口")
     fill_text(page, "#epoch-fastip-header", "some test data")
 
-    page.locator("button", has_text="清除数据头").click()
+    page.locator(".tool-panel.active button", has_text="清除数据头").click()
     page.wait_for_timeout(300)
     header_val = page.locator("#epoch-fastip-header").input_value()
     t("清除后 header 为空", header_val == "")
@@ -732,7 +749,7 @@ def test_template_preview_filled(page):
 
     click_nav(page, "我来定模板")
     page.wait_for_timeout(300)
-    page.select_option("#scenario-select", label="Epoch FastIP · HK 香港出口")
+    select_scenario_cascade(page, ["Epoch FastIP", "4.0", "HK · OpenVPN"])
     page.wait_for_timeout(1000)
 
     # Load header data

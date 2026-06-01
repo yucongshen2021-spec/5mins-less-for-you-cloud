@@ -354,7 +354,7 @@ def parse_epoch_us(text):
 DEFAULT_WAN_CIDR   = "192.168.1.10/24"
 DEFAULT_WAN_GW     = "192.168.1.1"
 DEFAULT_LAN_CIDR   = "192.168.5.1/24"
-DEFAULT_INNER_NETS = "192.168.0.0/16"
+DEFAULT_INNER_NETS = "192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8"
 DEFAULT_WAN_ETH    = "0"
 DEFAULT_LAN_ETH    = "5"
 DEFAULT_WAN_DHCP   = False
@@ -1618,7 +1618,8 @@ def build_epoch5_hk_format_dict(hdr_text):
     wan_dhcp = bool(g.get("DEFAULT_WAN_DHCP", False))
     lan_dhcp = bool(g.get("DEFAULT_LAN_DHCP", True))
     bypass = bool(g.get("DEFAULT_BYPASS", False))
-    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "")).strip()
+    # IPSec 默认使用三大内网段
+    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8")).strip()
 
     # ── 3. 校验必要字段 ──
     if not d.get("main_pe") and not d.get("main_wanip"):
@@ -2550,14 +2551,6 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set interfaces tunnel {bk_ipsec_tun_id} mtu '1476'\n"
     "set interfaces tunnel {bk_ipsec_tun_id} remote '{bk_ipsec_docking_ip}'\n"
     "set interfaces tunnel {bk_ipsec_tun_id} source-address '{bk_ipsec_loop_ip}'\n"
-    "set nat destination rule 20 destination port '53'\n"
-    "set nat destination rule 20 inbound-interface name '{wan_if}'\n"
-    "set nat destination rule 20 protocol 'tcp_udp'\n"
-    "set nat destination rule 20 translation address '{wan_ip}'\n"
-    "set nat destination rule 25 destination port '53'\n"
-    "set nat destination rule 25 inbound-interface name '{lan_if}'\n"
-    "set nat destination rule 25 protocol 'tcp_udp'\n"
-    "set nat destination rule 25 translation address '{lan_ip}'\n"
     "set nat source rule 10 destination address '{main_ipsec_docking_ip}'\n"
     "set nat source rule 10 exclude\n"
     "set nat source rule 10 outbound-interface name '{wan_if}'\n"
@@ -2667,9 +2660,8 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "# ── IPSec 上游路由（拨号 IP / docking / CE loopback）──\n"
     "{ipsec_routes_block}\n"
     "\n"
-    "# ── NAT/GRE 上游路由（NAT PE docking / 探测点）──\n"
-    "{nat_routes_block}\n"
-    "\n"
+    "# ── NAT/GRE 上游路由（NAT PE docking 走对应 IPSec PE）──\\n"
+    "{nat_routes_block}\n"    "\n"
     "# ── BGP 服务器路由（next-hop + blackhole 保护）──\n"
     "{bgp_server_routes_block}\n"
     "\n"
@@ -2777,7 +2769,7 @@ def build_epoch5_us_ipsec_format_dict(hdr_text: str):
     lan_cidr = str(g.get("DEFAULT_LAN_CIDR", "")).strip()
     wan_gw = str(g.get("DEFAULT_WAN_GW", "")).strip()
     wan_dhcp = bool(g.get("DEFAULT_WAN_DHCP", False))
-    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "")).strip()
+    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8")).strip()
 
     ok_wan, msg_wan = _validate_cidr(wan_cidr, "WAN IP")
     ok_lan, msg_lan = _validate_cidr(lan_cidr, "LAN IP")
@@ -2893,7 +2885,6 @@ def build_epoch5_us_ipsec_format_dict(hdr_text: str):
 
     # ── IPSec 上游路由（拨号、docking、CE loopback）──
     ipsec_route_lines = [
-        f"set protocols static route {ce_loip}/32 next-hop {ib['tun_pe_ip']}",
         f"set protocols static route {im['docking_ip']}/32 next-hop 1.1.1.1",
         f"set protocols static route {ib['docking_ip']}/32 next-hop 1.1.1.1",
         f"set protocols static route {im['dial_ip']}/32 next-hop 1.1.1.1",
@@ -2908,11 +2899,10 @@ def build_epoch5_us_ipsec_format_dict(hdr_text: str):
         )
     ipsec_routes_block = "\n".join(ipsec_route_lines)
 
-    # ── NAT/GRE 上游路由（NAT PE docking 走对应 IPSec PE；4.2.2.1 探测）──
+    # NAT/GRE 上游路由（NAT PE docking）
     nat_routes_block = "\n".join([
-        f"set protocols static route {nm['pe_docking']}/32 next-hop {im['tun_pe_ip']}",
-        f"set protocols static route {nb['pe_docking']}/32 next-hop {ib['tun_pe_ip']}",
-        f"set protocols static route 4.2.2.1/32 next-hop {nm['tun_pe_ip']}",
+        f"set protocols static route {nm['pe_docking']}/32 next-hop 1.1.1.1",
+        f"set protocols static route {nb['pe_docking']}/32 next-hop 1.1.1.1",
     ])
 
     # ── BGP 服务器路由（每个 BGP IP 一组 next-hop + blackhole 保护）──

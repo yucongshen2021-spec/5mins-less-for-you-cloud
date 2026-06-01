@@ -2147,6 +2147,34 @@ def api_template_preview():
                             rendered = tpl.format(**d)
                         except Exception:
                             pass
+        elif slot == "TEMPLATE_EPOCH5_HK":
+            fn = ns.get("build_epoch5_hk_format_dict")
+            if fn:
+                result = fn(hdr_text)
+                d = result[0] if isinstance(result, tuple) else result
+                if d:
+                    rendered = tpl.format(**d)
+        elif slot == "TEMPLATE_EPOCH5_US":
+            fn = ns.get("build_epoch5_us_format_dict")
+            if fn:
+                result = fn(hdr_text)
+                d = result[0] if isinstance(result, tuple) else result
+                if d:
+                    rendered = tpl.format(**d)
+        elif slot == "TEMPLATE_EPOCH5_US_IPSEC":
+            fn = ns.get("build_epoch5_us_ipsec_format_dict")
+            if fn:
+                result = fn(hdr_text)
+                d = result[0] if isinstance(result, tuple) else result
+                if d:
+                    rendered = tpl.format(**d)
+        elif slot == "TEMPLATE_EPOCH5_DOMAIN_SPLIT":
+            fn = ns.get("build_epoch5_us_format_dict")
+            if fn:
+                result = fn(hdr_text)
+                d = result[0] if isinstance(result, tuple) else result
+                if d:
+                    rendered = tpl.format(**d)
         elif slot in ("TEMPLATE_MPLS_DOMESTIC", "TEMPLATE_MPLS_OVERSEAS"):
             build_fn = ns.get("build_mpls_domestic_format_dict" if "DOMESTIC" in slot else "build_mpls_overseas_format_dict")
             gen_fn = ns.get("generate_mpls_config")

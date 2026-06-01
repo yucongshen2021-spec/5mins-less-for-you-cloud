@@ -1,2 +1,0 @@
-PING 192.0.2.10 (mock)
-500 packets transmitted, 500 received, 0% packet loss

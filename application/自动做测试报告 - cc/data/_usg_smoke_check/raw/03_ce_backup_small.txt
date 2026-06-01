@@ -1,2 +1,0 @@
-PING 10.22.60.122 (mock USG)
-500 packets transmitted, 500 received, 0% packet loss

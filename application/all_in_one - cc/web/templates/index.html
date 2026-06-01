@@ -165,13 +165,13 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 /* ═══════════ 级联场景菜单 ═══════════ */
 .cascade-menu{display:flex;align-items:flex-start;gap:0;position:relative;margin-bottom:10px}
 .cascade-label{font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.8px;padding:6px 10px 6px 0;white-space:nowrap;flex-shrink:0}
-.cascade-col{list-style:none;padding:0;margin:0;min-width:170px;background:var(--sf);border:1px solid var(--hl);border-radius:var(--rp);overflow:hidden}
+.cascade-col{list-style:none;padding:0;margin:0;min-width:170px;background:var(--sf);border:1px solid var(--hl);border-radius:var(--rm);overflow:visible}
 .cascade-col li{position:relative}
 .cascade-col li a{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;font-size:13px;font-weight:500;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;transition:background .12s}
 .cascade-col li a:hover,.cascade-col li a.active{background:linear-gradient(135deg,rgba(245,78,0,.15),rgba(255,160,110,.06))}
 .cascade-col li a .arr{font-size:10px;color:var(--mu);margin-left:12px}
 .cascade-col .cascade-col{position:absolute;left:100%;top:0;display:none;z-index:5}
-.cascade-col li:hover>.cascade-col{display:block}
+.cascade-col li:hover>.cascade-col{display:block}.cascade-col li.active-path>.cascade-col{display:block}
 .cascade-col li a.leaf .arr{display:none}
 .cascade-col li a.leaf:hover,.cascade-col li a.leaf.selected{background:var(--ink);color:var(--cv)}
 .cascade-col li a.leaf.selected::before{content:'✓ ';font-size:11px}
@@ -402,7 +402,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <div class="panel-header"><h1 class="panel-title">我来定模板</h1><p class="panel-subtitle">可视化编辑：数据头 · 变量映射 · 生成模板 · 预览效果</p></div>
 <div class="cascade-menu" id="tpl-cascade">
   <span class="cascade-label">场景选择</span>
-  <ul class="cascade-col" id="tpl-col1"></ul>
+  <ul id="tpl-col1"></ul>
 </div>
 <div class="card" style="margin-bottom:10px"><div class="card-h" onclick="tg(this)"><span>初始化默认</span><span class="carr">▼</span></div>
 <div class="card-b" id="tpl-init-body"><span style="color:var(--mu);font-size:12px">选择场景后加载初始化参数…</span></div></div>
@@ -733,6 +733,8 @@ function _renderCascadeCol(parentUl, nodes, depth){
         ul.querySelectorAll('a.leaf').forEach(x=>x.classList.remove('selected'));
         a.classList.add('selected');
         loadSc(n.key);
+        document.querySelectorAll('#tpl-cascade li.active-path').forEach(x=>x.classList.remove('active-path'));
+        let pli=a.closest('li');while(pli){pli.classList.add('active-path');pli=pli.parentElement?.closest('li');}
       });
       li.appendChild(a);
     }

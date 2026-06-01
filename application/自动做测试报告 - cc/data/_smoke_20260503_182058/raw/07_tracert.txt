@@ -1,2 +1,0 @@
-Mock tracert output for 07_tracert
-1  10 ms  192.168.1.1
