@@ -47,7 +47,7 @@ def _ensure_sponsor_board_file() -> None:
     SPONSOR_BOARD_DIR.mkdir(parents=True, exist_ok=True)
     SPONSOR_BOARD_FILE.write_text(
         json.dumps(SPONSOR_BOARD_DEFAULT, ensure_ascii=False, indent=2),
-        encoding="utf-8",
+        encoding="utf-8-sig",
     )
 
 
@@ -58,7 +58,7 @@ def _load_sponsor_board_data() -> tuple[dict[str, list[str]], str]:
     except Exception as e:
         return dict(SPONSOR_BOARD_DEFAULT), f"榜单文件初始化失败：{e}"
     try:
-        raw = json.loads(SPONSOR_BOARD_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(SPONSOR_BOARD_FILE.read_text(encoding="utf-8-sig"))
         if not isinstance(raw, dict):
             raise ValueError("顶层必须为 JSON 对象")
         out: dict[str, list[str]] = {}
@@ -403,7 +403,7 @@ def _append_scenario_changelog(sdir: Path, line: str) -> None:
     try:
         sdir.mkdir(parents=True, exist_ok=True)
         logf = sdir / "changelog.log"
-        with logf.open("a", encoding="utf-8") as f:
+        with logf.open("a", encoding="utf-8-sig") as f:
             f.write(line.rstrip() + "\n")
     except Exception:
         pass
@@ -553,7 +553,7 @@ def _load_saved_templates_into_runtime(sources: set[str] | None = None) -> None:
         if not path.exists():
             continue
         try:
-            raw = path.read_text(encoding="utf-8")
+            raw = path.read_text(encoding="utf-8-sig")
             _apply_template_to_runtime(key, info, raw)
         except Exception:
             pass
@@ -632,7 +632,7 @@ def _embed(name: str, frame: tk.Frame) -> str | None:
                     return []
 
             _field_coverage_embed = _DummyFieldCoverage()
-        raw = path.read_text(encoding="utf-8")
+        raw = path.read_text(encoding="utf-8-sig")
         code = _preprocess(name, raw)
         # 注入共享工具模块，使嵌入脚本可直接调用 shared_utils 中的函数
         import shared_utils as _su  # noqa: F811
@@ -1104,7 +1104,7 @@ _VAR_SAMPLE: dict[str, str] = {
 
 def _read_src(filename: str) -> str:
     try:
-        return (BUNDLE_DIR / filename).read_text(encoding="utf-8")
+        return (BUNDLE_DIR / filename).read_text(encoding="utf-8-sig")
     except Exception:
         return ""
 
@@ -1200,21 +1200,21 @@ def _factory_tpl_for_scenario(info: dict) -> str:
             p = EDITOR_DEFAULTS_ROOT / "ER_MPLS___国内配置" / "TEMPLATE_MPLS_DOMESTIC.tpl"
             try:
                 if p.exists():
-                    return p.read_text(encoding="utf-8")
+                    return p.read_text(encoding="utf-8-sig")
             except (OSError, UnicodeDecodeError):
                 pass
         elif slot == "TEMPLATE_MPLS_OVERSEAS":
             p = EDITOR_DEFAULTS_ROOT / "ER_MPLS___海外配置" / "TEMPLATE_MPLS_OVERSEAS.tpl"
             try:
                 if p.exists():
-                    return p.read_text(encoding="utf-8")
+                    return p.read_text(encoding="utf-8-sig")
             except (OSError, UnicodeDecodeError):
                 pass
         elif slot == "TEMPLATE_MPLS_IPSEC":
             p = EDITOR_DEFAULTS_ROOT / "Epoch_MPLS___IPSec" / "TEMPLATE_MPLS_IPSEC.tpl"
             try:
                 if p.exists():
-                    return p.read_text(encoding="utf-8")
+                    return p.read_text(encoding="utf-8-sig")
             except (OSError, UnicodeDecodeError):
                 pass
     if info.get("source") == MOD_AR_SDWAN and info.get("tpl_static"):
@@ -1286,7 +1286,7 @@ def _parse_user_init_placeholders_json() -> dict | None:
     if not INIT_USER_PLACEHOLDERS_JSON.exists():
         return None
     try:
-        raw = json.loads(INIT_USER_PLACEHOLDERS_JSON.read_text(encoding="utf-8"))
+        raw = json.loads(INIT_USER_PLACEHOLDERS_JSON.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
     if not isinstance(raw, dict):
@@ -1649,9 +1649,9 @@ def _write_factory_editor_defaults_bundle(dst: Path, info: dict, slot: str) -> N
     mp = info.get("map_static") or _auto_mapping(tpl)
     if info.get("source") == MOD_ER_FASTIP:
         hdr = _strip_leading_hostname_visual_line(hdr)
-    (dst / f"{slot}.tpl").write_text(tpl, encoding="utf-8")
-    (dst / "headers.txt").write_text(hdr, encoding="utf-8")
-    (dst / "mapping.txt").write_text(mp, encoding="utf-8")
+    (dst / f"{slot}.tpl").write_text(tpl, encoding="utf-8-sig")
+    (dst / "headers.txt").write_text(hdr, encoding="utf-8-sig")
+    (dst / "mapping.txt").write_text(mp, encoding="utf-8-sig")
 
 
 def _seed_editor_defaults(*, clear_workspace: bool = False) -> None:
@@ -1707,7 +1707,7 @@ def _load_prog_templates(*, apply_overrides: bool = True) -> dict[str, str]:
     data: dict[str, str] = {}
     if tpl_file.exists():
         try:
-            raw = json.loads(tpl_file.read_text(encoding="utf-8"))
+            raw = json.loads(tpl_file.read_text(encoding="utf-8-sig"))
             if isinstance(raw, dict):
                 data = dict(raw)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError):
@@ -1725,7 +1725,7 @@ def _load_prog_templates(*, apply_overrides: bool = True) -> dict[str, str]:
         p = EDITOR_DEFAULTS_ROOT / rel[0] / rel[1]
         try:
             if p.exists():
-                data[sk] = p.read_text(encoding="utf-8").rstrip("\n")
+                data[sk] = p.read_text(encoding="utf-8-sig").rstrip("\n")
         except (OSError, UnicodeDecodeError):
             pass
     return data
@@ -4118,15 +4118,15 @@ class VisualEditorTab:
         slot = _scenario_tpl_slot(info)
         tpl_path = sdir / f"{slot}.tpl"
         # 写入前先读旧内容，用于 changelog 里记录"何时 + 新增/删除哪些行"
-        before_tpl = tpl_path.read_text(encoding="utf-8") if tpl_path.exists() else ""
+        before_tpl = tpl_path.read_text(encoding="utf-8-sig") if tpl_path.exists() else ""
         hdr_path = sdir / "headers.txt"
         mp_path = sdir / "mapping.txt"
-        before_hdr = hdr_path.read_text(encoding="utf-8") if hdr_path.exists() else ""
-        before_mp = mp_path.read_text(encoding="utf-8") if mp_path.exists() else ""
+        before_hdr = hdr_path.read_text(encoding="utf-8-sig") if hdr_path.exists() else ""
+        before_mp = mp_path.read_text(encoding="utf-8-sig") if mp_path.exists() else ""
 
-        tpl_path.write_text(tpl, encoding="utf-8")
-        hdr_path.write_text(hdr, encoding="utf-8")
-        mp_path.write_text(mp, encoding="utf-8")
+        tpl_path.write_text(tpl, encoding="utf-8-sig")
+        hdr_path.write_text(hdr, encoding="utf-8-sig")
+        mp_path.write_text(mp, encoding="utf-8-sig")
 
         from datetime import datetime
 
@@ -4174,7 +4174,7 @@ class VisualEditorTab:
         if not p.exists():
             return 0
         try:
-            return max(0, int(p.read_text(encoding="utf-8").strip()))
+            return max(0, int(p.read_text(encoding="utf-8-sig").strip()))
         except ValueError:
             return 0
 
@@ -4183,7 +4183,7 @@ class VisualEditorTab:
             return
         try:
             self._scenario_dir(key).mkdir(parents=True, exist_ok=True)
-            self._tpl_version_counter_path(key).write_text(str(max(0, value)), encoding="utf-8")
+            self._tpl_version_counter_path(key).write_text(str(max(0, value)), encoding="utf-8-sig")
         except Exception:
             pass
 
@@ -4707,7 +4707,7 @@ class VisualEditorTab:
             data[mod] = self._init_mod_row_snapshot(mod)
         try:
             INIT_USER_PLACEHOLDERS_JSON.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8-sig")
         except (OSError, ValueError) as e:
             messagebox.showerror("写入失败", str(e))
             return
@@ -4793,11 +4793,11 @@ class VisualEditorTab:
         tpl_legacy = self._legacy_flat(key, "template.tpl")
 
         if tpl_new.exists():
-            tpl = tpl_new.read_text(encoding="utf-8")
+            tpl = tpl_new.read_text(encoding="utf-8-sig")
         elif tpl_def.exists():
-            tpl = tpl_def.read_text(encoding="utf-8")
+            tpl = tpl_def.read_text(encoding="utf-8-sig")
         elif tpl_legacy.exists():
-            tpl = tpl_legacy.read_text(encoding="utf-8")
+            tpl = tpl_legacy.read_text(encoding="utf-8-sig")
         else:
             tpl = self._default_tpl(info)
 
@@ -4805,7 +4805,7 @@ class VisualEditorTab:
             fixed = self._default_tpl(info)
             if tpl_def.exists():
                 try:
-                    cand = tpl_def.read_text(encoding="utf-8")
+                    cand = tpl_def.read_text(encoding="utf-8-sig")
                     if _er_domain_split_tpl_looks_valid(cand):
                         fixed = cand
                 except Exception:
@@ -4813,7 +4813,7 @@ class VisualEditorTab:
             tpl = fixed
             if not getattr(self, "_regression_skip_disk", False):
                 try:
-                    tpl_new.write_text(tpl, encoding="utf-8")
+                    tpl_new.write_text(tpl, encoding="utf-8-sig")
                 except Exception:
                     pass
 
@@ -4826,7 +4826,7 @@ class VisualEditorTab:
                 if not getattr(self, "_regression_skip_disk", False):
                     try:
                         tpl_new.parent.mkdir(parents=True, exist_ok=True)
-                        tpl_new.write_text(tpl, encoding="utf-8")
+                        tpl_new.write_text(tpl, encoding="utf-8-sig")
                     except Exception:
                         pass
 
@@ -4834,11 +4834,11 @@ class VisualEditorTab:
         hdr_def = sdef / "headers.txt"
         hdr_legacy = self._legacy_flat(key, "headers.txt")
         if hdr_new.exists():
-            hdr = hdr_new.read_text(encoding="utf-8")
+            hdr = hdr_new.read_text(encoding="utf-8-sig")
         elif hdr_def.exists():
-            hdr = hdr_def.read_text(encoding="utf-8")
+            hdr = hdr_def.read_text(encoding="utf-8-sig")
         elif hdr_legacy.exists():
-            hdr = hdr_legacy.read_text(encoding="utf-8")
+            hdr = hdr_legacy.read_text(encoding="utf-8-sig")
         elif info.get("hdr_static"):
             hdr = info["hdr_static"]
         else:
@@ -4851,11 +4851,11 @@ class VisualEditorTab:
         map_def = sdef / "mapping.txt"
         map_legacy = self._legacy_flat(key, "mapping.txt")
         if map_new.exists():
-            mapping = map_new.read_text(encoding="utf-8")
+            mapping = map_new.read_text(encoding="utf-8-sig")
         elif map_def.exists():
-            mapping = map_def.read_text(encoding="utf-8")
+            mapping = map_def.read_text(encoding="utf-8-sig")
         elif map_legacy.exists():
-            mapping = map_legacy.read_text(encoding="utf-8")
+            mapping = map_legacy.read_text(encoding="utf-8-sig")
         elif info.get("map_static"):
             mapping = str(info["map_static"])
         else:
@@ -5866,7 +5866,7 @@ def _reg_read_scenario_template_text(key: str, info: dict) -> str | None:
     if not p_ws.exists():
         return None
     try:
-        return p_ws.read_text(encoding="utf-8")
+        return p_ws.read_text(encoding="utf-8-sig")
     except Exception:
         return None
 
@@ -6348,7 +6348,7 @@ def _run_ui_regression_19(root: tk.Tk, ved: VisualEditorTab) -> tuple[Path, Path
     out_dir = out_root / run_tag
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "ui_regression_19_report.json"
-    out_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    out_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8-sig")
     json_abs = str(out_path.resolve())
     summary_txt = out_dir / "ui_regression_19_summary.txt"
     visual_fail_lines: list[str] = []
@@ -6421,7 +6421,7 @@ def _run_ui_regression_19(root: tk.Tk, ved: VisualEditorTab) -> tuple[Path, Path
             json_abs,
         ]
     )
-    summary_txt.write_text(txt_body, encoding="utf-8")
+    summary_txt.write_text(txt_body, encoding="utf-8-sig")
     print(f"UI_REGRESSION_19: passed={passed}/{total}", flush=True)
     print(f"UI_REGRESSION_19_RUN: {run_tag}", flush=True)
     print(f"UI_REGRESSION_19_REPORT_JSON: {json_abs}", flush=True)
@@ -6485,13 +6485,13 @@ def _formal_load_default_header(key: str, info: dict) -> str:
     p_ws = WORKSPACE / sk / "headers.txt"
     if p_ws.exists():
         try:
-            return p_ws.read_text(encoding="utf-8").strip()
+            return p_ws.read_text(encoding="utf-8-sig").strip()
         except Exception:
             pass
     p_def = EDITOR_DEFAULTS_ROOT / sk / "headers.txt"
     if p_def.exists():
         try:
-            return p_def.read_text(encoding="utf-8").strip()
+            return p_def.read_text(encoding="utf-8-sig").strip()
         except Exception:
             pass
     tpl = _factory_tpl_for_scenario(info)
@@ -7172,7 +7172,7 @@ def _formal_check_workspace_rw(
     notes: list[str] = []
     try:
         tpl_path.parent.mkdir(parents=True, exist_ok=True)
-        tpl_path.write_text(probe_tpl, encoding="utf-8")
+        tpl_path.write_text(probe_tpl, encoding="utf-8-sig")
         # 模拟从 workspace 加载并应用到内存
         _apply_template_to_runtime(key, info, probe_tpl)
         # 验证内存态
@@ -7746,7 +7746,7 @@ def _selftest() -> None:
         if not path.exists():
             print(f"[SKIP] {filename}")
             continue
-        raw  = path.read_text(encoding="utf-8")
+        raw  = path.read_text(encoding="utf-8-sig")
         code = _preprocess(filename, raw)
         if "root = tk.Tk()" in code:
             print(f"[FAIL] {filename}: root=tk.Tk() 未被替换")
@@ -7773,9 +7773,9 @@ def _write_canonical_template_bundle(dst: Path, info: dict, slot: str) -> None:
     if info.get("source") == MOD_ER_FASTIP:
         hdr = _strip_leading_hostname_visual_line(hdr)
     dst.mkdir(parents=True, exist_ok=True)
-    (dst / f"{slot}.tpl").write_text(tpl, encoding="utf-8")
-    (dst / "headers.txt").write_text(hdr, encoding="utf-8")
-    (dst / "mapping.txt").write_text(mp, encoding="utf-8")
+    (dst / f"{slot}.tpl").write_text(tpl, encoding="utf-8-sig")
+    (dst / "headers.txt").write_text(hdr, encoding="utf-8-sig")
+    (dst / "mapping.txt").write_text(mp, encoding="utf-8-sig")
 
 
 def _resync_all_editor_template_bundles(

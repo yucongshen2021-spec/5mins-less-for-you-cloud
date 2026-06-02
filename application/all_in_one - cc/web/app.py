@@ -63,7 +63,7 @@ def _load_module(filename: str) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Module not found: {filename}")
 
-    raw = path.read_text(encoding="utf-8")
+    raw = path.read_text(encoding="utf-8-sig")
 
     # Create hidden Tk root before loading module (only one Tk instance allowed)
     _web_root = tk.Tk()
@@ -1556,7 +1556,7 @@ def api_sponsor_board():
     json_path = _DATA_RO_DIR / "sponsor_board" / "rankings.json"
     try:
         if json_path.exists():
-            data = json.loads(json_path.read_text(encoding="utf-8"))
+            data = json.loads(json_path.read_text(encoding="utf-8-sig"))
             return jsonify({"ok": True, "board": data})
     except Exception:
         pass
@@ -1770,7 +1770,7 @@ def api_template_load():
             p = d / name
             if p.exists():
                 try:
-                    text = p.read_text(encoding="utf-8")
+                    text = p.read_text(encoding="utf-8-sig")
                     if text.strip():
                         return text
                 except Exception:
@@ -1860,9 +1860,9 @@ def api_template_save():
     slot = info["tpl_slot"]
 
     try:
-        (ws_dir / "headers.txt").write_text(hdr, encoding="utf-8")
-        (ws_dir / "mapping.txt").write_text(mp, encoding="utf-8")
-        (ws_dir / f"{slot}.tpl").write_text(tpl, encoding="utf-8")
+        (ws_dir / "headers.txt").write_text(hdr, encoding="utf-8-sig")
+        (ws_dir / "mapping.txt").write_text(mp, encoding="utf-8-sig")
+        (ws_dir / f"{slot}.tpl").write_text(tpl, encoding="utf-8-sig")
         _apply_template_to_runtime(scenario_key, info, tpl)
         return jsonify({"ok": True, "message": f"Saved to {ws_dir} and applied to runtime"})
     except Exception as e:
@@ -1899,7 +1899,7 @@ def api_template_reset():
         p = d / f"{slot}.tpl"
         if p.exists():
             try:
-                tpl = p.read_text(encoding="utf-8")
+                tpl = p.read_text(encoding="utf-8-sig")
                 if tpl.strip():
                     break
             except Exception:
@@ -2290,7 +2290,7 @@ def _load_workspace_templates():
         tpl_file = sdir / f"{info['tpl_slot']}.tpl"
         if tpl_file.exists():
             try:
-                tpl = tpl_file.read_text(encoding="utf-8")
+                tpl = tpl_file.read_text(encoding="utf-8-sig")
                 if tpl.strip():
                     _apply_template_to_runtime(info["key"], info, tpl)
                     count += 1
@@ -2329,7 +2329,7 @@ def _load_init_defaults():
     if not json_path.exists():
         return
     try:
-        all_values = json.loads(json_path.read_text(encoding="utf-8"))
+        all_values = json.loads(json_path.read_text(encoding="utf-8-sig"))
         if not isinstance(all_values, dict):
             return
     except Exception:
@@ -2382,7 +2382,7 @@ def api_init_defaults_get(scenario_key):
     json_path = _DATA_RW_DIR / "user_init_placeholders.json"
     try:
         if json_path.exists():
-            saved = json.loads(json_path.read_text(encoding="utf-8"))
+            saved = json.loads(json_path.read_text(encoding="utf-8-sig"))
             if isinstance(saved, dict):
                 user = saved.get(scenario_key, {})
                 if isinstance(user, dict):
@@ -2413,11 +2413,11 @@ def api_init_defaults_save():
     try:
         all_values = {}
         if json_path.exists():
-            all_values = json.loads(json_path.read_text(encoding="utf-8"))
+            all_values = json.loads(json_path.read_text(encoding="utf-8-sig"))
         if not isinstance(all_values, dict):
             all_values = {}
         all_values[scenario_key] = values
-        json_path.write_text(json.dumps(all_values, ensure_ascii=False, indent=2), encoding="utf-8")
+        json_path.write_text(json.dumps(all_values, ensure_ascii=False, indent=2), encoding="utf-8-sig")
     except Exception as e:
         return jsonify({"ok": False, "error": _humanize_error(e)}), 500
 
@@ -2448,10 +2448,10 @@ def api_init_defaults_reset():
     json_path = _DATA_RW_DIR / "user_init_placeholders.json"
     try:
         if json_path.exists():
-            all_values = json.loads(json_path.read_text(encoding="utf-8"))
+            all_values = json.loads(json_path.read_text(encoding="utf-8-sig"))
             if isinstance(all_values, dict) and scenario_key in all_values:
                 del all_values[scenario_key]
-                json_path.write_text(json.dumps(all_values, ensure_ascii=False, indent=2), encoding="utf-8")
+                json_path.write_text(json.dumps(all_values, ensure_ascii=False, indent=2), encoding="utf-8-sig")
     except Exception:
         pass
 
@@ -2464,7 +2464,7 @@ def api_init_defaults_reset():
     # Re-apply saved init defaults for OTHER scenarios sharing this module
     try:
         if json_path.exists():
-            remaining = json.loads(json_path.read_text(encoding="utf-8"))
+            remaining = json.loads(json_path.read_text(encoding="utf-8-sig"))
             if isinstance(remaining, dict):
                 for sk, sv in remaining.items():
                     si = next((s for s in _SCENARIO_LIST if s["key"] == sk), None)
@@ -2488,7 +2488,7 @@ def api_init_defaults_reset():
                 tp = ws / sk_dir / f"{si['tpl_slot']}.tpl"
                 if tp.exists():
                     try:
-                        txt = tp.read_text(encoding="utf-8").strip()
+                        txt = tp.read_text(encoding="utf-8-sig").strip()
                         if txt:
                             ns[si["tpl_slot"]] = txt
                     except Exception:

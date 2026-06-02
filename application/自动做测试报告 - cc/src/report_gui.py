@@ -767,7 +767,7 @@ class App(tk.Tk):
                     subprocess.run(
                         ["taskkill", "/PID", str(self.current_proc.pid), "/T", "/F"],
                         capture_output=True,
-                        text=True,
+                        text=True, encoding="utf-8",
                     )
             except Exception:
                 pass

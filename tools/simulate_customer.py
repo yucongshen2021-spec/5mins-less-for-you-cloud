@@ -142,7 +142,7 @@ class TempPatch:
         self._backup = None
 
     def __enter__(self):
-        self._backup = self.path.read_text(encoding="utf-8") if self.path.is_file() else None
+        self._backup = self.path.read_text(encoding="utf-8-sig") if self.path.is_file() else None
         return self
 
     def write(self, content: str):
@@ -257,7 +257,7 @@ def scenario_e_client_newer(client_uc, customer_release_info: Path, t: Tally):
     """客户 9.9.9 > 服务端 0.3.1 → comparison=newer，不出横幅。"""
     print(cyan("\n[场景 E] 客户版本比服务端还高（开发机自测/降级场景）"))
     with TempPatch(customer_release_info) as patch:
-        info = json.loads(customer_release_info.read_text(encoding="utf-8"))
+        info = json.loads(customer_release_info.read_text(encoding="utf-8-sig"))
         info["version"] = "9.9.9"
         patch.write_json(info)
 
@@ -277,7 +277,7 @@ def scenario_f_cache(client_uc, t: Tally, customer_config: Path):
     print(cyan("\n[场景 F] 缓存生效（TTL 内不重复打 mirror）"))
     # 把客户 cache_ttl_seconds 改为 3600，确保会命中缓存
     with TempPatch(customer_config) as patch:
-        cfg = json.loads(customer_config.read_text(encoding="utf-8"))
+        cfg = json.loads(customer_config.read_text(encoding="utf-8-sig"))
         cfg["cache_ttl_seconds"] = 3600
         patch.write_json(cfg)
 
@@ -311,7 +311,7 @@ def main():
 
     print(cyan(f"客户 bundle：{customer_bundle}"))
     print(cyan(f"客户 update_config.json 内 mirror_url：" +
-               json.loads(customer_config.read_text(encoding='utf-8'))["mirror_url"]))
+               json.loads(customer_config.read_text(encoding='utf-8-sig'))["mirror_url"]))
 
     # 启动开发机 portal
     print(cyan(f"\n启动开发机 portal: http://{args.bind}:{args.port}"))

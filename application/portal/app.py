@@ -68,7 +68,7 @@ def _find_latest_release():
 
 def _local_version():
     try:
-        info = json.loads((Path(__file__).resolve().parents[2] / "RELEASE_INFO.json").read_text(encoding="utf-8"))
+        info = json.loads((Path(__file__).resolve().parents[2] / "RELEASE_INFO.json").read_text(encoding="utf-8-sig"))
         v = info.get("version")
         return v if isinstance(v, str) and v.strip() else None
     except (OSError, json.JSONDecodeError):

@@ -124,7 +124,7 @@ def detect_version(cli_version: str | None) -> str:
             ["git", "describe", "--tags", "--always", "--dirty"],
             cwd=str(PROJECT_ROOT),
             stderr=subprocess.DEVNULL,
-            text=True,
+            text=True, encoding="utf-8",
         ).strip()
         if out:
             return out.lstrip("v")

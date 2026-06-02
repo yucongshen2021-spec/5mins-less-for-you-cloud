@@ -3449,7 +3449,7 @@ class ERAnalyzerGUI:
             return
 
         try:
-            content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+            content = Path(file_path).read_text(encoding="utf-8", errors="replace")
             scene = self._current_scene()
             self.scene_widgets[scene]["config"].delete("1.0", tk.END)
             self.scene_widgets[scene]["config"].insert("1.0", content)

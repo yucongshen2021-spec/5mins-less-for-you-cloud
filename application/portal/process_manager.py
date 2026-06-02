@@ -118,7 +118,7 @@ def _start_one(app: dict) -> None:
     _kill_port(app["port"])
     log_path = os.path.join(LOG_DIR, f"{app['id']}.log")
     try:
-        log_fh = open(log_path, "a")
+        log_fh = open(log_path, "a", encoding="utf-8")
         proc = subprocess.Popen(
             app["cmd"],
             cwd=app["cwd"],
