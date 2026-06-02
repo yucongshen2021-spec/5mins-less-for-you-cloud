@@ -389,12 +389,14 @@
 
 <div class="toast" id="toast"></div>
 
+{% if is_release %}
   <!-- Update banner — must be BEFORE <script> so getElementById works at IIFE execution time -->
   <div class="update-banner" id="updateBanner" style="display:none;background:var(--primary);color:#fff;text-align:center;padding:8px 36px 8px 16px;font-size:13px;font-weight:500;position:relative;">
     <span>有新版本可用：</span>
     <span id="updateBannerVer" style="font-weight:700;"></span>
     <a id="updateBannerLink" href="#" style="color:#fff;margin-left:8px;text-decoration:underline;">立即下载</a> <button onclick="document.getElementById('updateBanner').classList.remove('visible')" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;position:absolute;right:12px;top:50%;transform:translateY(-50%);line-height:1;" title="关闭">&times;</button>
   </div>
+{% endif %}
 
 <script>
 (function() {
@@ -571,7 +573,8 @@
       });
     });
 
-// -- Update check (every hour) --
+{% if is_release %}
+// -- Update check (every hour, RELEASE ONLY) --
   var updateBanner = document.getElementById('updateBanner');
   var updateBannerVer = document.getElementById('updateBannerVer');
   var updateBannerLink = document.getElementById('updateBannerLink');
@@ -642,6 +645,7 @@
   // First check after 5s, then every hour
   setTimeout(checkUpdate, 5000);
   setInterval(checkUpdate, 3600000);
+{% endif %}
 })();
 </script>
 
