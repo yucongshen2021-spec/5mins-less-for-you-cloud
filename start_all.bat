@@ -1,9 +1,7 @@
 @echo off
-chcp 65001 >nul
-set "PYTHONUTF8=1"
 cd /d "%~dp0"
 
-rem 优先用包内便携 Python（客户解压后存在），否则回退到系统 py -3（开发机器）
+rem Use bundled Python runtime if present (customer package), otherwise system py -3
 set "PYTHON=%~dp0runtime\python\python.exe"
 if exist "%PYTHON%" (
     set "PYTHONNOUSERSITE=1"
@@ -19,8 +17,7 @@ echo.
 echo   Python: %PYTHON%
 echo.
 echo   [1/2] Cleaning old processes...
-rem Sub-apps use fixed ports 5001-5004, portal uses 5000 (demo) or 7000 (release)
-for %%p in (5003 5002 5001 5004 5000 7003 7002 7001 7004 7000) do call :kill_port %%p
+for %%p in (5003 5002 5001 5004 5000) do call :kill_port %%p
 echo   [2/2] Starting all services...
 echo.
 if defined RELEASE_MODE (
