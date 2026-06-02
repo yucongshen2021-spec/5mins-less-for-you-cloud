@@ -8,32 +8,29 @@
 - **端口**: 5000（portal）+ 5001-5004（子应用）
 - **启动**: 源码直接运行 `py application/portal/app.py`
 - **RELEASE_MODE**: 不设置
-- **页面**: DEMO 橙色标签、"demo试用版"、左下角下载卡片
-- **下载**: 左下角按钮 → 从 `dist/` 下载 **唯一正式版** zip
-- **更新检查**: **不做**（无更新横幅、无检查按钮、无自动检查）
+- **页面**: DEMO 橙色标签、"demo试用版"
+- **侧栏底部**: **下载卡片** (dlCard) — 扫描 dist/ 最新 zip，显示版本号和大小
+- **更新检查**: **不做**（无横幅、无检查按钮、无自动定时器）
 - **RELEASE_INFO.json**: 读项目根目录的文件
-- **dist/**: 只放 **一个** 正式版 zip
+- **/api/download/latest**: 扫描 dist/ 返回最新 zip 元数据
 
 ### Release 版（客户交付）
 - **端口**: 7000（portal）+ 7001-7004（子应用）
 - **启动**: 解压 zip → 双击 `start_all.bat`（自动设 RELEASE_MODE=1）
 - **RELEASE_MODE**: 自动设置（便携 Python 存在时）
 - **页面**: RELEASE 绿色标签、"正式版"、手动检查版本按钮
-- **更新检查**: **必须做**（5 秒自动检查 + 手动按钮 + 横幅通知）
+- **侧栏底部**: **更新卡片** (upgradeBtn) — 5 态按钮（检查中/已是最新/有新版本/错误/升级中）
+- **更新检查**: **必须做**（5 秒自动 + 手动按钮 + 横幅通知）
 - **RELEASE_INFO.json**: 读 zip 解压根目录的文件（构建时写入）
 - **update_config.json**: 含 mirror_urls（主备双源）
+- **/api/update/check**: 从 mirror 获取最新版本号，比较本地版本
+- **/api/update/upgrade**: 下载新 zip → 解压覆盖 → 提示重启
 
-### dist/ 目录规则
-- 正常情况下 **只有一个** zip：当前正式版
-- 测试更新流程时 **临时** 放 2 个 zip（旧版 + 新版），测完立即删除新版
-- mirror 扫描 `dist/` 最新 mtime 的 zip 作为"最新版"
-- 绝对不允许测试版 zip 长期留在 dist/
-
-### 发版流程
-1. 改 RELEASE_INFO.json → 新版本号
-2. `py tools/build_release.py --version vX.Y.Z --mirror-url http://192.168.5.10:8000/api/update/manifest`
-3. git commit + push
-4. dist/ 保持只有正式版 zip
+### dist/ 目录（动态，非写死）
+- 由 `build_release.py` 写入，`serve_mirror.py` 和 `/api/download/latest` 读取
+- mirror 和 demo 下载都取 **最新 mtime** 的 zip（动态最新版）
+- 发新版 → build_release 写新 zip → 自然成为最新
+- 测试更新流程时需要新旧两个 zip 同时存在（旧版模拟客户，新版作为更新目标）
 
 ## 规则 1：做事前先查 mistake.txt
 
