@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import sys
+import urllib.parse
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
@@ -81,7 +82,7 @@ class MirrorHandler(SimpleHTTPRequestHandler):
         self._json({"ok": True, **manifest})
 
     def _serve_download(self, path: str):
-        filename = os.path.basename(path)
+        filename = urllib.parse.unquote(os.path.basename(path))
         filepath = DIST_DIR / filename
 
         if not filepath.is_file():
@@ -90,8 +91,11 @@ class MirrorHandler(SimpleHTTPRequestHandler):
 
         self.send_response(200)
         self.send_header("Content-Type", "application/zip")
+        # RFC 5987: non-ASCII filenames must use filename*=UTF-8''...
+        encoded = urllib.parse.quote(filename, safe='')
         self.send_header("Content-Disposition",
-                         f'attachment; filename="{filename}"')
+                         f"attachment; filename=\"{encoded}\"; "
+                         f"filename*=UTF-8''{encoded}")
         self.send_header("Content-Length", str(filepath.stat().st_size))
         self.end_headers()
 
