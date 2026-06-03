@@ -710,6 +710,7 @@
   if (btnCheck) {
     btnCheck.addEventListener('click', function() {
       if (btnCheck.disabled && btnCheck.classList.contains('is-latest')) return;
+      setBtnCheckState('checking');
       fetch('/api/update/check?force=1')
         .then(function(r) { return r.json(); })
         .then(function(info) {
@@ -720,15 +721,18 @@
             setBtnCheckState('latest');
             showToast('已是最新版本');
           } else if (info.status !== 'ok') {
-            setBtnCheckState('error');
-            showToast('检查失败: ' + (info.message || info.status));
+            // Server returned error — show toast but don't change button to error.
+            // The cached result (shown in sidebar) is still valid.
+            setBtnCheckState('normal');
+            showToast('暂时无法连接更新服务器，请稍后重试');
           } else {
             setBtnCheckState('normal');
           }
         })
         .catch(function() {
-          showToast('网络错误，无法检查更新');
-          setBtnCheckState('error');
+          // Actual network error — fetch itself failed
+          setBtnCheckState('normal');
+          showToast('网络不可用，请检查连接');
         });
     });
   }
@@ -736,6 +740,7 @@
   function setBtnCheckState(state) {
     if (!btnCheck) return;
     btnCheck.classList.remove('is-latest', 'is-error');
+    btnCheck.disabled = false;
     if (state === 'checking') {
       btnCheck.textContent = '\u68c0\u67e5\u4e2d\u2026'; btnCheck.disabled = true;
     } else if (state === 'latest') {
