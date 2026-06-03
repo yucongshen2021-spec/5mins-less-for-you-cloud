@@ -186,9 +186,12 @@ def perform_upgrade(download_url: str) -> dict:
     zip_dest = parent / "__update__.zip"
     bat_dest = parent / "__update__.bat"
 
-    # 清理上次失败的残留
+    # 清理上次失败的残留（忽略被锁定的文件，下载时会覆盖）
     for p in (zip_dest, bat_dest):
-        p.unlink(missing_ok=True)
+        try:
+            p.unlink(missing_ok=True)
+        except PermissionError:
+            pass  # 文件被占用时跳过，下载会覆盖
 
     # 下载
     last_downloaded = 0
