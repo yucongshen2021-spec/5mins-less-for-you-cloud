@@ -164,6 +164,16 @@ def _start_mirror() -> subprocess.Popen | None:
 
 
 def main():
+    # Clean stale .pyc bytecode before importing anything important.
+    # Prevents "fixed the code but portal runs old version" bugs
+    # (Python loads cached .pyc if it appears newer than source).
+    import shutil
+    for pyc_dir in _PROJECT_ROOT.rglob("__pycache__"):
+        try:
+            shutil.rmtree(pyc_dir, ignore_errors=True)
+        except Exception:
+            pass
+
     process_manager.start_all()
     mirror_proc = None
     if not _RELEASE:

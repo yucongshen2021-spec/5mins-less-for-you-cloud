@@ -77,3 +77,4 @@ mistake.txt
 **/mistake.txt
 log/mistake/
 **/log/mistake/
+.test_e2e_tmp/
