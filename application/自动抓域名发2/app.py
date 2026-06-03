@@ -544,6 +544,25 @@ INDEX_HTML = r"""<!DOCTYPE html>
   }
   .toast.show { opacity:1; }
 
+  /* ── yydy link button ──────────────────────────── */
+  .yydy-btn {
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:11px; font-weight:600; letter-spacing:.6px;
+    color:var(--body); background:var(--surface);
+    border:1px solid var(--hairline); border-radius:9999px;
+    padding:5px 14px; cursor:pointer; text-decoration:none;
+    transition:border-color .18s,color .18s,background .18s;
+    margin-top:6px;
+  }
+  .yydy-btn:hover {
+    color:var(--primary); border-color:var(--primary);
+    background:rgba(245,78,0,.04);
+  }
+  .yydy-btn .yydy-dot {
+    width:5px; height:5px; border-radius:50%;
+    background:var(--primary); flex-shrink:0;
+  }
+
   /* ── Responsive ──────────────────────────────── */
   @media (max-width:640px) {
     .input-row { flex-direction:column; }
@@ -559,6 +578,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
   <h1>Domain <span class="hl">Capture</span></h1>
   <div class="hero-sep"></div>
   <p class="hero-sub">输入 URL，自动捕获网页所有请求域名，追踪 DNS CNAME 解析链路</p>
+  <a class="yydy-btn" href="https://domain.yydy.link:2023/" target="_blank" rel="noopener" title="打开 YYDY 域名平台"><span class="yydy-dot"></span>yydy</a>
 </div>
 
 <div class="card" id="inputCard">
