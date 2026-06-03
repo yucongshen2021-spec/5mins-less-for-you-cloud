@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import urllib.parse
+import zipfile
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
@@ -35,6 +36,22 @@ def find_latest_zip(dist_dir: Path) -> Path | None:
     return zips[0] if zips else None
 
 
+def _read_zip_version(zip_path: Path) -> str | None:
+    """从 zip 内 RELEASE_INFO.json 读取版本号（clean semver，不含 bundle 前缀）。"""
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            # RELEASE_INFO.json 在 zip 根目录下（inside the bundle folder）
+            for name in zf.namelist():
+                if name.endswith("/RELEASE_INFO.json") or name == "RELEASE_INFO.json":
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    v = data.get("version")
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+    except Exception:
+        pass
+    return None
+
+
 def build_manifest(zip_path: Path, base_url: str) -> dict:
     """从 zip 文件构建 manifest 响应。"""
     stat = zip_path.stat()
@@ -42,7 +59,10 @@ def build_manifest(zip_path: Path, base_url: str) -> dict:
         sha256 = hashlib.sha256(f.read()).hexdigest()
 
     filename = zip_path.name
-    version = filename.removeprefix(f"{BUNDLE_NAME}-").removesuffix(".zip")
+    # 优先从 zip 内 RELEASE_INFO.json 读版本（clean semver），fallback 文件名提取
+    version = _read_zip_version(zip_path)
+    if not version:
+        version = filename.removeprefix(f"{BUNDLE_NAME}-").removesuffix(".zip")
 
     return {
         "name": BUNDLE_NAME,
