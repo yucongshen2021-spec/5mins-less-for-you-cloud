@@ -134,6 +134,16 @@ exit
 
 def _download_with_progress(url: str, dest: Path, timeout: int = 120):
     """下载文件到 dest，期间 yield (downloaded_bytes, total_bytes)。"""
+    # URL-encode non-ASCII path segments (urllib rejects raw Chinese in URLs)
+    import urllib.parse
+    scheme, rest = url.split("://", 1)
+    if "/" in rest:
+        host, path = rest.split("/", 1)
+        encoded_path = "/".join(
+            urllib.parse.quote(part, safe="") for part in path.split("/")
+        )
+        url = f"{scheme}://{host}/{encoded_path}"
+
     req = urllib.request.Request(url, headers={
         "User-Agent": "5mins-portal-upgrade",
     })
