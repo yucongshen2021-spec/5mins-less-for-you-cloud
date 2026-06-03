@@ -1,6 +1,7 @@
 """Portal Flask app — unified shell + reverse proxy for all sub-apps."""
 import json
 import os
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -147,8 +148,26 @@ def proxy_route(app_id, subpath):
     return proxy.proxy_to(app_id, subpath, _PORT_MAP)
 
 
+def _start_mirror() -> subprocess.Popen | None:
+    """Demo mode: start mirror server on port 8000 so download/update work."""
+    mirror_script = _PROJECT_ROOT / "tools" / "serve_mirror.py"
+    if not mirror_script.is_file():
+        print("[portal] WARNING: mirror script not found, skipping")
+        return None
+    # Kill stale mirror processes
+    process_manager._kill_port(8000)
+    print("[portal] Starting mirror server on port 8000...")
+    return subprocess.Popen(
+        [sys.executable, str(mirror_script), "--port", "8000", "--dist", str(_DIST_DIR)],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+
 def main():
     process_manager.start_all()
+    mirror_proc = None
+    if not _RELEASE:
+        mirror_proc = _start_mirror()
     port = 7000 if _RELEASE else 5000
     threading.Timer(2.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
     try:
@@ -156,6 +175,12 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        if mirror_proc:
+            mirror_proc.terminate()
+            try:
+                mirror_proc.wait(timeout=5)
+            except Exception:
+                mirror_proc.kill()
         process_manager.shutdown_all()
 
 
