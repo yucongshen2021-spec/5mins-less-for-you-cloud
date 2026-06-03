@@ -1,88 +1,146 @@
 """在线升级：下载新版本 zip → 生成升级脚本 → 启动脚本 → portal 退出。
 
 升级脚本（update.bat）负责：
-  1. 等 portal 进程退出
-  2. 强杀残留端口（5000/5739-5742）
-  3. 解压新 zip 覆盖旧文件
-  4. 重启 portal
+  1. 备份用户配置文件
+  2. 等待 portal 退出 + 清理残留端口
+  3. 解压新 zip → 复制到项目目录（兼容 zip 内任意文件夹名）
+  4. 恢复用户配置 + 清理 __pycache__
+  5. 重启 portal
 
-用户自定义数据（editor_workspace/、.update_cache.json 等）不在发行 zip 内，
-解压覆盖不会丢失。
+关键设计：
+- 不再硬编码 BUNDLE_NAME，使用运行时的实际项目路径
+- 解压到临时目录再复制，不受 zip 内文件夹名影响
 """
 from __future__ import annotations
 
 import json
-import os
 import subprocess
-import sys
-import tempfile
-import time
 import urllib.request
 import zipfile
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_BUNDLE_NAME = "帮你节省5分钟"
+_PROJECT_DIR = str(_PROJECT_ROOT.resolve())
+
+_PRESERVE_FILES = [
+    r"application\portal\update_config.json",
+]
 
 UPDATE_BAT_TEMPLATE = r"""@echo off
-setlocal
+setlocal enabledelayedexpansion
 
 echo ============================================
-echo   帮你节省5分钟 - 在线升级
+echo   5mins-tools - Online Upgrade
+echo   Data will be preserved. Do NOT close.
 echo ============================================
 echo.
 
-:: 等 portal 彻底退出（最多等 15 秒）
-echo [1/4] 等待 portal 退出...
-set /a waited=0
-:wait_loop
-timeout /t 1 /nobreak >nul
-set /a waited+=1
-for %%p in (5000 5739 5740 5741 5742) do (
-    for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /c:":%%p " ^| findstr "LISTENING" 2^>nul') do (
-        if %waited% lss 15 goto :wait_loop
-    )
-)
+set "BUNDLE={bundle_path}"
+set "BACKUP=%~dp0__update_backup__"
 
-:: 强制清理残留端口
-echo [2/4] 清理残留进程...
-for %%p in (5000 5739 5740 5741 5742) do (
-    for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /c:":%%p " ^| findstr "LISTENING" 2^>nul') do (
-        taskkill /F /PID %%a >nul 2>&1
-    )
-)
-
-:: 解压新版本（zip 内含"帮你节省5分钟/"顶层目录，解压到 %~dp0 即覆盖当前安装）
-echo [3/4] 安装新版本...
-powershell -NoProfile -Command "Expand-Archive -Path '%~dp0__update__.zip' -DestinationPath '%~dp0' -Force" 2>&1
-if %errorlevel% neq 0 (
-    echo 解压失败！请手动解压 %~dp0__update__.zip 覆盖到当前目录。
+:: ---- [1/5] Back up user config ----
+echo [1/5] Backing up user config...
+if exist "%BACKUP%" rmdir /s /q "%BACKUP%"
+mkdir "%BACKUP%" 2>nul
+if not exist "%BACKUP%" (
+    echo   ERROR: cannot create backup dir
     pause
     exit /b 1
 )
 
-:: 删除下载的 zip
+if exist "%BUNDLE%\application\portal\update_config.json" (
+    copy /Y "%BUNDLE%\application\portal\update_config.json" "%BACKUP%\" >nul 2>&1
+    if exist "%BACKUP%\update_config.json" (
+        echo   Config backed up
+    ) else (
+        echo   WARNING: backup failed, continuing
+    )
+)
+
+:: ---- [2/5] Wait for portal exit + kill ports ----
+echo [2/5] Waiting for portal to exit...
+set /a waited=0
+:wait_loop
+timeout /t 1 /nobreak >nul
+set /a waited+=1
+for %%p in (7000 7001 7002 7003 7004 5000 5001 5002 5003 5004) do (
+    for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /c:":%%p " ^| findstr "LISTENING" 2^>nul') do (
+        if !waited! lss 15 goto :wait_loop
+    )
+)
+
+echo   Killing leftover processes...
+for %%p in (7000 7001 7002 7003 7004 5000 5001 5002 5003 5004) do (
+    for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /c:":%%p " ^| findstr "LISTENING" 2^>nul') do (
+        taskkill /F /PID %%a >nul 2>&1
+    )
+)
+timeout /t 2 /nobreak >nul
+
+:: ---- [3/5] Extract new version ----
+echo [3/5] Installing new version...
+set "TMPDIR=%~dp0__update_tmp__"
+if exist "%TMPDIR%" rmdir /s /q "%TMPDIR%"
+powershell -NoProfile -Command "try { Expand-Archive -Path '%~dp0__update__.zip' -DestinationPath '%TMPDIR%' -Force -ErrorAction Stop } catch { exit 1 }" 2>&1
+if %errorlevel% neq 0 (
+    echo   ERROR: extraction failed
+    echo   Try manually extracting %~dp0__update__.zip
+    echo   Your config is backed up at %BACKUP%
+    pause
+    exit /b 1
+)
+
+:: Copy contents of the single top-level folder into BUNDLE (handles any folder name)
+for /d %%d in ("%TMPDIR%\*") do (
+    echo   Copying files to project...
+    robocopy "%%d" "%BUNDLE%" /E /NFL /NDL /NJH /NJS /NC /NS /NP >nul 2>&1
+    if %errorlevel% geq 8 (
+        echo   ERROR: copy failed (code %errorlevel%)
+        rmdir /s /q "%TMPDIR%" 2>nul
+        pause
+        exit /b 1
+    )
+)
+rmdir /s /q "%TMPDIR%" 2>nul
 del "%~dp0__update__.zip" 2>nul
 
-:: 重启 portal
-echo [4/4] 启动新版本...
+:: ---- [4/5] Restore config + clean cache ----
+echo [4/5] Restoring user config...
+
+if exist "%BACKUP%\update_config.json" (
+    copy /Y "%BACKUP%\update_config.json" "%BUNDLE%\application\portal\" >nul 2>&1
+    if exist "%BUNDLE%\application\portal\update_config.json" (
+        echo   Config restored
+    ) else (
+        echo   WARNING: config restore failed
+    )
+)
+
+rmdir /s /q "%BACKUP%" 2>nul
+
+echo   Cleaning Python cache...
+powershell -NoProfile -Command "Get-ChildItem -Path '%BUNDLE%' -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue" 2>&1
+echo   Done
+
+:: ---- [5/5] Restart portal ----
+echo [5/5] Starting new version...
 echo.
-start "" "%~dp0{bundle}\start_all.bat"
+start "" "%BUNDLE%\start_all.bat"
 
 endlocal
 exit
 """
 
 
-def _download_with_progress(url: str, dest: Path, timeout: int = 120) -> None:
-    """下载文件到 dest，期间每 2 秒 yield 一次已下载字节数。"""
+def _download_with_progress(url: str, dest: Path, timeout: int = 120):
+    """下载文件到 dest，期间 yield (downloaded_bytes, total_bytes)。"""
     req = urllib.request.Request(url, headers={
         "User-Agent": "5mins-portal-upgrade",
     })
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         total = int(resp.headers.get("Content-Length", "0"))
         downloaded = 0
-        chunk_size = 256 * 1024  # 256 KB
+        chunk_size = 256 * 1024
         with open(dest, "wb") as f:
             while True:
                 chunk = resp.read(chunk_size)
@@ -94,7 +152,7 @@ def _download_with_progress(url: str, dest: Path, timeout: int = 120) -> None:
 
 
 def _verify_zip(zip_path: Path) -> dict | None:
-    """验证 zip 是否包含 RELEASE_INFO.json，返回其内容或 None。"""
+    """验证 zip 内包含 RELEASE_INFO.json，返回内容或 None。"""
     try:
         with zipfile.ZipFile(zip_path) as zf:
             for name in zf.namelist():
@@ -111,9 +169,8 @@ def perform_upgrade(download_url: str) -> dict:
 
     1. 下载最新 zip 到项目父目录
     2. 验证 zip 合法性
-    3. 生成 update.bat
-    4. 启动 update.bat（新控制台窗口）
-    5. 返回成功 → 前端调用 /api/shutdown 退出
+    3. 生成 update.bat（使用实际项目路径，不硬编码目录名）
+    4. 启动 update.bat → portal 退出
     """
     parent = _PROJECT_ROOT.parent
     zip_dest = parent / "__update__.zip"
@@ -124,7 +181,6 @@ def perform_upgrade(download_url: str) -> dict:
         p.unlink(missing_ok=True)
 
     # 下载
-    errors: list[str] = []
     last_downloaded = 0
     try:
         for downloaded, total in _download_with_progress(download_url, zip_dest):
@@ -157,14 +213,14 @@ def perform_upgrade(download_url: str) -> dict:
 
     new_version = release_info.get("version", "未知")
 
-    # 生成升级脚本
-    bat_content = UPDATE_BAT_TEMPLATE.replace("{bundle}", _BUNDLE_NAME)
-    bat_dest.write_text(bat_content, encoding="gbk")
+    # 生成升级脚本 — 使用实际项目路径
+    bat_content = UPDATE_BAT_TEMPLATE.replace("{bundle_path}", _PROJECT_DIR)
+    bat_dest.write_text(bat_content, encoding="utf-8")
 
-    # 启动升级脚本（新控制台窗口，独立于当前进程）
+    # 启动升级脚本（新控制台窗口）
     try:
         subprocess.Popen(
-            ["cmd", "/c", "start", f"帮你节省5分钟 在线升级", str(bat_dest)],
+            ["cmd", "/c", "start", "5mins-tools Online Upgrade", str(bat_dest)],
             cwd=str(parent),
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         )
