@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from flask import Flask, abort, jsonify, render_template, request, send_file
 import process_manager
 import proxy
+import upgrade
 
 # ── Release mode ──
 _RELEASE = os.environ.get("RELEASE_MODE", "").strip() == "1"
@@ -103,6 +104,19 @@ def api_update_check():
     import update_check
     force = request.args.get("force", "0") == "1"
     return jsonify(update_check.check(force=force))
+
+
+@app.route("/api/update/upgrade", methods=["POST"])
+def api_update_upgrade():
+    """执行在线升级：下载最新 zip → 解压覆盖 → 提示重启。"""
+    data = request.get_json(silent=True) or {}
+    download_url = (data.get("download_url") or "").strip()
+    if not download_url:
+        return jsonify({"ok": False, "error": "缺少 download_url"}), 400
+    result = upgrade.perform_upgrade(download_url)
+    if result.get("ok"):
+        return jsonify(result)
+    return jsonify(result), 500
 
 
 @app.route("/download/latest.zip")
