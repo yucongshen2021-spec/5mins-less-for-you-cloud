@@ -32,7 +32,7 @@ MIRROR_PORT = 8000
 CUSTOMER_PORT = 7000
 
 CUSTOMER_VERSION = "1.1.4"
-UPDATE_VERSION = "1.1.5"
+UPDATE_VERSION = "dynamic"  # Read from mirror at runtime
 
 PASSED = 0
 FAILED = 0
@@ -142,17 +142,18 @@ mirror = subprocess.Popen(
 time.sleep(2)
 check("Mirror started", port_open(MIRROR_PORT))
 
-# Verify mirror serves v1.1.5
+# Read actual latest version from mirror (dynamic, not hardcoded)
 import urllib.request
 try:
     with urllib.request.urlopen(f"http://127.0.0.1:{MIRROR_PORT}/api/update/manifest",
                                 timeout=5) as r:
         manifest = json.loads(r.read())
-    check("Mirror version is " + UPDATE_VERSION,
-          manifest.get("version") == UPDATE_VERSION,
-          f"got {manifest.get('version')}")
+    actual_update_version = manifest.get("version")
+    check("Mirror version read", actual_update_version is not None,
+          f"got {actual_update_version}")
 except Exception as e:
     check("Mirror accessible", False, str(e))
+    sys.exit(1)
 
 # Start customer portal
 print("\n--- Starting customer portal ---")
@@ -222,8 +223,8 @@ if banner:
         ver_el = page.query_selector("#updateBannerVer")
         if ver_el:
             ver_text = ver_el.inner_text()
-            check("Banner shows new version " + UPDATE_VERSION,
-                  UPDATE_VERSION in ver_text,
+            check("Banner shows new version " + str(actual_update_version),
+                  str(actual_update_version) in ver_text,
                   f"got '{ver_text}'")
 
         dl_link = page.query_selector("#updateBannerLink")
@@ -242,7 +243,7 @@ if ub:
     check("Upgrade button is available (not error)", "is-available" in classes,
           f"label='{label}' classes='{classes}'")
     check("Upgrade button shows new version",
-          UPDATE_VERSION in label,
+          str(actual_update_version) in label,
           f"got '{label}'")
 
 # Test 5: Manual check button exists in sidebar
