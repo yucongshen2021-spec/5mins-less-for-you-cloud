@@ -68,6 +68,23 @@ py tools/release.py <version> --no-push   # 仅本地测试，不推送
 
 发版脚本自动完成：切换分支 → 构建 → 注入 mirror 配置 → 提交 → 推送 → 验证。
 
+## 项目文档索引
+
+修改代码前，根据任务类型先读对应的文档：
+
+| 文件 | 用途 | 何时读 |
+|------|------|--------|
+| [`RELEASE.md`](RELEASE.md) | 发版流程、测试命令、架构图 | 发版前必读 |
+| [`log/mistake.txt`](log/mistake.txt) | 历史错误记录及避免方法 | **每次修改前必读** |
+| [`DESIGN.md`](DESIGN.md) | Cursor 设计系统（颜色/字体/间距/组件） | 任何 UI 修改前 |
+| [`AGENTS.md`](AGENTS.md) | AI agent 工作守则 | 了解行为边界 |
+| [`README.md`](README.md) | 项目说明 | 了解项目概况 |
+| [`framework/INTEGRATION.md`](framework/INTEGRATION.md) | 框架集成指南 | 修改框架/公共 CSS |
+| [`plan/`](plan/) | 功能设计文档 | 了解某个功能的设计意图 |
+| [`log/`](log/) | 按日期记录的修改日志 | 追溯修改历史 |
+| `application/*/DESIGN.md` | 各子应用的设计规范 | 修改子应用 UI |
+| `application/*/plan/` | 各子应用的设计文档 | 了解子应用功能设计 |
+
 ## 测试命令速查
 
 ```powershell
@@ -78,9 +95,15 @@ py -m pytest application/test/ -v
 # 必须通过才能发版
 py application/test/portal/test_customer_full.py
 
+# Portal 更新 UI Playwright 测试（真实浏览器点击按钮）
+py -m pytest application/test/portal/test_update_ui_playwright.py -v
+
 # 只跑 3 个子应用（快速验证）
 py -m pytest application/test/test_report/ application/test/domain_capture/ application/test/config_analyzer/ application/test/portal/ -v
 
 # config_analyzer 浏览器 E2E（不走 pytest）
 py application/test/config_analyzer/test_e2e_playwright.py
+
+# 构建后 zip 校验
+py tools/_verify_zip.py dist/帮你节省5分钟-<version>.zip <version>
 ```
