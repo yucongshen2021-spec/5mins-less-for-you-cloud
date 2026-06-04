@@ -16,8 +16,8 @@
 
 ### Release 版（客户交付）
 - **端口**: 7000（portal）+ 7001-7004（子应用）
-- **启动**: 解压 zip → 双击 `start_all.bat`（自动设 RELEASE_MODE=1）
-- **RELEASE_MODE**: 自动设置（便携 Python 存在时）
+- **启动**: 解压 zip → 双击 `start_all.bat`
+- **端口**: app.py 硬编码 7000，process_manager 硬编码 7001-7004。不依赖环境变量。
 - **页面**: RELEASE 绿色标签、"正式版"、手动检查版本按钮
 - **侧栏底部**: **更新卡片** (upgradeBtn) — 5 态按钮（检查中/已是最新/有新版本/错误/升级中）
 - **更新检查**: **必须做**（5 秒自动 + 手动按钮 + 横幅通知）
@@ -56,11 +56,27 @@
 
 不得只修复当前指出的单点，必须系统性排查并修复所有同类问题。
 
+## 发版（每次发版必须执行）
+
+**发版流程详见 [`RELEASE.md`](RELEASE.md)。** 简要命令：
+
+```powershell
+git checkout release
+py tools/release.py <version>       # 一键发版（构建+推送+验证）
+py tools/release.py <version> --no-push   # 仅本地测试，不推送
+```
+
+发版脚本自动完成：切换分支 → 构建 → 注入 mirror 配置 → 提交 → 推送 → 验证。
+
 ## 测试命令速查
 
 ```powershell
 # 全量 pytest（改代码后必跑）
 py -m pytest application/test/ -v
+
+# 完整客户模拟测试（解压 zip → 启动 → 检测更新 → 验证 UI）
+# 必须通过才能发版
+py application/test/portal/test_customer_full.py
 
 # 只跑 3 个子应用（快速验证）
 py -m pytest application/test/test_report/ application/test/domain_capture/ application/test/config_analyzer/ application/test/portal/ -v
