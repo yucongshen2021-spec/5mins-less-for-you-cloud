@@ -653,8 +653,13 @@
       .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
       .then(function(res) {
         if (res.ok && res.data && res.data.ok) {
-          showToast('升级完成，请重新启动 portal');
-          setUpgradeBtnState('busy', '请重新启动 portal', { disabled: true, icon: '…' });
+          showToast('升级已启动，即将自动重启…');
+          setUpgradeBtnState('busy', '正在自动重启…', { disabled: true, icon: '…' });
+          // Give the bat process a moment to start, then shutdown portal.
+          // The bat is waiting for port 7000 to be free — once we exit, it takes over.
+          setTimeout(function() {
+            fetch('/api/shutdown', { method: 'POST' }).catch(function(){});
+          }, 2000);
         } else {
           showToast((res.data && res.data.error) ? res.data.error : '升级失败');
           applyCheckResult(lastCheckInfo);
