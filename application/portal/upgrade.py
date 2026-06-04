@@ -107,12 +107,10 @@ rd /s /q "%BAK%" 2>nul
 :: ---- [6/6] Restart portal ----
 echo [6/6] Starting new version...
 echo.
-cd /d "%BUNDLE%"
-set "RELEASE_MODE=1"
-:: Use start with explicit empty title so RELEASE_MODE is inherited
-start "" "%BUNDLE%\start_all.bat"
-
+:: setlocal prevents environment inheritance. Use endlocal + fresh cmd:
 endlocal
+set "RELEASE_MODE=1"
+start "" "%BUNDLE%\start_all.bat"
 exit
 
 :: ---- Helper functions ----
