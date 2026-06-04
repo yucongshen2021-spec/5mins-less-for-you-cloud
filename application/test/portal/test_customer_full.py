@@ -95,8 +95,27 @@ customer_zips = sorted(DIST_DIR.glob(f"*-{CUSTOMER_VERSION}.zip"),
                        key=lambda p: p.stat().st_mtime, reverse=True)
 check("Customer zip exists", len(customer_zips) > 0)
 if not customer_zips:
-    print("ABORT: No customer zip found")
-    sys.exit(1)
+    print("  No old zip found, building test customer zip...")
+    ri_bak = (PROJECT_ROOT / "RELEASE_INFO.json").read_text(encoding="utf-8")
+    (PROJECT_ROOT / "RELEASE_INFO.json").write_text(
+        '{"version":"' + CUSTOMER_VERSION + '","name":"test","built_at":"2000-01-01T00:00:00Z"}',
+        encoding="utf-8",
+    )
+    r = subprocess.run(
+        [sys.executable, str(PROJECT_ROOT / "tools" / "build_release.py"),
+         "--version", CUSTOMER_VERSION, "--no-runtime"],
+        cwd=str(PROJECT_ROOT), capture_output=True, text=True,
+    )
+    (PROJECT_ROOT / "RELEASE_INFO.json").write_text(ri_bak, encoding="utf-8")
+    if r.returncode != 0:
+        print("  FAILED to build test zip")
+        sys.exit(1)
+    customer_zips = sorted(DIST_DIR.glob(f"*-{CUSTOMER_VERSION}.zip"),
+                           key=lambda p: p.stat().st_mtime, reverse=True)
+    check("Customer zip built", len(customer_zips) > 0)
+    if not customer_zips:
+        print("  ABORT: Still no customer zip")
+        sys.exit(1)
 
 customer_zip = customer_zips[0]
 print(f"  Using: {customer_zip.name}")
