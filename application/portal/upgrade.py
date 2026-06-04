@@ -107,9 +107,9 @@ rd /s /q "%BAK%" 2>nul
 :: ---- [6/6] Restart portal ----
 echo [6/6] Starting new version...
 echo.
-cd /d "%BUNDLE%"
-set "RELEASE_MODE=1"
-start "" start_all.bat
+:: Use cmd /c to pass RELEASE_MODE explicitly to the new process
+:: (endlocal would undo set, so we use a fresh cmd for the restart)
+start "5mins-tools" cmd /c "cd /d "%BUNDLE%" && set RELEASE_MODE=1 && start_all.bat"
 
 endlocal
 exit
