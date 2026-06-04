@@ -340,8 +340,8 @@ INDEX_HTML = r"""<!DOCTYPE html>
     color:var(--ink); letter-spacing:-0.3px; margin-bottom:10px;
   }
   .hero h1 .hl { color:var(--ink); }
-  .hero p { color:var(--muted); font-size:15px; max-width:420px; margin:0 auto; }
-  .hero-sub { white-space:nowrap; }
+  .hero p { color:var(--muted); font-size:15px; max-width:560px; margin:0 auto; }
+  .hero-sub { display:flex; align-items:center; justify-content:center; gap:10px; }
 
   /* ── Card ────────────────────────────────────── */
   .card {
@@ -552,7 +552,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
     border:1px solid var(--hairline); border-radius:9999px;
     padding:5px 14px; cursor:pointer; text-decoration:none;
     transition:border-color .18s,color .18s,background .18s;
-    margin-top:6px;
+    flex-shrink:0;
   }
   .yydy-btn:hover {
     color:var(--primary); border-color:var(--primary);
@@ -577,8 +577,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
   <div class="hero-badge">F12 Domain Tool</div>
   <h1>Domain <span class="hl">Capture</span></h1>
   <div class="hero-sep"></div>
-  <p class="hero-sub">输入 URL，自动捕获网页所有请求域名，追踪 DNS CNAME 解析链路</p>
-  <a class="yydy-btn" href="https://domain.yydy.link:2023/" target="_blank" rel="noopener" title="打开 YYDY 域名平台"><span class="yydy-dot"></span>yydy</a>
+  <p class="hero-sub"><span>输入 URL，自动捕获网页所有请求域名，追踪 DNS CNAME 解析链路</span><a class="yydy-btn" href="https://domain.yydy.link:2023/" target="_blank" rel="noopener" title="打开 YYDY 域名平台"><span class="yydy-dot"></span>yydy</a></p>
 </div>
 
 <div class="card" id="inputCard">
