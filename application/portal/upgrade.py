@@ -107,8 +107,11 @@ rd /s /q "%BAK%" 2>nul
 :: ---- [6/6] Restart portal ----
 echo [6/6] Starting new version...
 echo.
-:: setlocal prevents environment inheritance. Use endlocal + fresh cmd:
+:: Endlocal discards local env; save BUNDLE path to a file first.
+echo %BUNDLE%> "%TEMP%\__upgrade_bundle__.tmp"
 endlocal
+set /p BUNDLE=<"%TEMP%\__upgrade_bundle__.tmp"
+del "%TEMP%\__upgrade_bundle__.tmp" 2>nul
 set "RELEASE_MODE=1"
 start "" "%BUNDLE%\start_all.bat"
 exit
