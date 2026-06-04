@@ -107,7 +107,9 @@ rd /s /q "%BAK%" 2>nul
 :: ---- [6/6] Restart portal ----
 echo [6/6] Starting new version...
 echo.
-start "5mins-portal" cmd /c "set RELEASE_MODE=1 && cd /d "%BUNDLE%" && start_all.bat"
+cd /d "%BUNDLE%"
+set "RELEASE_MODE=1"
+start "" start_all.bat
 
 endlocal
 exit
