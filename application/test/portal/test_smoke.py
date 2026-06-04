@@ -115,8 +115,8 @@ def test_demo_update_check_works(portal_running):
     assert "status" in data, f"应返回 status 字段: {data}"
 
 
-def test_demo_update_upgrade_not_found(portal_running):
-    """Demo 版不应暴露 /api/update/upgrade（不导入 upgrade）。"""
+def test_demo_update_upgrade_route_works(portal_running):
+    """Demo 版应有 /api/update/upgrade 端点（与 release 保持一致）。"""
     data = json.dumps({"download_url": "http://x"}).encode("utf-8")
     req = urllib.request.Request(
         portal_running + "/api/update/upgrade",
@@ -126,6 +126,6 @@ def test_demo_update_upgrade_not_found(portal_running):
     )
     try:
         urllib.request.urlopen(req, timeout=10.0)
-        assert False, "demo 版不应有 /api/update/upgrade"
+        assert False, "带无效 download_url 应返回错误"
     except urllib.error.HTTPError as e:
-        assert e.code == 404, f"应 404, 实际 {e.code}"
+        assert e.code == 500, f"应 500 (download failed), 实际 {e.code}"
