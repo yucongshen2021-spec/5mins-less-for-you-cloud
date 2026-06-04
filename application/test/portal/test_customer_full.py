@@ -199,6 +199,12 @@ else:
     sys.exit(1)
 check("Customer portal started on " + str(CUSTOMER_PORT), True)
 
+# Verify each sub-app is actually reachable (not just reported by API)
+for app_port in [7001, 7002, 7003, 7004]:
+    time.sleep(1)
+    check(f"Sub-app port {app_port} reachable", port_open(app_port),
+          f"sub-app on port {app_port} not responding")
+
 # ============================================================================
 # Playwright tests
 # ============================================================================
