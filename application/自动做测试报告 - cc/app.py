@@ -164,6 +164,7 @@ def _run_worker(task_id: str, cmd: list[str], run_dir: Path, cfg: dict) -> None:
         proc = subprocess.Popen(
             cmd,
             cwd=str(ROOT),
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             creationflags=creationflags,

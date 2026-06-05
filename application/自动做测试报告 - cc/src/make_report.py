@@ -21,6 +21,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Callable, Literal
 
+_INTERACTIVE = True  # False when --no-manual-pause or --smoke; prevents blocking prompts
+
 import paramiko
 from docx import Document
 from docx.shared import Inches
@@ -252,7 +254,7 @@ def prompt_inputs() -> Config:
 def ask_on_failure(
     tag: str, cmd: str, out: str, exit_code: int | None, err_extra: str = ""
 ) -> Literal["retry", "save_continue", "abort"]:
-    if not sys.stdin.isatty():
+    if not sys.stdin.isatty() or not _INTERACTIVE:
         raise RuntimeError(
             f"任务失败且当前为非交互环境，无法选择重试/继续。tag={tag}, exit={exit_code}"
         )
@@ -486,7 +488,7 @@ def run_task_loop(
         try:
             out, code = runner()
         except (paramiko.SSHException, RuntimeError) as e:
-            if sys.stdin.isatty():
+            if sys.stdin.isatty() and _INTERACTIVE:
                 choice = ask_on_failure(tag, cmd, "", None, f"连接/命令异常: {e}")
                 if choice == "retry":
                     continue
@@ -498,7 +500,7 @@ def run_task_loop(
                 out, code = f"异常: {e}\n", 1
         except KeyboardInterrupt:
             print("\n已 Ctrl+C 中断")
-            if sys.stdin.isatty():
+            if sys.stdin.isatty() and _INTERACTIVE:
                 choice = ask_on_failure(tag, cmd, "(无完整输出)", None, "用户中断")
                 if choice == "retry":
                     continue
@@ -514,7 +516,7 @@ def run_task_loop(
         raw_path.write_text(out, encoding="utf-8", errors="replace")
 
         if code != 0:
-            if sys.stdin.isatty():
+            if sys.stdin.isatty() and _INTERACTIVE:
                 choice = ask_on_failure(tag, cmd, out, code)
                 if choice == "retry":
                     continue
@@ -644,6 +646,10 @@ def main() -> None:
         help="跳过手工截图等待，直接生成 Word（缺图则留空）",
     )
     args = parser.parse_args()
+
+    global _INTERACTIVE
+    if args.smoke or args.no_manual_pause:
+        _INTERACTIVE = False
 
     if getattr(sys, "frozen", False):
         current_dir = Path(sys.executable).resolve().parent
