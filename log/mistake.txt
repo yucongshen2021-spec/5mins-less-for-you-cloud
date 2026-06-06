@@ -498,3 +498,23 @@ make_report.py 崩溃：`EOFError: EOF when reading a line`。
   1. 移入 `temp/` 目录的一次性文件必须立即删除（`rm -rf temp/*`）
   2. `temp/` 是运行时测试的工作目录，git 里只保留 `.gitkeep` 占位
   3. 区分两类 temp 内容：**测试运行时产生**的子目录（一次性，不保留）和**测试代码本身**（在 `application/test/`，永久保留）
+
+## 51. 宣称"测试报告可用"但只测了 API 没测浏览器 UI
+
+**现象**: 用户点"开始生成报告"按钮后页面无反应，一直"运行中"无日志回显。
+我用 `curl /api/run` 返回 `ok` 就声称"可用"，但用户是通过 portal 代理 (`/app/test_report/`)
+访问的——完整路径是浏览器 → portal:7000 → proxy → :7002。
+
+**根因**: portal 的 `proxy.py` 用 `with urlopen(...) as resp:` 的 `__exit__` 在
+返回 `Response(generator)` 时就关闭了 HTTP 连接。Flask 后续迭代 generator 调用
+`resp.readline()` 时连接已关 → 返回空 → 浏览器 EventSource 立即触发 `onerror`。
+
+**修复**: SSE 响应不用 `with`，手动管理 `resp` 生命周期——generator 的 `finally` 块里
+`resp.close()`，保证流未结束时连接不关。
+
+**避免**:
+  1. **任何涉及 UI 的功能必须以 Playwright 真实点击按钮验证**，不能只依赖 curl API。
+     API 200 ≠ 用户看得到。
+  2. `with urlopen(...) as resp:` 的 `__exit__` 在函数返回时就触发——如果 generator
+     还没消费 `resp`，连接就关了。流式响应必须手动管理连接生命周期。
+  3. 举一反三：检查 proxy.py 是否有其他使用 `with urlopen` + generator 的模式。
