@@ -1,0 +1,500 @@
+# 错误记录 — 帮你节省5分钟项目
+
+> 此文按照全局 Rule 6 要求维护。每次开始任何修改前，必须先读此文件。
+> 每个错误都记录了根因 + 避免方法。
+
+---
+
+## 1. Edit 工具"假成功"——改了但没存上
+
+**现象**: Edit 工具返回成功，但文件实际未修改。多次在 release 分支发生，commit 后发现核心文件仍是旧代码。
+**根因**: 在同一次对话中多次切换分支后，Edit 工具缓存的文件内容与实际磁盘内容不一致，old_string 匹配到了错误的版本。
+**避免**:
+  - 关键文件用 Write 覆写，不走 Edit。
+  - 分支切换后，涉及端口/路径改动的文件，先用 Read 确认当前内容再 Edit。
+  - 每次 commit 前用 `git show --name-status HEAD` 确认真的改了哪些文件。
+
+## 2. 改了 process_manager 端口但忘了改子应用端口
+
+**现象**: portal process_manager 改了端口后子应用起不来——因为 all_in_one / test_report / domain_capture 自己的 app.py 里也硬编码了端口。
+**根因**: 端口不是单一配置源，分散在 process_manager.py、子应用 app.py、start_all.bat、测试文件中。
+**避免**: 修改端口前，先 `grep -rn "旧端口号" .` 找到所有硬编码位置，列清单逐个改。改完再 grep 确认无遗漏。
+
+## 3. PYTHONNOUSERSITE=1 全局生效导致所有 import 炸
+
+**现象**: `start_all.bat` 启动后报 `ModuleNotFoundError: No module named 'markupsafe'`，所有 Flask 导入失败。
+**根因**: `set PYTHONNOUSERSITE=1` 在 batch 文件第 4 行无条件执行。开发机用 `py -3` 时，flask 等依赖装在用户 site-packages（`AppData\Roaming\Python`），被这条禁用。
+**避免**: `PYTHONNOUSERSITE=1` 只在便携 Python 路径存在时才设置（客户包场景），回退到 `py -3` 时不禁用。
+
+## 4. 测试没跑 start_all.bat，只测了 py app.py
+
+**现象**: smoke 测试全过，但用户双击 `start_all.bat` 就崩。用户说"是不是你做的测试都是自欺欺人的"。
+**根因**: smoke 测试用 `py -3 app.py` 直接启动，绕过 batch 脚本的 PYTHONNOUSERSITE=1 问题。
+**避免**: 涉及启动方式的修改后，必须用 `start_all.bat` 实际跑一次。不能只依赖 pytest。
+
+## 5. Chrome 封禁端口 6000 没提前查
+
+**现象**: Release 版设端口 6000，Chrome/Edge 直接拒连 `ERR_UNSAFE_PORT`。用户说打不开。
+**根因**: Chrome 默认封禁包括 6000 (X11) 在内的几十个端口。没在选端口前查列表。
+**避免**: 选端口前确认不在 Chrome blocked ports 列表中（常见被封: 6000, 6665-6669, 2049, 3659, 4045 等）。或者优先用 5000/7000/8000/9000 这些已知安全的。
+
+## 6. 搞不清自己在哪个分支就改代码
+
+**现象**: 在 main 分支编辑 release 文件，或者在 release 分支改了 demo 的 index.html。切分支后才发现改错了。
+**根因**: 没有确认当前分支就开始编辑。
+**避免**: 每次编辑 `application/portal/` 下的文件前，先 `git branch` 确认。改完检查 `git diff --stat` 确认改的是预期的文件。
+
+## 7. Help 面板有 HTML/CSS 但没有 JS 绑定
+
+**现象**: Release 版"?"按钮点了没反应。HTML 有 `helpOverlay` 面板和 `toggleHelp` 按钮，但 JS 里完全没有 `addEventListener`。
+**根因**: 从 demo 同步 UI 时只复制了 HTML/CSS，漏了 JS 交互逻辑。
+**避免**: 涉及 UI 交互的新元素，必须三步都检查：（1）HTML 元素存在、（2）CSS 存在、（3）JS 事件绑定存在。用 Playwright 实际点一下验证。
+
+## 8. PowerShell Set-Content 写 JSON 带 BOM
+
+**现象**: 用 PowerShell 写 `update_config.json`，`update_check.load_config()` 静默失败回退到默认配置。mirror_url 始终为空，更新检测不工作。
+**根因**: `Set-Content -Encoding UTF8` 写入 UTF-8 with BOM。Python `json.load(encoding='utf-8')` 遇到 BOM 抛 `JSONDecodeError`，被 `try/except` 静默吞掉→用了默认空配置。
+**避免**:
+  - 写 JSON 用 `[System.IO.File]::WriteAllText($path, $json, [Text.UTF8Encoding]::new($false))` 避免 BOM。
+  - `update_check.py` 中所有 `json.loads(path.read_text(encoding="utf-8"))` 改为 `encoding="utf-8-sig"` 兼容 BOM。
+
+## 9. Commit 标题写"feat(release): port 6000-6004，有更新无下载"但实际没改代码
+
+**现象**: `1cda2bd` 标题声称完成了 release 分支切换，`git show --name-status` 却只看到测试文件和工作流被改——app.py/process_manager.py/start_all.bat/index.html 一个没动。
+**根因**: Edit 工具假成功（见错误 #1），加上提交前没有用 `git show --name-status` 验证。
+**避免**: commit 前执行 `git diff --cached --name-status` 或 `git show --name-status HEAD`，确认改动的文件列表与预期一致。标题和内容不符的 commit 必须 amend 或追加修复。
+
+## 10. 子应用反复重启——因为日志覆盖了错误输出
+
+**现象**: domain_capture 和 test_report 不断重启（12 次），但日志里只有 "Serving Flask app" 没有 traceback。
+**根因**: `stdout` 和 `stderr` 都重定向到同一个 log 文件，每次重启 `open(log_path, "a")` 追加。如果子 app 在 stdout 打印完 "Serving" 之后才崩溃，traceback 可能被缓冲或未及时 flush。
+**避免**: 子应用异常时，直接去子应用的 app.py 目录手动运行 `py -3 app.py` 看完整输出。log 文件不代表全部错误。
+
+## 11. 字体用了 DM Sans 而非 DESIGN.md 规定的 Inter
+
+**现象**: Header 和 body 用的 `font-family: 'DM Sans'`，DESIGN.md 的 typography 规定用 CursorGothic（替代 Inter）。
+**根因**: 直接从原来的框架 CSS 复制，没对照 DESIGN.md 检查字体。
+**避免**: 任何 UI 修改前读 DESIGN.md typography 段。字体、颜色、间距、圆角必须和 DESIGN.md token 一致。
+
+## 12. Header 背景白底而非 DESIGN.md 规定的 canvas
+
+**现象**: `.topbar { background: var(--surface) }` 即白色 #ffffff，DESIGN.md `top-nav` 组件规定背景 `{colors.canvas}` 即 #f7f7f4 暖奶油色。
+**根因**: 写 CSS 时习惯性用了 surface token，没对照组件规范。
+**避免**: 改 UI 组件前，先在 DESIGN.md 的 `components:` 段查对应的组件规范。
+
+## 13. 帮助面板内容写给开发者而非用户
+
+**现象**: 帮助面板里写 `git checkout release`、`py -3 tools/build_release.py`、`pytest` 等开发命令。这是面向运维人员的工具，他们不需要知道 git。
+**根因**: 我作为 AI 开发者的视角写文档，没有切换到终端用户（网络运维工程师）的视角。
+**避免**: 写面向用户的文字前问自己：终端用户是谁（运维工程师）、他们需要知道什么（怎么生成配置、怎么梳理拓扑）、他们不需要知道什么（git、pytest、打包命令）。
+
+## 14. 切分支后 pycache 导致跑旧代码
+
+**现象**: 改了 app.py 但 portal 启动后还是旧行为（端口、import 都不对）。
+**根因**: `__pycache__/*.pyc` 字节码文件比源码时间戳新，Python 直接用缓存跳过源码。
+**避免**: 切分支后、改代码后，先删 `__pycache__` 再启动。或者在测试前统一 `find . -name __pycache__ -exec rm -rf {} +`。
+
+## 15. 打 zip 时忘了自己在哪个分支
+
+**现象**: 在 main 分支跑 `build_release.py` 打包，zip 里是 demo 版代码（没有 update_check import）。客户解压后 release 功能全废。
+**根因**: 打包前没确认 `git branch`。
+**避免**: 发布打包流程：先 `git checkout release`，确认 `git branch`，确认测试通过，再跑 `build_release.py`。
+
+## 16. v1.0.1 manifest 没给 download_url，客户点不动"立即升级"
+
+**现象**: release 第一版 `/api/update/manifest` 只返回 `version / release_url`，前端 JS 严守"必须有 download_url 才允许升级"的规则，导致客户能看到提示却点不动按钮。
+**根因**: 原始设计里 download_url 由 GitHub release asset 提供，切到内网 mirror 后没补 zip 下载端点。
+**避免**: 升级链路必须 4 步走通才算完成——`/api/update/check` → `/api/update/manifest`（含 download_url）→ `/api/update/download/latest.zip` → `/api/update/upgrade`。新加 `application/portal/test_update_manifest.py` 锁住该不变量。
+
+## 17. build_release 重复打包 runtime/ 与 RELEASE_INFO.json
+
+**现象**: 构建日志满屏 `UserWarning: Duplicate name: '帮你节省5分钟/runtime/...'` 和 `'帮你节省5分钟/RELEASE_INFO.json'`。
+**根因**: 源码 walk 没排除 `runtime/`，runtime 又被 `collect_runtime_files` 单独收一遍；根目录 `RELEASE_INFO.json` 也没在 EXCLUDE_FILE_GLOBS，构建末尾再 `writestr` 一次。
+**避免**: `EXCLUDE_DIR_NAMES` 必含 `"runtime"`，`EXCLUDE_FILE_GLOBS` 必含 `"RELEASE_INFO.json"`。`tools/test_build_release.py` 现在已经锁住这两个不变量，禁止再放回去。
+
+## 18. 过早宣称"v1.0.1 主备 mirror 已生效"，本机端到端没跑
+
+**现象**: 打包并 push v1.0.1 之后，本机 portal `/api/update/check` 实际返回 `config_error`（页面显示"无法检查更新"）。
+**根因**: `--mirror-url` 只把主备源写入**客户包内**的 `update_config.json`；仓库根的同名文件仍是空 `mirror_urls`。本地运行 portal 用的是仓库版本，不是客户包内的版本。
+**避免**: 改 update / manifest / build 链路时，必须 `curl /api/update/check?force=1` 拿到 `status: ok` 才能宣称"修好了"。开发机 portal 与客户包是**两份**配置，必须分别维护。
+
+## 19. 开发机 portal 标题显示老版本（1.0.0），但客户包是 1.0.1
+
+**现象**: 已发布 v1.0.1，客户包 `RELEASE_INFO.json` 是 1.0.1，但本机启动 portal 顶部显示 `v1.0.0`。
+**根因**: 仓库根 `RELEASE_INFO.json` 是开发机运行时读的版本来源，构建脚本只往 zip 里写新值，不动源仓库的旧文件。
+**避免**: 发新版必同步**三件**——客户包内的 RELEASE_INFO（构建写入）、仓库根 `RELEASE_INFO.json`（手工同步）、`application/portal/update_config.json`（手工填 mirror_urls）。
+
+## 20. PowerShell 用 bash heredoc 提交 commit，整个命令报 ParserError
+
+**现象**: `git commit -m "$(cat <<'EOF' ... EOF)"` 在 PowerShell 直接 `MissingFileSpecification`，commit 没生成。
+**根因**: PowerShell 不解析 `$(...)` 子 shell，不识别 `<<` heredoc 语法。
+**避免**: 写 commit message 一律用 `@'...'@` here-string + `Out-File -Encoding utf8` 写到临时文件，再 `git commit -F .commit_msg.tmp` + `Remove-Item .commit_msg.tmp`。
+
+## 21. 写 commit message 留了 UTF-8 BOM，commit 标题首字符变隐形
+
+**现象**: commit `7983679` 在 `git log --oneline` 看着像 `7983679 ﻿fix(release): ...`，subject 实际首字节是 `EF BB BF`（BOM）。
+**根因**: 用 `Set-Content -Encoding UTF8` 写 commit message 文件，PowerShell 5.x 默认带 BOM。
+**避免**: 写完 commit message 文件用 `Format-Hex` 看头三字节，确认是真正内容字节而不是 `EF BB BF`。优先用 Python 写文件。
+
+## 22. 验证 portal 首页用 Invoke-WebRequest 30s 超时
+
+**现象**: 改完 release 标题想看效果，`Invoke-WebRequest http://127.0.0.1:7000/` 卡住到超时退出。
+**根因**: portal `/` 路由会同步遍历所有 sub-app 端口做健康检查，子应用慢/未起就拖死首页。
+**避免**: 验证模板渲染内容（如标题版本号）用 Flask test client：`app.app.test_client().get("/")`。要看真实 HTTP 行为再起服务。
+
+## 23. 中文 Content-Disposition 用 endswith 断言，全部失败
+
+**现象**: 写下载端点测试时断言 `disposition.endswith('filename="帮你节省5分钟-1.0.1.zip"')` 一直失败，实际值是 `attachment; filename=5-1.0.1.zip; filename*=UTF-8''%E5%B8%AE...`。
+**根因**: Werkzeug 按 RFC 5987 输出，非 ASCII 文件名走 `filename*=` 编码，ASCII fallback 名字会被裁。
+**避免**: 文件下载断言一律走 RFC 5987：`f"filename*=UTF-8''{quote('帮你节省5分钟-1.0.1.zip')}" in disposition`。
+
+## 24. update_check.py 的错误文案没提 mirror_urls
+
+**现象**: 配置缺失时返回 `"未配置 github_repo 或 mirror_url"`，用户照着文案找 mirror_url 字段，但实际我把 schema 改成了 `mirror_urls`（list），用户去找新字段名找不到。
+**根因**: 改 schema 时只动了实现，没同步错误文案。
+**避免**: 改任何 config schema 时，同步搜全仓库 `rg <旧字段名>`，特别是 error message / 文档。
+
+## 25. 给 mistake.txt 与 memory/ 选了不同载体，跨分支同步失败
+
+**现象**: 我在 main 分支磁盘上把 9 条新错误追加到 log/mistake.txt 后 commit 了"git rm --cached"删除该文件。然后 git checkout release，磁盘上的 24 条被 release tracked 版本（15 条）覆盖，新追加内容丢失。
+**根因**: 没意识到 git checkout 在切换分支时会用目标分支 tracked 的版本覆盖工作树。在 mistake.txt 转 local-only 之前先在 main 编辑了它。
+**避免**: 把一份共享文档转成 local-only 时，第一步必须是先在所有相关分支都加 `.gitignore` + `git rm --cached` + commit；之后才允许写入新内容。否则磁盘版本会被另一个分支的 tracked 版本覆盖。
+
+## 26. 客户 portal 与 mirror 共享 7000 端口，同台机器自我 loopback 必失败
+
+**现象**: 用户解压 v1.0.1 zip 到桌面跑客户 portal（监听 0.0.0.0:7000），update_config 备源是 `http://192.168.5.10:7000/api/update/manifest`，但本机 IP 就是 5.10，于是 5.10:7000 = 客户自己。客户 portal 的 `/api/update/manifest` 扫本地 dist/，但客户包不含 dist/（构建脚本就要排除），返回 404，被 update_check 视为 mirror 失败。两源全失败 → `status: network_error` → "无法检查更新"。
+**根因**: 架构混淆——客户 portal 同时承担"使用更新源"与"提供更新源"两个角色，共享 7000 端口。同台机器只能一个进程，客户和 mirror 必然冲突；即便不冲突，客户的 manifest 本身没数据可服务。
+**避免**: mirror 必须是独立服务，独占自己端口（现选 8000），由 dev 机器上的 `tools/serve_mirror.py` 跑。客户 portal 删除 `/api/update/manifest` 与 `/api/update/download/latest.zip` 路由——客户只是 mirror 的 consumer，不再是 provider。验证时端到端起一份解压客户 + 一份独立 mirror，看 `/api/update/check?force=1` 必须返回 `status: ok` 才算修好。
+
+## 27. 改 BUNDLE_NAME 时忘了同步 upgrade.py 里硬编码的 _BUNDLE_NAME
+
+**现象**: build_release.py 改 BUNDLE_NAME 后客户解压目录变了，但 upgrade.py 里的 `_BUNDLE_NAME = "帮你节省5分钟"` 没改，会导致升级时备份/恢复路径错位、新版本启动指向不存在的目录、bat 模板里的 `{bundle}` 替换错误。
+**根因**: 同一概念在两处独立硬编码（build_release.BUNDLE_NAME 与 upgrade._BUNDLE_NAME），改一处忘改另一处。
+**避免**: 改 BUNDLE_NAME 时全仓库 `rg "帮你节省5分钟"` 列出所有命中点，逐个评估是文案、构建产物名还是 upgrade 路径前缀，一次性同步。注意：改名带来一次"v1.0.0 客户首次升级到新名字"的迁移问题（旧目录不会被覆盖、需手动删），从新名字开始才一致。
+
+## 28. IPSec UI 按钮放进了 er5-panel-hk-us 共用面板，HK 也跟着出现按钮
+
+**现象**: ER 5.0 IPSec 隧道类型按钮（OpenVPN/IPSec）放在 `<div id="er5-panel-hk-us">` 内，HK 与 US 共用同一个面板，导致选 HK 时也能看到 IPSec 按钮，而 HK IPSec 还没实现。
+**根因**: 用 panel 复用结构装专属 us 的控件，没有在 showNetPanel 里按 variant 单独控制 `.er5-tunnel-type` 显隐；同时 getER5TunnelType 直接读 radio，切到 HK/4.0/flink 后 radio 仍可能是 ipsec，发请求时携带脏 tunnel_type。
+**避免**: 控件可见性必须在 panel 切换函数（showNetPanel）里按 (tool, version, variant) 三元组明确判定，而不是依赖 panel 嵌套；getter 同步加防御逻辑：上下文不允许时直接返回安全默认值，且把 radio 强制重置以避免脏状态。
+
+## 29. 默认路由 next-hop 把 0.0.0.0/0 写成 wan_gw，黑洞触发条件错位
+
+**现象**: IPSec/OpenVPN 模板里 `set protocols static route 0.0.0.0/0 next-hop {wan_gw} distance '220'` + `set protocols static route 1.1.1.1/32 next-hop {wan_gw}`。这等于把 0/0 和 1.1.1.1 都直接指向 WAN 网关，绕过了"黑洞触发器"的设计意图。
+**根因**: 不熟悉这套配置的语义就推断 next-hop 都用同一个值。线网原始 VyOS 是 `0.0.0.0/0 next-hop 1.1.1.1 distance 220`（distance 较高的备选默认路由，且 1.1.1.1 这个伪 IP 必须再被 1.1.1.1/32 → wan_gw 的另一条静态路由解析）——这是一种刻意制造的"必须有 wan_gw 才能用 default route"的依赖链路，触发条件解耦。
+**避免**: 改任何 production VyOS 路由块前，先把原始线网 6-8 条相关 set 语句完整对照一遍；遇到看似冗余的中间跳（1.1.1.1/32 → wan_gw）不要"优化"，那是 trigger 设计的一部分。
+
+## 30. 模板自定义只做扁平下拉，新增的 IPSec 模板加不进去也找不到
+
+**现象**: 「我来定模板」用 `<select>` 单层下拉展示 _SCENARIO_LIST 全部 25 条；后续加 ER 4.0/5.0 IPSec 模板时，要么和 OpenVPN 同名混淆，要么只能拼接长串 key（"Epoch FastIP 5.0 · 非香港出口 · IPSec"），用户在 25 项里翻找。
+**根因**: 数据结构与 UI 一对一映射成扁平 list；新增子分支（OpenVPN/IPSec、4.0/5.0）只能往 key 里继续叠 `·` 分隔的层级。
+**避免**: 一开始就建立独立的 `_SCENARIO_TREE` 树形元数据 + `_scenario_tree_leaf_keys + _validate_scenario_tree` 启动期校验（保证树叶子和扁平 list 不漂移），UI 用级联下拉。新增 IPSec 这种正交维度时，只在树里加节点，扁平 list 也补一行，叶子 key 仍然是稳定字符串便于 disk alias / example 映射。
+
+## 31. cascade menu 从引入第一天就有 bug，API 测试全过但用户看不到
+
+**现象**: 「我来定模板」的 cascade menu 场景选择完全空白，4 个一级菜单项（Epoch FastIP / USG FastIP / Epoch MPLS / AR SD-WAN）都不显示。API 测试 16 个全绿。
+
+**根因（两个 bug）**:
+  1. `#tpl-col1` 同时是 `class="cascade-col"`，`_renderCascadeCol` 在它内部创建新的 `<ul class="cascade-col">` 放 level-1 菜单项。CSS `.cascade-col .cascade-col { display:none }` 把 level-1 永久隐藏，且 hover 规则只匹配 `<li>` 直系子元素，level-1 `<ul>` 不在 `<li>` 内，永无法被触发。
+  2. `.cascade-col { overflow:hidden }` 把 `position:absolute; left:100%` 的子菜单裁剪掉——子菜单延伸到父容器右边框外就不可见。这个 `overflow:hidden` 原本是为了配合 `border-radius:var(--rp)`（9999px pill 形状），但和 cascade 子菜单的绝对定位矛盾。
+
+**修复**:
+  1. 从 `#tpl-col1` 移除 `cascade-col` class → 改为普通 `<ul>` 容器
+  2. `.cascade-col` 的 `overflow:hidden` → `overflow:visible`，`border-radius:var(--rp)` → `var(--rm)` (8px)
+
+**避免**:
+  1. 任何 UI 重构后，必须有至少一个 Playwright/browser-based 测试验证渲染结果——API 测试不能替代视觉验证。
+  2. CSS 后代选择器要注意根元素是否也有同一个 class——会误伤第一级子项。
+  3. `overflow:hidden` + `border-radius` pill 形状的组合与 absolutely positioned sub-menus 矛盾，设计级联菜单时不能同时使用。
+
+## 32. 全局 *.docx 排除误删了测试报告的合法模板
+
+**现象**: 客户下载 v1.0.2 后，测试报告功能报读取不到模板。
+**根因**: build_release.py 的 EXCLUDE_FILE_GLOBS 加了 "*.docx" 全局排除，
+  但 自动做测试报告/script/ 下的 FASTIP-测试报告.docx 是该应用的合法 Word 模板，
+  被全局规则误伤。
+**避免**:
+  1. 任何全局文件排除规则，必须先  确认所有命中点，
+     区分测试垃圾和应用合法文件。
+  2. 排除应尽量精确到路径（如 application/自动做测试报告/data/*/screenshots/）
+     而非全局 glob（*.docx）。
+  3. 修改 build_release.py 后必须解压 zip 验证全部 4 个子应用功能正常。
+
+## 33. `text.replace("5001", "7001")` 误伤 `chcp 65001` → `chcp 67001`
+
+**现象**: 客户解压 release zip 后运行 start_all.bat，中文全是乱码。反复出现多次。
+**根因**: `_apply_release_ports()` 用 `text.replace("5001", "7001")` 做简单字符串替换。
+`chcp 65001` 中的 `5001` 被替换为 `7001`，变成 `chcp 67001`（无效 codepage）。
+控制台回退到默认 GBK 编码，UTF-8 bat 文件的中文全部乱码。
+
+同样的 bug 存在于所有端口替换："5000"→"7000" 会误伤 "15000"→"17000" 等。
+
+**修复**: 用 `re.sub(r"\b" + old + r"\b", new, text)` 做单词边界匹配，
+"5001" 作为独立数字才替换，`65001` 内部的 `5001` 不受影响。
+
+**避免**:
+  1. **永远不要用简单 str.replace 做数字替换** — 必须用正则 `\b` 边界。
+  2. 端口替换后必须解压 zip，打开 bat 验证 `chcp` 行未被破坏。
+  3. 举一反三：任何文件中只要出现 500x 数字（URL、端口、编码值……），
+     str.replace 都可能误伤。对所有 `_RELEASE_PORT_FILES` 中的文件，
+     应 review 是否有非端口的 500x 数字。
+  4. 在 build_release.py 中加入 smoke 校验：构建完成后解压 zip，
+     检查 start_all.bat 中 `chcp 65001` 存在且 `chcp 67001` 不存在。
+
+## 34. updateBanner 放在 </html> 之后，JS 拿不到 DOM 元素
+
+**现象**: 更新检查 API 返回 `has_update: true`，但页面横幅永远不显示。
+更新按钮点击后始终显示"检查失败，点击重试"。
+根因: `document.getElementById('updateBanner')` 返回 `null`。
+
+**根因**: `updateBanner` div 放在 `</html>` 之后。浏览器解析到 `</html>` 后
+停止解析，之后的元素可能不被加入 DOM。即使浏览器容错将元素移入 body，
+`<script>` 标签在 banner 之前，IIFE 执行时 `document.getElementById` 尚未
+看到 banner 元素。`updateBanner`/`updateBannerVer`/`updateBannerLink` 变量
+在 IIFE 执行时全为 `null`。后续 `showUpdateBanner` 访问 `null.textContent`
+抛出 TypeError，被 `.catch()` 吞掉，按钮显示错误状态。
+
+**修复**:
+  1. `updateBanner` div 移到 `<script>` 标签**之前**，确保 IIFE 执行时 DOM 已存在
+  2. 移除 `</html>` 之后的旧 banner
+
+**避免**:
+  1. **任何被 JS 操作的 DOM 元素必须在 `<script>` 之前定义**（或使用 DOMContentLoaded）
+  2. 绝对不要将元素放在 `</html>` 之后
+  3. `document.getElementById` 结果必须判空，空值时有明确的 console.error
+  4. 举一反三：检查 index.html 中所有在 `</html>` 之后的元素（历史遗留问题）
+
+## 35. 用 RELEASE_MODE=1 在 5000 端口测试 release 版本
+
+**现象**: 测试 `RELEASE_MODE=1` 页面效果时，portal 仍监听 5000 端口。
+正式版和 demo 版混在同一个端口上，测试结果不可信——5000 端口
+不是客户实际看到的 release 版本。
+
+**根因**: `app.py` 中 `app.run(port=5000)` 是写死的，RELEASE_MODE 只改变
+模板文字（"正式版"/"demo试用版"），不改变端口。端口只依赖构建时替换。
+但 release 版本的核心特征之一就是端口 7000。
+
+**修复**: `app.py` 和 `process_manager.py` 在运行时根据 RELEASE_MODE 切换端口：
+  - RELEASE_MODE=1 → portal: 7000, sub-apps: 7001-7004
+  - 无 RELEASE_MODE → portal: 5000, sub-apps: 5001-5004
+  - sub-app 的端口通过命令行参数传入（`app.py <port>`）
+
+**避免**:
+  1. 测试 release 功能必须在 7000 端口进行，不允许在 5000 测试 release
+  2. RELEASE_MODE=1 必须是完整的环境切换（端口+模板+功能），不只改文字
+  3. 构建后的 zip 解压验证必须在 7000 端口进行
+  4. 所有 release 测试必须明确标注端口为 7000
+
+## 36. bat 用 chcp 65001 + 中文 — 客户控制台乱码；mirror 没开导致更新检查失败
+
+**现象 1**: 客户双击 start_all.bat，echo 中文全是乱码。
+  即使 chcp 65001 正确执行，部分 Windows 终端字体不支持 CJK，仍乱码。
+
+**现象 2**: 客户端（demo 或 release）点击更新检查 → "网络错误，无法检查更新"。
+  根因: tools/serve_mirror.py 没有运行。更新检查依赖 mirror 服务器
+  （端口 8000）提供 manifest 和 zip 下载。mirror 关闭 → 所有 mirror URL
+  不可达 → status=network_error。
+
+**修复**:
+  1. bat 文件改为纯 ASCII（英文 echo），彻底消除编码问题。移除 chcp 65001。
+  2. 每次需要测试更新功能前，先启动 mirror: `py tools/serve_mirror.py --port 8000`
+
+**避免**:
+  1. **bat 文件只用纯 ASCII** — 英文 echo，不依赖任何 codepage
+  2. 测试更新/下载功能前，确认 mirror 服务正在运行
+  3. demo 版也需要运行 mirror（否则 update check 全部失败）
+  4. 举一反三：所有面向客户的文本文件应优先使用纯 ASCII，
+     避免中文编码在不同 Windows 版本上的兼容问题
+
+## 37. 更新测试端到端流程 — 仅测了 API 没测真客户端
+
+**现象**: 用 `curl /api/update/check` 测试返回 `has_update: true`，
+  就声称"更新可用"。但 Playwright 测试用的是源码目录的 portal
+  （RELEASE_INFO 可能是 1.0.5 / 1.0.6 混用），不是从 zip 解压的真正客户环境。
+
+**根因**: 更新流程涉及 4 个独立组件：mirror 服务器、客户包内 RELEASE_INFO、
+  update_config.json 配置、Portal 模板 JS。只测 API 只能验证后端的
+  update_check 逻辑，无法验证完整链路（bat 启动 → 端口 → 版本号 → 模板
+  → JS → 横幅）。
+
+**正确的端到端测试流程**:
+  1. 构建 v1.0.5 和 v1.0.6 两个 zip → dist/
+  2. 启动 mirror: `py tools/serve_mirror.py --port 8000`
+  3. 解压 v1.0.5 → 临时目录（模拟客户下载）
+  4. 用包内 Python 启动: `runtime/python/python.exe application/portal/app.py`
+  5. 验证: 端口=7000, GET /api/update/check?force=1 → has_update=True
+  6. Playwright 打开 http://localhost:7000 → 横幅 "v1.0.6"
+  7. 验证: 零 console 错误
+
+**避免**:
+  1. 更新功能测试必须在 UNZIPPED 包上运行，不能依赖源码目录
+  2. mirror 必须在更新测试前启动
+  3. 每次发版前必须跑完整端到端更新流程
+  4. 这个流程应作为 CI/CD 的一环，不应手工执行
+
+## 38. Release 侧栏用了下载卡片 (dlCard) 而非更新卡片 (upgradeBtn)
+
+**现象**: release 版（7000 端口）左下角显示"下载完整应用 v1.0.5"，
+  与 demo 版完全一样。客户看不到更新入口。
+
+**根因**: 模板中 sidebar 底部的 dlCard（下载卡片）和 upgradeBtn（更新卡片）
+  没有按版本条件渲染。`{% if is_release %}` 只控制了 header 按钮和横幅，
+  但 sidebar 控制和 JS 没有对应分离。
+
+**修复**:
+  1. sidebar: `{% if is_release %}` → upgradeBtn，`{% else %}` → dlCard
+  2. JS: dlCard 代码用 `{% if not is_release %}` 包裹
+  3. JS: upgradeBtn 代码用 `{% if is_release %}` 包裹，含 5 态按钮状态机
+  4. CLAUDE.md 写清两个版本的完整交互流程
+
+**避免**:
+  1. 任何 UI 元素添加时必须同时考虑 demo 和 release 两个版本
+  2. dlCard ↔ upgradeBtn 互斥，不会同时出现在一个页面上
+  3. 每次修改 sidebar 或 footer 区域，必须两个版本都验证
+
+## 39. USG CE ping 命令不加 sudo —— 用户之前说过，但我忘记了
+
+**现象**: USG 的 CE ping 命令是 `ping -c 500 -s 64 -m 1 <ip>`，没有 `sudo`。用户之前明确告诉过我，但我在修改 make_report.py 时只看了 ER 的 `sudo ping`。
+
+**根因**: 没有建立记忆/检查清单。同一个问题被用户重复告知。
+
+**避免**:
+  1. 已写入 memory: `ce-sudo-minus-s` — 所有 CE 命令必须 `sudo -S`
+  2. 修改 `build_ce_commands()` 时必须同时改 ER 和 USG 两个分支
+  3. 修改后对照 `assert_ce_cmd_allowed()` 确认 regex 匹配
+
+## 40. `sudo` 不加 `-S` —— paramiko 无 TTY，密码无法注入
+
+**现象**: ER 命令是 `sudo ping ...`（无 `-S`），`ssh_exec_ce()` 的密码注入检查 `if "sudo -S" in cmd` 永远 False，sudo 在非交互式 SSH channel 中读取密码失败。
+
+**根因**: 不知道 paramiko `exec_command()` 不分配伪终端（PTY）。`sudo` 默认从 TTY 读密码，无 TTY 时必须有 `-S` 从 stdin 读取。
+
+**避免**:
+  1. 所有 CE sudo 命令必须是 `sudo -S`（不是 `sudo`）
+  2. `ssh_exec_ce()` 依赖 `-S` 标记来注入密码，不允许 `sudo` 不带 `-S`
+  3. 写 SSH 相关代码前先了解 paramiko channel 的 TTY 行为
+
+## 41. USG ping 参数顺序 —— 猜的，没问用户
+
+**现象**: 我把 USG ping 写成 `sudo -S ping -c 500 -s 64 -m 1`，用户纠正为 `sudo -S ping -s 64 -c 500 -m 1`。`-s` 在前、`-c` 在后。
+
+**根因**: 猜测命令格式，没有基于用户提供的真实命令行输入。用户明确给了格式 `ping -s 1500 -c 500 -m 1 223.5.5.5`。
+
+**避免**:
+  1. 命令格式必须从用户输入或文档获取，不允许猜测
+  2. 全局 Rule 1: 禁止猜测，不确定时停下来问
+
+## 42. 构建发布包忘记 `--mirror-url`
+
+**现象**: v1.1.1 第一次构建没用 `--mirror-url`，客户包内 `mirror_url` 为空。用户明确要求用 72.219 和 5.10 的 8000 端口。
+
+**根因**: 没有默认 mirror URL 配置记忆。
+
+**避免**:
+  1. 已写入 memory: `mirror-urls` — 主 mirror: `http://192.168.72.219:8000/api/update/manifest`，备 mirror: `http://192.168.5.10:8000/api/update/manifest`
+  2. 每次 build_release.py 必须带 `--mirror-url` 参数
+  3. 构建后验证 zip 内 `update_config.json` 的 `mirror_url` 不为空
+
+## 43. Mirror 服务没启动，用户无法检测更新
+
+**现象**: 用户启动 portal (7000) 后"无法检测更新"。`192.168.5.10:8000` 返回 Connection refused。
+
+**根因**: portal 和 mirror 是两个独立进程。portal (端口 7000/5000) 是更新 consumer，mirror (端口 8000) 是更新 provider。只启动 portal 不会自动启动 mirror。历史错误 #26 已经记录过这个架构混淆。
+
+**避免**:
+  1. 测试更新功能前，必须先启动 mirror: `py tools/serve_mirror.py --port 8000`
+  2. 验证 mirror 在线: `curl http://127.0.0.1:8000/api/update/manifest`
+  3. mirror 必须在客户可访问的 IP 上运行（5.10 或 72.219）
+
+## 44. ER 5.0 IPSec 模板遗漏 zabbix 路由 + firewall whitelist
+
+**现象**: `TEMPLATE_EPOCH5_US_IPSEC` 缺少 `114.113.245.99/100` 静态路由和 firewall whitelist。ER 4.0 和 ER 5.0 OpenVPN 版本都有，只有 IPSec 版本漏了。
+
+**根因**: 从 OpenVPN 复制模板到 IPSec 时没有逐条对照差异。没有在新增变体时做完整的字段级 diff。
+
+**避免**:
+  1. 新增模板变体时，必须和已有的同类型模板做逐行 diff
+  2. 举一反三: 每次修复模板 bug，同时检查 IPSec 和 OpenVPN 两个变体
+  3. 所有模板必须包含相同的核心路由: zabbix 探测 (114.113.245.99/100)、跳板机 (192.168.55.250)、内网段
+
+## 45. 让用户自己排查问题，而不是主动诊断
+
+**现象**: 用户报"域名抓取 502"，我回了三个排查命令让用户自己跑。用户说"你自己检查啊"。
+
+**根因**: 我在本地 curl 127.0.0.1 看到正常就下结论。但其实用户机器在 192.168.5.10，我可以直接 curl 过去诊断。应该先主动排查，确认根因后再告诉用户。
+
+**避免**:
+  1. 用户反馈问题 → 先直接访问用户机器排查（如果能连通）
+  2. 排查完再告诉用户结论和修复步骤
+  3. 不要让用户当"手"去执行诊断命令
+
+## 46. v1.1.2 zip 内 start_all.bat 有 chcp 65001 + 中文注释 — main/release 分支 bat 不同步
+
+**现象**: v1.1.2 客户 zip（release 分支构建）的 start_all.bat 包含 `chcp 65001` 和中文注释，
+  而 main 分支的 start_all.bat 早已清理为纯 ASCII。构建验证时只检查了 "chcp 67001 不在 bat 中"，
+  没有检查 "chcp 65001 不在 bat 中"，导致这个错误漏过。
+
+**根因**: main 和 release 的 start_all.bat 是两个独立文件，内容不同（main 用 RELEASE_MODE + proxy URL，
+  release 用直接端口）。main 的 bat 修复后没有同步到 release。构建后的自动验证只查了误伤（67001）没查残留（65001）。
+  且之前的"全量测试"只检查了 chcp 67001 不在，没有主动检查 chcp 65001（应该把 65001 也视为 bug，因为它已被 mistake #36 判决移除）。
+
+**避免**:
+  1. 任何文件修改后，必须确认 main 和 release 两个分支是否都有同名文件需要同步修改
+  2. 构建验证必须同时检查: chcp 65001 不在 bat 中（已移除的编码 hack）+ chcp 67001 不在 bat 中（端口替换误伤保护）
+  3. bat 文件验证规则：纯 ASCII，零中文，零 chcp
+  4. 举一反三：检查 release 分支其他文件（所有 .bat、.py、.html）是否有同类 main/release 不同步问题
+
+## 47. upgrade.py URL 编码问题 — 中文下载 URL 导致 urllib UnicodeEncodeError
+
+**现象**: 客户点升级按钮后，portal API 返回 500。日志显示 `UnicodeEncodeError: 'ascii' codec can't encode characters`。
+
+**根因**: mirror 的 download_url 包含中文 bundle 名（如 "帮你节省5分钟-release-1.1.2.zip"），
+  而 urllib.request 的 HTTP 请求不支持非 ASCII URL。URL 路径中的中文字符无法被 ASCII 编码。
+
+**修复**: _download_with_progress() 在发起请求前，用 urllib.parse.quote() 对 URL 路径段逐个编码。
+
+**避免**: 所有涉及 URL 下载的代码必须考虑非 ASCII 字符。urllib 不支持 raw Unicode URL。
+
+## 48. upgrade.py PermissionError — 残留 zip 文件被锁定
+
+**现象**: 两次连续升级时，第二次报 `PermissionError: [WinError 32]` on `__update__.zip`。
+  第一次升级下载的 zip 文件句柄未释放，第二次尝试 unlink() 失败。
+
+**修复**: unlink(missing_ok=True) 只处理 FileNotFoundError，不处理 PermissionError。
+  增加 try/except PermissionError 包装。
+
+**避免**: Python 文件操作必须同时考虑 FileNotFoundError 和 PermissionError。missing_ok 参数只解决"文件不存在"。
+
+## 49. make_report.py subprocess 继承了 stdin TTY → 非交互模式下 input() 阻塞崩溃
+
+**现象**: 测试报告在 web 页面点击"开始生成报告"后，CE ping 测试失败时
+make_report.py 崩溃：`EOFError: EOF when reading a line`。
+触发链：ping 失败 → code != 0 → `sys.stdin.isatty()` 返回 True
+（因为 subprocess 继承了 flask 进程的 stdin，而 flask 是从终端启动的）
+→ `ask_on_failure()` → `input()` → 但 subprocess 的 stdin 已经被占用 → EOFError。
+
+**根因**: `run_task_loop` 和 `ask_on_failure` 只检查 `sys.stdin.isatty()`
+来判断是否交互模式，没有检查 `--no-manual-pause` 标志。
+而 web app 通过 `subprocess.Popen` 启动 make_report.py 时，stdin 默认从
+父进程继承（父进程如果是 terminal 启动的，isatty() 就返回 True）。
+
+**修复**:
+  1. 添加 `_INTERACTIVE` 全局标志，当 `--no-manual-pause` 或 `--smoke` 时设为 False
+  2. `run_task_loop` 和 `ask_on_failure` 的 isatty 检查增加 `and _INTERACTIVE`
+  3. app.py 的 Popen 增加 `stdin=subprocess.DEVNULL` 作为额外防护
+
+**避免**:
+  1. 任何用于 web 后台的 subprocess 必须同时设置 `stdin=subprocess.DEVNULL`
+  2. 非交互标志不应只依赖 `sys.stdin.isatty()`，必须传参或设环境变量
+  3. 举一反三：检查项目所有 subprocess.Popen 调用，确认 stdin 已重定向
+
+## 50. 移动一次性测试产物后没删除
+
+**现象**: 把 `.test_upgrade_bat_tmp`、`.test_upgrade_playwright`、`.customer_test` 从根目录移到 `temp/` 后，测试生成的旧文件（bat、zip、log 等）仍然留在 temp 子目录里。这些都是过往测试跑出来的垃圾，不是"需要保留的数据"。
+
+**根因**: 只做了 mv 操作，没意识到 mv 只是换位置，内容仍是垃圾。一次性测试产物的生命周期：测试跑 → 产生 → 测试结束就没有保留价值。
+
+**避免**:
+  1. 移入 `temp/` 目录的一次性文件必须立即删除（`rm -rf temp/*`）
+  2. `temp/` 是运行时测试的工作目录，git 里只保留 `.gitkeep` 占位
+  3. 区分两类 temp 内容：**测试运行时产生**的子目录（一次性，不保留）和**测试代码本身**（在 `application/test/`，永久保留）
