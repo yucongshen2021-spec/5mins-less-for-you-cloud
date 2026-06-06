@@ -72,9 +72,11 @@ credentials.json
 .update_cache.json
 **/.update_cache.json
 
+# ---- 临时测试运行产物 ----
+temp/
+
 # ---- AI 助手错误记录（仅本机维护，不进 git）----
 mistake.txt
 **/mistake.txt
 log/mistake/
 **/log/mistake/
-.test_e2e_tmp/

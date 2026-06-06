@@ -26,7 +26,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DIST_DIR = PROJECT_ROOT / "dist"
 MIRROR_SCRIPT = PROJECT_ROOT / "tools" / "serve_mirror.py"
-TEMP_ROOT = PROJECT_ROOT / ".customer_test"
+TEMP_ROOT = PROJECT_ROOT / "temp" / "customer_test"
 
 MIRROR_PORT = 8000
 CUSTOMER_PORT = 7000

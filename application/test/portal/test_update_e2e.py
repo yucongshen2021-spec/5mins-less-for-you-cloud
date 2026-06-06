@@ -29,7 +29,7 @@ DIST_DIR = PROJECT_ROOT / "dist"
 BUILD_SCRIPT = PROJECT_ROOT / "tools" / "build_release.py"
 MIRROR_SCRIPT = PROJECT_ROOT / "tools" / "serve_mirror.py"
 PORTAL_APP = PROJECT_ROOT / "application" / "portal" / "app.py"
-TEMP_ROOT = PROJECT_ROOT / ".test_e2e_tmp"
+TEMP_ROOT = PROJECT_ROOT / "temp" / "test_e2e"
 
 MIRROR_PORT = 8000
 DEMO_PORT = 5000

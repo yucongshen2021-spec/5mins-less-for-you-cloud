@@ -52,7 +52,7 @@ EXCLUDE_DIR_NAMES = {
     "log", "logs",
     "test", "tests", "test_html_refactor",
     "测试用例",
-    "agent-transcripts", "plan",
+    "agent-transcripts", "plan", "temp",
     "editor_workspace",  # 用户工作区 → 客户应拿到工厂态
     "screenshots",  # 测试截图 — 客户包绝不应含图片
     "raw",  # 测试原始数据

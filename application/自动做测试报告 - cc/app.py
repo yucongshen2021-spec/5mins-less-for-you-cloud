@@ -14,9 +14,7 @@ app = Flask(__name__, template_folder="web/templates", static_folder="web/static
 
 CURRENT_DIR = Path(__file__).resolve().parent
 ROOT = CURRENT_DIR
-# 项目根（start_all.bat 所在目录）：向上两级（application/.. → 项目根）
-_BUNDLE_ROOT = ROOT.parent.parent
-REPORT_DIR = _BUNDLE_ROOT / "report"
+REPORT_DIR = ROOT / "report"
 SCRIPT = ROOT / "src" / "make_report.py"
 ENGINE_EXE = ROOT / "src" / "make_report.exe"
 

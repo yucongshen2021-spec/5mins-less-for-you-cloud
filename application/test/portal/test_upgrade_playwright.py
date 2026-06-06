@@ -23,7 +23,7 @@ DIST_DIR = PROJECT_ROOT / "dist"
 CUSTOMER_VERSION = "1.1.7"
 NEW_VERSION = "1.1.9"
 
-TEMP = PROJECT_ROOT / ".test_upgrade_playwright"
+TEMP = PROJECT_ROOT / "temp" / "test_upgrade_playwright"
 MIRROR_PORT = 8000
 PORTAL_PORT = 7000
 
