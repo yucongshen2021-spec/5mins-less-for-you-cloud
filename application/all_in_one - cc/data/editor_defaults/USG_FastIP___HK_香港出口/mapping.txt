@@ -37,3 +37,12 @@ DEFAULT_LAN_GW  初始化默认：LAN网关
 DEFAULT_LAN_DHCP  初始化默认：LAN DHCP
 DEFAULT_INNER_NETS  初始化默认：内网段
 DEFAULT_GEN_RETURN_ROUTE  初始化默认：生成回程路由
+DEFAULT_BGP_VERSION  初始化默认：BGP Server 版本（old=旧版/new=新版）
+bgp_main_server1  主线 BGP Server 1 IP
+bgp_main_server2  主线 BGP Server 2 IP
+bgp_backup_server1  备线 BGP Server 1 IP
+bgp_backup_server2  备线 BGP Server 2 IP
+bgp_main_name1  主线 BGP Server 1 名称
+bgp_main_name2  主线 BGP Server 2 名称
+bgp_backup_name1  备线 BGP Server 1 名称
+bgp_backup_name2  备线 BGP Server 2 名称

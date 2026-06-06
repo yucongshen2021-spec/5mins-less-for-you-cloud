@@ -1084,7 +1084,8 @@ def generate_usg_fastip():
         if not build_fn:
             return jsonify({"ok": False, "error": _humanize_error("Builder not found", variant)}), 500
 
-        result = build_fn(hdr_text)
+        bgp_ver = network.get("DEFAULT_BGP_VERSION") if isinstance(network, dict) else None
+        result = build_fn(hdr_text, bgp_version=bgp_ver) if bgp_ver else build_fn(hdr_text)
         if isinstance(result, tuple):
             d = result[0]
             err = result[1] if len(result) >= 2 else None
@@ -2552,11 +2553,13 @@ def _get_init_keys(slot):
     if slot == "TEMPLATE_USG_HK":
         return ["HK_DEFAULT_DNS1","HK_DEFAULT_DNS2","DEFAULT_WAN_ETH","DEFAULT_WAN_IP",
                 "DEFAULT_WAN_GW","DEFAULT_WAN_DHCP","DEFAULT_LAN_ETH","DEFAULT_LAN_IP",
-                "DEFAULT_LAN_GW","DEFAULT_LAN_DHCP","DEFAULT_INNER_NETS","DEFAULT_GEN_RETURN_ROUTE"]
+                "DEFAULT_LAN_GW","DEFAULT_LAN_DHCP","DEFAULT_INNER_NETS","DEFAULT_GEN_RETURN_ROUTE",
+                "DEFAULT_BGP_VERSION"]
     if slot == "TEMPLATE_USG_NONHK":
         return ["DEFAULT_DNS1","DEFAULT_DNS2","DEFAULT_WAN_ETH","DEFAULT_WAN_IP",
                 "DEFAULT_WAN_GW","DEFAULT_WAN_DHCP","DEFAULT_LAN_ETH","DEFAULT_LAN_IP",
-                "DEFAULT_LAN_GW","DEFAULT_LAN_DHCP","DEFAULT_INNER_NETS","DEFAULT_GEN_RETURN_ROUTE"]
+                "DEFAULT_LAN_GW","DEFAULT_LAN_DHCP","DEFAULT_INNER_NETS","DEFAULT_GEN_RETURN_ROUTE",
+                "DEFAULT_BGP_VERSION"]
     if slot == "TEMPLATE_USG_FLINK_VISUAL":
         return ["USG_FL_MAIN_TUN_DEFAULT","USG_FL_BK_TUN_DEFAULT"]
     if slot == "TEMPLATE_USG_NEW_EXIT_VISUAL":

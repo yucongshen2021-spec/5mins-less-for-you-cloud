@@ -75,6 +75,33 @@ DEFAULT_GEN_RETURN_ROUTE = False
 HK_DEFAULT_WAN_DHCP = False
 HK_DEFAULT_LAN_DHCP = True
 HK_DEFAULT_GEN_RETURN_ROUTE = False
+
+# ── BGP Server 版本 ──
+DEFAULT_BGP_VERSION = "new"  # init 默认值："old" = 旧版 BGP, "new" = 新版 BGP
+
+# 旧版 BGP server（现有）
+_OLD_BGP_MAIN_1 = "103.252.19.25"
+_OLD_BGP_MAIN_2 = "43.229.117.226"
+_OLD_BGP_BACKUP_1 = "43.229.119.251"
+_OLD_BGP_BACKUP_2 = "103.252.19.99"
+
+# 新版 BGP server（hkg1-bgpserver5/6, szd-bgpserver5/6）
+_NEW_BGP_MAIN_1 = "103.252.18.206"   # hkg1-bgpserver5
+_NEW_BGP_MAIN_2 = "103.252.19.206"   # hkg1-bgpserver6
+_NEW_BGP_BACKUP_1 = "43.229.117.207" # szd-bgpserver5
+_NEW_BGP_BACKUP_2 = "43.229.119.206" # szd-bgpserver6
+
+def _get_bgp_servers(version="old"):
+    """返回 (main_1, main_2, backup_1, backup_2) 根据版本选择 BGP server 组。"""
+    if version == "new":
+        return (_NEW_BGP_MAIN_1, _NEW_BGP_MAIN_2, _NEW_BGP_BACKUP_1, _NEW_BGP_BACKUP_2)
+    return (_OLD_BGP_MAIN_1, _OLD_BGP_MAIN_2, _OLD_BGP_BACKUP_1, _OLD_BGP_BACKUP_2)
+
+def _get_bgp_server_names(version="old"):
+    """返回 (main_name_1, main_name_2, backup_name_1, backup_name_2)。"""
+    if version == "new":
+        return ("hkg1-bgpserver5", "hkg1-bgpserver6", "szd-bgpserver5", "szd-bgpserver6")
+    return ("BGPserver1", "BGPserver2", "BGPserver3", "BGPserver4")
 DEFAULT_WAN_IP_PLAIN = DEFAULT_WAN_IP.split("/", 1)[0].strip() if DEFAULT_WAN_IP else ""
 DEFAULT_LAN_IP_PLAIN = DEFAULT_LAN_IP.split("/", 1)[0].strip() if DEFAULT_LAN_IP else ""
 HK_DEFAULT_WAN_IP_PLAIN = (
@@ -637,15 +664,15 @@ ip route-static 114.113.245.99 255.255.255.255 {main_wanip1} description to-mian
 ip route-static 192.168.55.11 255.255.255.255 {backup_wanip1} description to-backup-zabbix
 
 6.6、公网BGP路由
-ip route-static 103.252.19.25 255.255.255.255 {main_wanip1} description BGPserver1
-ip route-static 43.229.117.226 255.255.255.255 {main_wanip1} description BGPserver2
-ip route-static 43.229.119.251 255.255.255.255 {backup_wanip1} description BGPserver3
-ip route-static 103.252.19.99 255.255.255.255 {backup_wanip1} description BGPserver4
+ip route-static {bgp_main_server1} 255.255.255.255 {main_wanip1} description {bgp_main_name1}
+ip route-static {bgp_main_server2} 255.255.255.255 {main_wanip1} description {bgp_main_name2}
+ip route-static {bgp_backup_server1} 255.255.255.255 {backup_wanip1} description {bgp_backup_name1}
+ip route-static {bgp_backup_server2} 255.255.255.255 {backup_wanip1} description {bgp_backup_name2}
 #
-ip route-static 103.252.19.25 255.255.255.255 NULL0 preference 65 description BGPserver1
-ip route-static 43.229.117.226 255.255.255.255 NULL0 preference 65 description BGPserver2
-ip route-static 43.229.119.251 255.255.255.255 NULL0 preference 65 description BGPserver3
-ip route-static 103.252.19.99 255.255.255.255 NULL0 preference 65 description BGPserver4
+ip route-static {bgp_main_server1} 255.255.255.255 NULL0 preference 65 description {bgp_main_name1}
+ip route-static {bgp_main_server2} 255.255.255.255 NULL0 preference 65 description {bgp_main_name2}
+ip route-static {bgp_backup_server1} 255.255.255.255 NULL0 preference 65 description {bgp_backup_name1}
+ip route-static {bgp_backup_server2} 255.255.255.255 NULL0 preference 65 description {bgp_backup_name2}
 {extra_return_routes}
 七、NAT配置
 7.1、创建IPSec对端PE兴趣流地址组
@@ -868,28 +895,28 @@ bgp 65000
  timer keepalive 5 hold 15
  y
  private-4-byte-as enable
- peer 103.252.19.25 as-number 65000
- peer 103.252.19.25 connect-interface {bgp_main_lo}
- peer 43.229.117.226 as-number 65000
- peer 43.229.117.226 connect-interface {bgp_main_lo}
- peer 43.229.119.251 as-number 65000
- peer 43.229.119.251 connect-interface {bgp_backup_lo}
- peer 103.252.19.99 as-number 65000
- peer 103.252.19.99 connect-interface {bgp_backup_lo}
+ peer {bgp_main_server1} as-number 65000
+ peer {bgp_main_server1} connect-interface {bgp_main_lo}
+ peer {bgp_main_server2} as-number 65000
+ peer {bgp_main_server2} connect-interface {bgp_main_lo}
+ peer {bgp_backup_server1} as-number 65000
+ peer {bgp_backup_server1} connect-interface {bgp_backup_lo}
+ peer {bgp_backup_server2} as-number 65000
+ peer {bgp_backup_server2} connect-interface {bgp_backup_lo}
  #
  ipv4-family unicast
   preference 20 50 200
-  peer 103.252.19.25 route-policy bgp-from--RSVR import
-  peer 103.252.19.25 route-policy bgp-from--deny export
-  peer 43.229.117.226 enable
-  peer 43.229.117.226 route-policy bgp-from--RSVR import
-  peer 43.229.117.226 route-policy bgp-from--deny export
-  peer 43.229.119.251 enable
-  peer 43.229.119.251 route-policy bgp-from--RSVR2 import
-  peer 43.229.119.251 route-policy bgp-from--deny export
-  peer 103.252.19.99 enable
-  peer 103.252.19.99 route-policy bgp-from--RSVR2 import
-  peer 103.252.19.99 route-policy bgp-from--deny export
+  peer {bgp_main_server1} route-policy bgp-from--RSVR import
+  peer {bgp_main_server1} route-policy bgp-from--deny export
+  peer {bgp_main_server2} enable
+  peer {bgp_main_server2} route-policy bgp-from--RSVR import
+  peer {bgp_main_server2} route-policy bgp-from--deny export
+  peer {bgp_backup_server1} enable
+  peer {bgp_backup_server1} route-policy bgp-from--RSVR2 import
+  peer {bgp_backup_server1} route-policy bgp-from--deny export
+  peer {bgp_backup_server2} enable
+  peer {bgp_backup_server2} route-policy bgp-from--RSVR2 import
+  peer {bgp_backup_server2} route-policy bgp-from--deny export
 #
 十、安全策略
 10.1、创建邮件规则
@@ -1402,15 +1429,15 @@ ip route-static 114.113.245.99 255.255.255.255 {main_wanip1} description to-mian
 ip route-static 192.168.55.11 255.255.255.255 {backup_wanip1} description to-backup-zabbix
 
 6.6、公网BGP路由
-ip route-static 103.252.19.25 255.255.255.255 {main_wanip1} description BGPserver1
-ip route-static 43.229.117.226 255.255.255.255 {main_wanip1} description BGPserver2
-ip route-static 43.229.119.251 255.255.255.255 {backup_wanip1} description BGPserver3
-ip route-static 103.252.19.99 255.255.255.255 {backup_wanip1} description BGPserver4
+ip route-static {bgp_main_server1} 255.255.255.255 {main_wanip1} description {bgp_main_name1}
+ip route-static {bgp_main_server2} 255.255.255.255 {main_wanip1} description {bgp_main_name2}
+ip route-static {bgp_backup_server1} 255.255.255.255 {backup_wanip1} description {bgp_backup_name1}
+ip route-static {bgp_backup_server2} 255.255.255.255 {backup_wanip1} description {bgp_backup_name2}
 #
-ip route-static 103.252.19.25 255.255.255.255 NULL0 preference 65 description BGPserver1
-ip route-static 43.229.117.226 255.255.255.255 NULL0 preference 65 description BGPserver2
-ip route-static 43.229.119.251 255.255.255.255 NULL0 preference 65 description BGPserver3
-ip route-static 103.252.19.99 255.255.255.255 NULL0 preference 65 description BGPserver4
+ip route-static {bgp_main_server1} 255.255.255.255 NULL0 preference 65 description {bgp_main_name1}
+ip route-static {bgp_main_server2} 255.255.255.255 NULL0 preference 65 description {bgp_main_name2}
+ip route-static {bgp_backup_server1} 255.255.255.255 NULL0 preference 65 description {bgp_backup_name1}
+ip route-static {bgp_backup_server2} 255.255.255.255 NULL0 preference 65 description {bgp_backup_name2}
 {extra_return_routes}
 七、NAT配置
 7.1、创建IPSec对端PE兴趣流地址组
@@ -1627,28 +1654,28 @@ bgp 65000
  timer keepalive 5 hold 15
  y
  private-4-byte-as enable
- peer 103.252.19.25 as-number 65000
- peer 103.252.19.25 connect-interface LoopBack100
- peer 43.229.117.226 as-number 65000
- peer 43.229.117.226 connect-interface LoopBack100
- peer 43.229.119.251 as-number 65000
- peer 43.229.119.251 connect-interface LoopBack100
- peer 103.252.19.99 as-number 65000
- peer 103.252.19.99 connect-interface LoopBack100
+ peer {bgp_main_server1} as-number 65000
+ peer {bgp_main_server1} connect-interface LoopBack100
+ peer {bgp_main_server2} as-number 65000
+ peer {bgp_main_server2} connect-interface LoopBack100
+ peer {bgp_backup_server1} as-number 65000
+ peer {bgp_backup_server1} connect-interface LoopBack100
+ peer {bgp_backup_server2} as-number 65000
+ peer {bgp_backup_server2} connect-interface LoopBack100
  #
  ipv4-family unicast
   preference 20 50 200
-  peer 103.252.19.25 route-policy bgp-from--RSVR import
-  peer 103.252.19.25 route-policy bgp-from--deny export
-  peer 43.229.117.226 enable
-  peer 43.229.117.226 route-policy bgp-from--RSVR import
-  peer 43.229.117.226 route-policy bgp-from--deny export
-  peer 43.229.119.251 enable
-  peer 43.229.119.251 route-policy bgp-from--RSVR2 import
-  peer 43.229.119.251 route-policy bgp-from--deny export
-  peer 103.252.19.99 enable
-  peer 103.252.19.99 route-policy bgp-from--RSVR2 import
-  peer 103.252.19.99 route-policy bgp-from--deny export
+  peer {bgp_main_server1} route-policy bgp-from--RSVR import
+  peer {bgp_main_server1} route-policy bgp-from--deny export
+  peer {bgp_main_server2} enable
+  peer {bgp_main_server2} route-policy bgp-from--RSVR import
+  peer {bgp_main_server2} route-policy bgp-from--deny export
+  peer {bgp_backup_server1} enable
+  peer {bgp_backup_server1} route-policy bgp-from--RSVR2 import
+  peer {bgp_backup_server1} route-policy bgp-from--deny export
+  peer {bgp_backup_server2} enable
+  peer {bgp_backup_server2} route-policy bgp-from--RSVR2 import
+  peer {bgp_backup_server2} route-policy bgp-from--deny export
 #
 十、安全策略
 10.1、创建邮件规则
@@ -1972,10 +1999,12 @@ def parse_business_data_hk(text):
     return parse_business_data(text)
 
 
-def _build_usg_format_dict_common(text, is_hk=False):
+def _build_usg_format_dict_common(text, is_hk=False, bgp_version=None):
     """可视化编辑器用：从业务文本 + 模块全局 DEFAULT_* 构建完整 format dict。"""
     g = globals()
     _p = "HK_" if is_hk else ""
+    if bgp_version is None:
+        bgp_version = str(g.get("DEFAULT_BGP_VERSION", "new")).strip()
     d = parse_business_data(text)
     if not d:
         return None, ("empty", [])
@@ -1999,6 +2028,14 @@ def _build_usg_format_dict_common(text, is_hk=False):
     wan_if_block = build_wan_if_block(wan_ip, wan_mask, wan_gw, dhcp=wan_dhcp, wan_eth=wan_eth)
     wan_default_routes = build_wan_default_routes(wan_gw, dhcp=wan_dhcp, wan_eth=wan_eth)
     dns_dnat_block = build_dns_dnat_block(wan_ip, dhcp=wan_dhcp)
+
+    # BGP server 选择（优先使用传入参数，fallback 到模块全局默认值）
+    if bgp_version not in ("old", "new"):
+        bgp_version = str(g.get("DEFAULT_BGP_VERSION", "new")).strip()
+        if bgp_version not in ("old", "new"):
+            bgp_version = "new"
+    bm1, bm2, bb1, bb2 = _get_bgp_servers(bgp_version)
+    bn1, bn2, bn3, bn4 = _get_bgp_server_names(bgp_version)
 
     if lan_dhcp:
         ds, de = compute_dhcp_range(lan_ip, lan_mask)
@@ -2082,6 +2119,10 @@ def _build_usg_format_dict_common(text, is_hk=False):
             backup_pe=_g("backup_pe"), backup_wanip=_g("backup_wanip"),
             backup_tunnel=_g("backup_tunnel"), backup_wanip1=_g("backup_wanip1"),
             backup_wanip2=_g("backup_wanip2"), backup_peer_ip=_g("backup_peer_ip"),
+            bgp_main_server1=bm1, bgp_main_server2=bm2,
+            bgp_backup_server1=bb1, bgp_backup_server2=bb2,
+            bgp_main_name1=bn1, bgp_main_name2=bn2,
+            bgp_backup_name1=bn3, bgp_backup_name2=bn4,
         ), None
 
     main_lo_lines = []
@@ -2124,17 +2165,21 @@ def _build_usg_format_dict_common(text, is_hk=False):
         backup_pe=_g("backup_pe"), backup_wanip=_g("backup_wanip"),
         backup_tunnel=_g("backup_tunnel"), backup_wanip1=_g("backup_wanip1"),
         backup_wanip2=_g("backup_wanip2"), backup_peer_ip=_g("backup_peer_ip"),
+        bgp_main_server1=bm1, bgp_main_server2=bm2,
+        bgp_backup_server1=bb1, bgp_backup_server2=bb2,
+        bgp_main_name1=bn1, bgp_main_name2=bn2,
+        bgp_backup_name1=bn3, bgp_backup_name2=bn4,
     ), None
 
 
-def build_usg_us_format_dict(text):
+def build_usg_us_format_dict(text, bgp_version=None):
     """可视化编辑器用：非香港出口。返回 (dict, fail)。"""
-    return _build_usg_format_dict_common(text, is_hk=False)
+    return _build_usg_format_dict_common(text, is_hk=False, bgp_version=bgp_version)
 
 
-def build_usg_hk_format_dict(text):
+def build_usg_hk_format_dict(text, bgp_version=None):
     """可视化编辑器用：HK 出口。返回 (dict, fail)。"""
-    return _build_usg_format_dict_common(text, is_hk=True)
+    return _build_usg_format_dict_common(text, is_hk=True, bgp_version=bgp_version)
 
 
 # ── 颜色 / 字体 ───────────────────────────────────────────────────────────────

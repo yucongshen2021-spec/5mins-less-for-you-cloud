@@ -307,6 +307,13 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <div class="fr2"><div class="fg"><label class="fl">首选 DNS</label><input class="fi" id="usg-fastip-dns1" value="10.255.108.7"></div><div class="fg"><label class="fl">备选 DNS</label><input class="fi" id="usg-fastip-dns2" value="10.255.108.58"></div></div>
 <div class="fg"><label class="fl">内网段</label><input class="fi" id="usg-fastip-inner-nets" value="192.168.0.0/16"></div>
 <div class="cb"><input type="checkbox" id="usg-fastip-gen-rr"><label for="usg-fastip-gen-rr">生成回程路由</label></div>
+<div class="fg" style="margin-top:4px">
+  <label class="fl">BGP Server</label>
+  <div class="field-row" style="gap:12px">
+    <div class="cb"><input type="radio" name="usg-bgp-version" id="usg-bgp-version-old" value="old" onchange="usgInitBgpChange()"><label for="usg-bgp-version-old">旧版 BGP</label></div>
+    <div class="cb"><input type="radio" name="usg-bgp-version" id="usg-bgp-version-new" value="new" checked onchange="usgInitBgpChange()"><label for="usg-bgp-version-new">新版 BGP</label></div>
+  </div>
+</div>
 </div>
 <div class="net-panel" id="usg-panel-flink">
 <div class="fr2"><div class="fg"><label class="fl">主 Tunnel 号</label><input class="fi" id="usg-fastip-fl-main-tun" value="3000"></div><div class="fg"><label class="fl">备 Tunnel 号</label><input class="fi" id="usg-fastip-fl-bk-tun" value="4000"></div></div>
@@ -507,6 +514,12 @@ function showNetPanel(tp,v){
   }
 }
 // USG DNS switching: HK = 10.255.108.5/6, US = 10.255.108.7/58
+function usgInitBgpChange(){
+  // Called when BGP server radio changes. Persist to hidden field for save.
+  let bgpV=document.getElementById('usg-bgp-version-new')?.checked?'new':'old';
+  // Store in localStorage for persistence across page loads
+  try{localStorage.setItem('usg_bgp_version',bgpV)}catch(e){}
+}
 function usgUpdateDNS(v){
   if(v==='hk'){$('usg-fastip-dns1').value='10.255.108.5';$('usg-fastip-dns2').value='10.255.108.6'}
   else{$('usg-fastip-dns1').value='10.255.108.7';$('usg-fastip-dns2').value='10.255.108.58'}
@@ -618,7 +631,8 @@ function gn(tp){
        wan_eth:g('wan-eth')?.value||'',wan_cidr:g('wan-cidr')?.value||'',wan_gw:g('wan-gw')?.value||'',
        lan_eth:g('lan-eth')?.value||'',lan_cidr:g('lan-cidr')?.value||'',lan_gw:g('lan-gw')?.value||'',
        wan_dhcp:cb('wan-dhcp'),lan_dhcp:cb('lan-dhcp'),inner_nets:g('inner-nets')?.value||'',
-       dns1:g('dns1')?.value||'',dns2:g('dns2')?.value||'',gen_return_route:cb('gen-rr'),bypass:cb('bypass')};
+       dns1:g('dns1')?.value||'',dns2:g('dns2')?.value||'',gen_return_route:cb('gen-rr'),bypass:cb('bypass'),
+       DEFAULT_BGP_VERSION:(document.getElementById('usg-bgp-version-new')?.checked?'new':'old')};
   }else if(v==='flink'){
     if(tp==='epoch-fastip') n={ER_FL_MAIN_NH_DEFAULT:g('fl-main-nh')?.value||'',ER_FL_BACKUP_NH_DEFAULT:g('fl-backup-nh')?.value||''};
     else n={USG_FL_MAIN_TUN_DEFAULT:g('fl-main-tun')?.value||'',USG_FL_BK_TUN_DEFAULT:g('fl-bk-tun')?.value||''};
@@ -639,7 +653,8 @@ function gn5(tp){
        wan_eth:g('wan-eth')?.value||'',wan_cidr:g('wan-cidr')?.value||'',wan_gw:g('wan-gw')?.value||'',
        lan_eth:g('lan-eth')?.value||'',lan_cidr:g('lan-cidr')?.value||'',lan_gw:g('lan-gw')?.value||'',
        wan_dhcp:cb('wan-dhcp'),lan_dhcp:cb('lan-dhcp'),inner_nets:g('inner-nets')?.value||'',
-       dns1:g('dns1')?.value||'',dns2:g('dns2')?.value||'',gen_return_route:cb('gen-rr'),bypass:cb('bypass')};
+       dns1:g('dns1')?.value||'',dns2:g('dns2')?.value||'',gen_return_route:cb('gen-rr'),bypass:cb('bypass'),
+       DEFAULT_BGP_VERSION:(document.getElementById('usg-bgp-version-new')?.checked?'new':'old')};
   }else if(v==='flink'){
     n={ER5_FL_MAIN_NH_DEFAULT:g('fl-main-nh')?.value||'',ER5_FL_BACKUP_NH_DEFAULT:g('fl-backup-nh')?.value||''};
   }else if(v==='new_exit'){
@@ -694,6 +709,14 @@ async function ldInitForm(tp){
         // LAN fields must never be 'dhcp' — LAN DHCP means the device is the server
         if((fid==='lan-cidr'||fid==='lan-gw'||fid==='lan-ip')&&sv.toLowerCase()==='dhcp')continue;
         el.value=sv}}
+      // Handle BGP version radio (not a regular input field)
+      if(vs.DEFAULT_BGP_VERSION){
+        let bgpV=String(vs.DEFAULT_BGP_VERSION).trim();
+        let oldRadio=document.getElementById('usg-bgp-version-old'),
+            newRadio=document.getElementById('usg-bgp-version-new');
+        if(bgpV==='new'&&newRadio)newRadio.checked=true;
+        else if(oldRadio)oldRadio.checked=true;
+      }
       _applyToggles(lookupTp)
   }catch(e){}
 }

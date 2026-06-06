@@ -408,15 +408,15 @@ ip route-static 114.113.245.99 255.255.255.255 {main_wanip1} description to-mian
 ip route-static 192.168.55.11 255.255.255.255 {backup_wanip1} description to-backup-zabbix
 
 6.6、公网BGP路由
-ip route-static 103.252.19.25 255.255.255.255 {main_wanip1} description BGPserver1
-ip route-static 43.229.117.226 255.255.255.255 {main_wanip1} description BGPserver2
-ip route-static 43.229.119.251 255.255.255.255 {backup_wanip1} description BGPserver3
-ip route-static 103.252.19.99 255.255.255.255 {backup_wanip1} description BGPserver4
+ip route-static {bgp_main_server1} 255.255.255.255 {main_wanip1} description {bgp_main_name1}
+ip route-static {bgp_main_server2} 255.255.255.255 {main_wanip1} description {bgp_main_name2}
+ip route-static {bgp_backup_server1} 255.255.255.255 {backup_wanip1} description {bgp_backup_name1}
+ip route-static {bgp_backup_server2} 255.255.255.255 {backup_wanip1} description {bgp_backup_name2}
 #
-ip route-static 103.252.19.25 255.255.255.255 NULL0 preference 65 description BGPserver1
-ip route-static 43.229.117.226 255.255.255.255 NULL0 preference 65 description BGPserver2
-ip route-static 43.229.119.251 255.255.255.255 NULL0 preference 65 description BGPserver3
-ip route-static 103.252.19.99 255.255.255.255 NULL0 preference 65 description BGPserver4
+ip route-static {bgp_main_server1} 255.255.255.255 NULL0 preference 65 description {bgp_main_name1}
+ip route-static {bgp_main_server2} 255.255.255.255 NULL0 preference 65 description {bgp_main_name2}
+ip route-static {bgp_backup_server1} 255.255.255.255 NULL0 preference 65 description {bgp_backup_name1}
+ip route-static {bgp_backup_server2} 255.255.255.255 NULL0 preference 65 description {bgp_backup_name2}
 {extra_return_routes}
 七、NAT配置
 7.1、创建IPSec对端PE兴趣流地址组
@@ -639,28 +639,28 @@ bgp 65000
  timer keepalive 5 hold 15
  y
  private-4-byte-as enable
- peer 103.252.19.25 as-number 65000
- peer 103.252.19.25 connect-interface {bgp_main_lo}
- peer 43.229.117.226 as-number 65000
- peer 43.229.117.226 connect-interface {bgp_main_lo}
- peer 43.229.119.251 as-number 65000
- peer 43.229.119.251 connect-interface {bgp_backup_lo}
- peer 103.252.19.99 as-number 65000
- peer 103.252.19.99 connect-interface {bgp_backup_lo}
+ peer {bgp_main_server1} as-number 65000
+ peer {bgp_main_server1} connect-interface {bgp_main_lo}
+ peer {bgp_main_server2} as-number 65000
+ peer {bgp_main_server2} connect-interface {bgp_main_lo}
+ peer {bgp_backup_server1} as-number 65000
+ peer {bgp_backup_server1} connect-interface {bgp_backup_lo}
+ peer {bgp_backup_server2} as-number 65000
+ peer {bgp_backup_server2} connect-interface {bgp_backup_lo}
  #
  ipv4-family unicast
   preference 20 50 200
-  peer 103.252.19.25 route-policy bgp-from--RSVR import
-  peer 103.252.19.25 route-policy bgp-from--deny export
-  peer 43.229.117.226 enable
-  peer 43.229.117.226 route-policy bgp-from--RSVR import
-  peer 43.229.117.226 route-policy bgp-from--deny export
-  peer 43.229.119.251 enable
-  peer 43.229.119.251 route-policy bgp-from--RSVR2 import
-  peer 43.229.119.251 route-policy bgp-from--deny export
-  peer 103.252.19.99 enable
-  peer 103.252.19.99 route-policy bgp-from--RSVR2 import
-  peer 103.252.19.99 route-policy bgp-from--deny export
+  peer {bgp_main_server1} route-policy bgp-from--RSVR import
+  peer {bgp_main_server1} route-policy bgp-from--deny export
+  peer {bgp_main_server2} enable
+  peer {bgp_main_server2} route-policy bgp-from--RSVR import
+  peer {bgp_main_server2} route-policy bgp-from--deny export
+  peer {bgp_backup_server1} enable
+  peer {bgp_backup_server1} route-policy bgp-from--RSVR2 import
+  peer {bgp_backup_server1} route-policy bgp-from--deny export
+  peer {bgp_backup_server2} enable
+  peer {bgp_backup_server2} route-policy bgp-from--RSVR2 import
+  peer {bgp_backup_server2} route-policy bgp-from--deny export
 #
 十、安全策略
 10.1、创建邮件规则
