@@ -402,7 +402,6 @@
           <span class="dl-icon">↓</span>
           <span class="dl-label" id="dlLabel">检测可下载版本…</span>
         </div>
-        <div class="dl-meta"><span id="dlVersion">—</span> · <span id="dlSize">—</span></div>
       </a>
       {% endif %}
       <div class="ft-status"><span class="cnt">{{ online_count }}</span> / {{ total_count }} online</div>
@@ -552,8 +551,6 @@
   // ── 下载入口 (demo only)：左下角 dlCard，扫描 dist/ 得到可下载版本 ──
   var dlCard = document.getElementById('dlCard');
   var dlLabel = document.getElementById('dlLabel');
-  var dlVersion = document.getElementById('dlVersion');
-  var dlSize = document.getElementById('dlSize');
 
   function setDownloadState(state, opts) {
     if (!dlCard) return;
@@ -561,16 +558,6 @@
     dlCard.classList.remove('is-empty', 'is-ready');
     dlCard.classList.add('is-' + state);
     dlLabel.textContent = opts.label || '';
-    if (opts.version) {
-      dlVersion.textContent = 'v' + String(opts.version).replace(/^v/, '');
-    } else {
-      dlVersion.textContent = '—';
-    }
-    if (typeof opts.size_mb === 'number') {
-      dlSize.textContent = opts.size_mb.toFixed(2) + ' MB';
-    } else {
-      dlSize.textContent = '—';
-    }
     if (opts.title) {
       dlCard.title = opts.title;
     } else {
@@ -593,16 +580,15 @@
     .then(function(r) { return r.json(); })
     .then(function(info) {
       if (info && info.available === true) {
+        var v = info.version ? 'v' + String(info.version).replace(/^v/, '') : '';
         setDownloadState('ready', {
-          label: '下载完整应用',
-          version: info.version,
-          size_mb: info.size_mb,
-          title: '下载整个工具套件的 zip 包'
+          label: v ? '下载 ' + v : '下载完整应用',
+          title: '下载最新交付版 zip 包'
         });
       } else {
         setDownloadState('empty', {
           label: '暂无可下载版本',
-          title: '本地 dist/ 内尚未生成发布包，请先运行 tools/build_release.py'
+          title: '本地 dist/ 内尚未生成发布包'
         });
       }
     })
