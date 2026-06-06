@@ -81,7 +81,7 @@ py application/test/portal/test_customer_full.py
 
 ### 发版命令
 
-**发版流程详见 [`RELEASE.md`](RELEASE.md)。** 简要命令：
+**发版流程详见 [`RELEASE.md`](docs/RELEASE.md)。** 简要命令：
 
 ```powershell
 git checkout release
@@ -97,13 +97,14 @@ py tools/release.py <version> --no-push   # 仅本地测试，不推送
 
 | 文件 | 用途 | 何时读 |
 |------|------|--------|
-| [`RELEASE.md`](RELEASE.md) | 发版流程、测试命令、架构图 | 发版前必读 |
+| [`RELEASE.md`](docs/RELEASE.md) | 发版流程、测试命令、架构图 | 发版前必读 |
+| [`docs/`](docs/) | 项目文档（发版、检查清单、经历） | 查阅项目规范 |
 | [`log/mistake.txt`](log/mistake.txt) | 历史错误记录及避免方法 | **每次修改前必读** |
 | [`DESIGN.md`](DESIGN.md) | Cursor 设计系统（颜色/字体/间距/组件） | 任何 UI 修改前 |
-| [`AGENTS.md`](AGENTS.md) | AI agent 工作守则 | 了解行为边界 |
+| [`AGENTS.md`](docs/AGENTS.md) | AI agent 工作守则 | 了解行为边界 |
 | [`README.md`](README.md) | 项目说明 | 了解项目概况 |
 | [`framework/INTEGRATION.md`](framework/INTEGRATION.md) | 框架集成指南 | 修改框架/公共 CSS |
-| [`plan/`](plan/) | 功能设计文档 | 了解某个功能的设计意图 |
+| [`plan/`](plan/) | 功能设计文档 & 规划文件 | 了解某个功能的设计意图 |
 | [`log/`](log/) | 按日期记录的修改日志 | 追溯修改历史 |
 | `application/*/DESIGN.md` | 各子应用的设计规范 | 修改子应用 UI |
 | `application/*/plan/` | 各子应用的设计文档 | 了解子应用功能设计 |

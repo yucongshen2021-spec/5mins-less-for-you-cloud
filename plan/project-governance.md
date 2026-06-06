@@ -429,7 +429,7 @@ curl http://127.0.0.1:8000/api/update/manifest
 
 | # | 测试文件 | 类型 | 绑定的功能 |
 |---|---------|------|-----------|
-| 1 | `application/portal/test_update_check.py` | 代码逻辑 | 版本比较、配置加载、网络失败、缓存、多源 fallback |
+| 1 | `application/test/portal/test_update_check.py` | 代码逻辑 | 版本比较、配置加载、网络失败、缓存、多源 fallback |
 | 2 | `application/test/portal/test_update_ui_playwright.py` | Playwright | 横幅出现、5态按钮、手动检查、升级按钮状态转换 |
 | 3 | `application/test/portal/test_customer_full.py` | 客户模拟 | 解压→启动→检查更新→横幅→升级→控制台错误 |
 | 4 | `application/test/portal/test_update_e2e.py` | E2E | 构建→mirror→demo→release→升级→数据保留 |

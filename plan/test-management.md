@@ -53,7 +53,7 @@ application/test/
 ├── portal/                              # Portal — 8 个测试文件
 │   ├── test_smoke.py                    # Portal smoke test
 │   ├── test_release.py                  # Release 功能测试
-│   ├── test_update_check.py             # (在 portal/ 根目录) 更新检查逻辑
+│   ├── test_update_check.py             # 更新检查逻辑
 │   ├── test_update_e2e.py               # 更新端到端测试
 │   ├── test_update_flow.py              # 更新流程测试
 │   ├── test_update_ui_playwright.py     # 更新 UI Playwright 测试

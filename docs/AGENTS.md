@@ -62,10 +62,7 @@ py -3 tools/build_release.py --version vX.X.X --mirror-url http://<IP>:8000/api/
 ## 跑测试的标准命令
 
 ```powershell
-cd application/portal
-py -3 -m pytest test_update_check.py test_update_manifest.py -q
-
-cd ../..
+py -m pytest application/test/portal/test_update_check.py -q
 py -3 -m pytest tools/test_build_release.py -q
 
 cd application/test
