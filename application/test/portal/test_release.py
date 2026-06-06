@@ -19,8 +19,8 @@ from _smoke_helpers import APPLICATION_DIR, PYTHON, SmokeServer, http_get
 
 PORTAL_DIR = APPLICATION_DIR / "portal"
 APP = PORTAL_DIR / "app.py"
-PORT = 5000  # main 分支代码，RELEASE_MODE=1 改变页面显示但不改端口
-SUB_PORTS = (5001, 5002, 5003, 5004)
+PORT = 7000  # RELEASE_MODE=1 时 portal 启动在 7000
+SUB_PORTS = (7001, 7002, 7003, 7004)
 
 
 def _post_json(url: str, data: dict, timeout: float = 10.0) -> tuple[int, dict]:
@@ -98,17 +98,17 @@ def test_update_check_response_has_local_version(release_portal):
 # ── 升级 & 重启（release 分支专属，main 分支应 404）──
 
 def test_upgrade_endpoint_not_in_main(release_portal):
-    """main 分支不导入 upgrade → /api/update/upgrade 应 404。"""
-    body = json.dumps({"download_url": "http://127.0.0.1:8000/test.zip"}).encode("utf-8")
+    """RELEASE_MODE=1 时升级端点存在，但缺少 download_url 应返回 400。"""
+    body = json.dumps({}).encode("utf-8")
     req = urllib.request.Request(
         release_portal + "/api/update/upgrade",
         data=body, headers={"Content-Type": "application/json"}, method="POST",
     )
     try:
         urllib.request.urlopen(req, timeout=10.0)
-        pytest.fail("main 分支不应有 /api/update/upgrade")
+        pytest.fail("缺少 download_url 应返回错误")
     except urllib.error.HTTPError as e:
-        assert e.code == 404, f"应 404, 实际 {e.code}"
+        assert e.code == 400, f"应 400, 实际 {e.code}"
 
 
 def test_shutdown_not_in_main(release_portal):

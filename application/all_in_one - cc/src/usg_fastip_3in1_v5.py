@@ -2496,6 +2496,14 @@ def generate_config_us(fields, wan_dhcp, extra_subnets_raw, return_route_nexthop
         backup_wanip1       = g('backup_wanip1'),
         backup_wanip2       = g('backup_wanip2'),
         backup_peer_ip      = g('backup_peer_ip'),
+        bgp_main_server1    = _NEW_BGP_MAIN_1,
+        bgp_main_server2    = _NEW_BGP_MAIN_2,
+        bgp_backup_server1  = _NEW_BGP_BACKUP_1,
+        bgp_backup_server2  = _NEW_BGP_BACKUP_2,
+        bgp_main_name1      = "hkg1-bgpserver5",
+        bgp_main_name2      = "hkg1-bgpserver6",
+        bgp_backup_name1    = "szd-bgpserver5",
+        bgp_backup_name2    = "szd-bgpserver6",
     )
     if net:
         inject_usg_template_init_aliases(fmt_kw, net)
@@ -3314,6 +3322,10 @@ def hk_generate():
             backup_pe=g("backup_pe"), backup_wanip=g("backup_wanip"),
             backup_tunnel=g("backup_tunnel"), backup_wanip1=g("backup_wanip1"),
             backup_wanip2=g("backup_wanip2"), backup_peer_ip=g("backup_peer_ip"),
+            bgp_main_server1=_NEW_BGP_MAIN_1, bgp_main_server2=_NEW_BGP_MAIN_2,
+            bgp_backup_server1=_NEW_BGP_BACKUP_1, bgp_backup_server2=_NEW_BGP_BACKUP_2,
+            bgp_main_name1="hkg1-bgpserver5", bgp_main_name2="hkg1-bgpserver6",
+            bgp_backup_name1="szd-bgpserver5", bgp_backup_name2="szd-bgpserver6",
         )
         inject_usg_template_init_aliases(hk_fmt, net)
         if field_coverage:
