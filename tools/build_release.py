@@ -103,6 +103,9 @@ def matches_file_glob(name: str) -> bool:
 def should_skip_dir(dir_path: Path, root: Path) -> bool:
     if dir_path.name in EXCLUDE_DIR_NAMES:
         return True
+    # 跳过 .test_* / .customer_test / .playwright-mcp 等测试残留目录
+    if dir_path.name.startswith((".test_", ".customer_test", ".playwright-")):
+        return True
     rel = dir_path.relative_to(root).as_posix()
     if any(rel == p or rel.startswith(p + "/") for p in EXCLUDE_PATH_PREFIXES):
         return True
