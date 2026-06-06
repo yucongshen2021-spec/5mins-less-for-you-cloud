@@ -58,6 +58,29 @@
 
 ## 发版（每次发版必须执行）
 
+### 发版前置条件：模拟客户全量测试（必须通过才能发版）
+
+**每次发版前，必须作为客户下载、解压并运行最新 release 版本，跑通全量测试。测试不通过 → 禁止发版。**
+
+流程：
+
+1. **构建新版本 zip**（如 `v1.1.x`）→ `dist/`
+2. **解压 zip 到临时目录**（模拟客户下载后解压）
+3. **启动 mirror 服务**: `py tools/serve_mirror.py --port 8000`
+4. **用包内 Python 启动客户 portal**（不是源码目录的 portal）
+5. **运行完整客户模拟测试**: `py application/test/portal/test_customer_full.py`
+6. **验证结果**: 所有测试通过（更新检查、UI 交互、横幅、升级流程等）→ 才能继续发版
+
+```powershell
+# 完整客户模拟测试（解压 zip → 启动 → 检测更新 → 验证 UI）
+# 必须通过才能发版
+py application/test/portal/test_customer_full.py
+```
+
+> 注意: 不能用源码目录的 `py app.py` 或 `RELEASE_MODE=1` 绕过。必须是 zip 解压后的真实客户环境。
+
+### 发版命令
+
 **发版流程详见 [`RELEASE.md`](RELEASE.md)。** 简要命令：
 
 ```powershell

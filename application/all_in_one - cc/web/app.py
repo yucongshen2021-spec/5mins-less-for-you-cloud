@@ -2518,7 +2518,9 @@ def api_init_defaults_reset():
 def _get_init_keys(slot):
     """Return the list of init keys for a given scenario slot."""
     if slot in ("TEMPLATE_EPOCH_HK", "TEMPLATE_EPOCH_US",
+                 "TEMPLATE_EPOCH_HK_IPSEC", "TEMPLATE_EPOCH_US_IPSEC",
                  "TEMPLATE_EPOCH5_HK", "TEMPLATE_EPOCH5_US",
+                 "TEMPLATE_EPOCH5_US_IPSEC",
                  "TEMPLATE_EPOCH5_DOMAIN_SPLIT"):
         return ["DEFAULT_WAN_ETH","DEFAULT_WAN_CIDR","DEFAULT_WAN_GW","DEFAULT_WAN_DHCP",
                 "DEFAULT_LAN_ETH","DEFAULT_LAN_CIDR","DEFAULT_LAN_GW","DEFAULT_LAN_DHCP",
