@@ -85,10 +85,10 @@ if %errorlevel% neq 0 (
 
 if not "%ERR%"=="1" (
     for /d %%d in ("%TMPDIR%\*") do (
-        echo   Copying files (this may take a moment)...
+        echo   Copying files - this may take a moment
         robocopy "%%d" "%BUNDLE%" /E /R:3 /W:3 /NFL /NDL /NJH /NJS /NC /NS /NP >nul 2>&1
         if %errorlevel% geq 8 (
-            echo   WARNING: some files could not be copied (code %errorlevel%)
+            echo   WARNING: some files could not be copied - code %errorlevel%
             set "ERR=1"
         )
     )
