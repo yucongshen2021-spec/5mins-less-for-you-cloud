@@ -104,7 +104,7 @@ if not customer_zips:
     r = subprocess.run(
         [sys.executable, str(PROJECT_ROOT / "tools" / "build_release.py"),
          "--version", CUSTOMER_VERSION, "--no-runtime"],
-        cwd=str(PROJECT_ROOT), capture_output=True, text=True,
+        cwd=str(PROJECT_ROOT), capture_output=True, text=True, encoding="utf-8",
     )
     (PROJECT_ROOT / "RELEASE_INFO.json").write_text(ri_bak, encoding="utf-8")
     if r.returncode != 0:

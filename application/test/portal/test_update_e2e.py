@@ -156,7 +156,7 @@ def phase1_build():
              "--version", TEST_VERSION_OLD,
              "--no-runtime"],
             cwd=str(PROJECT_ROOT),
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
         )
         check("Build old version", result.returncode == 0,
               result.stderr.strip()[-200:] if result.returncode != 0 else "")
@@ -172,7 +172,7 @@ def phase1_build():
              "--version", TEST_VERSION_NEW,
              "--no-runtime"],
             cwd=str(PROJECT_ROOT),
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
         )
         check("Build new version", result.returncode == 0,
               result.stderr.strip()[-200:] if result.returncode != 0 else "")

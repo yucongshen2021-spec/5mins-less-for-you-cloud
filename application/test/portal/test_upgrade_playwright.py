@@ -99,7 +99,7 @@ ri_bak = (PROJECT_ROOT / "RELEASE_INFO.json").read_text(encoding="utf-8")
 r = subprocess.run(
     [sys.executable, str(PROJECT_ROOT / "tools" / "build_release.py"),
      "--version", NEW_VERSION, "--no-runtime"],
-    cwd=str(PROJECT_ROOT), capture_output=True, text=True,
+    cwd=str(PROJECT_ROOT), capture_output=True, text=True, encoding="utf-8",
 )
 (PROJECT_ROOT / "RELEASE_INFO.json").write_text(ri_bak, encoding="utf-8")
 check("Build new version", r.returncode == 0, r.stderr[-200:] if r.returncode != 0 else "")
@@ -116,7 +116,7 @@ if not customer_zips:
     r = subprocess.run(
         [sys.executable, str(PROJECT_ROOT / "tools" / "build_release.py"),
          "--version", CUSTOMER_VERSION, "--no-runtime"],
-        cwd=str(PROJECT_ROOT), capture_output=True, text=True,
+        cwd=str(PROJECT_ROOT), capture_output=True, text=True, encoding="utf-8",
     )
     (PROJECT_ROOT / "RELEASE_INFO.json").write_text(ri_bak, encoding="utf-8")
     customer_zips = sorted(DIST_DIR.glob(f"*-{CUSTOMER_VERSION}.zip"),

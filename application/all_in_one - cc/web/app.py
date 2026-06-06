@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """all_in_one web — Flask backend using exec() to load business logic without tkinter mainloop."""
 

@@ -3,7 +3,7 @@ chcp 65001 >nul
 set "PYTHONUTF8=1"
 set "PORT=5003"
 
-rem 优先用包内便携 Python（zip 根/runtime/python/python.exe），否则回退到系统 py -3
+rem Prefer bundled portable Python (runtime/python/python.exe), fallback to system py -3
 set "PYTHON=%~dp0..\..\runtime\python\python.exe"
 if exist "%PYTHON%" (set "PYTHONNOUSERSITE=1") else (set "PYTHON=py -3")
 
