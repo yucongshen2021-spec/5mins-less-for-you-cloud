@@ -65,55 +65,61 @@ def proxy_to(app_id: str, subpath: str, port_map: dict) -> Response:
     if request.query_string:
         target += "?" + request.query_string.decode("utf-8")
 
+    backend_req = _build_proxy_request(target)
     try:
-        backend_req = _build_proxy_request(target)
-        with urllib.request.urlopen(backend_req, timeout=3600) as resp:
-            resp_headers = _filter_headers(dict(resp.headers))
-            content_type = resp.headers.get("Content-Type", "").lower()
-            is_sse = "text/event-stream" in content_type
-
-            if is_sse:
-                def generate():
-                    while True:
-                        chunk = resp.readline()
-                        if not chunk:
-                            break
-                        yield chunk
-                return Response(generate(), status=resp.status,
-                                headers=resp_headers,
-                                content_type="text/event-stream")
-
-            body = resp.read()
-
-            content_encoding = resp.headers.get("Content-Encoding", "")
-            if "gzip" in content_encoding:
-                try:
-                    body = gzip.decompress(body)
-                except Exception:
-                    pass
-                resp_headers.pop("Content-Encoding", None)
-
-            is_html = any(m in content_type for m in _HTML_MIMES)
-            is_js = any(m in content_type for m in _JS_MIMES)
-
-            if is_html or is_js:
-                body_str = body.decode("utf-8", errors="replace")
-
-                # Rewrite absolute paths in both HTML and JS
-                body_str = _rewrite_paths(body_str, app_id)
-
-                if is_html:
-                    # Inject <base> so relative URLs resolve correctly
-                    base_tag = f'<base href="/app/{app_id}/">'
-                    if "<head>" in body_str:
-                        body_str = body_str.replace("<head>", f"<head>\n  {base_tag}", 1)
-
-                body = body_str.encode("utf-8")
-                resp_headers["Content-Length"] = str(len(body))
-
-            return Response(body, status=resp.status, headers=resp_headers)
-
+        resp = urllib.request.urlopen(backend_req, timeout=3600)
     except urllib.error.HTTPError as e:
         return Response(e.read() or b"", status=e.code)
     except Exception as e:
         return Response(f"Proxy error: {e}", status=502)
+
+    resp_headers = _filter_headers(dict(resp.headers))
+    content_type = resp.headers.get("Content-Type", "").lower()
+    is_sse = "text/event-stream" in content_type
+
+    if is_sse:
+        def generate():
+            try:
+                while True:
+                    chunk = resp.readline()
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                resp.close()
+        return Response(generate(), status=resp.status,
+                        headers=resp_headers,
+                        content_type="text/event-stream")
+
+    try:
+        body = resp.read()
+    finally:
+        resp.close()
+
+    content_encoding = resp.headers.get("Content-Encoding", "")
+    if "gzip" in content_encoding:
+        try:
+            body = gzip.decompress(body)
+        except Exception:
+            pass
+        resp_headers.pop("Content-Encoding", None)
+
+    is_html = any(m in content_type for m in _HTML_MIMES)
+    is_js = any(m in content_type for m in _JS_MIMES)
+
+    if is_html or is_js:
+        body_str = body.decode("utf-8", errors="replace")
+
+        # Rewrite absolute paths in both HTML and JS
+        body_str = _rewrite_paths(body_str, app_id)
+
+        if is_html:
+            # Inject <base> so relative URLs resolve correctly
+            base_tag = f'<base href="/app/{app_id}/">'
+            if "<head>" in body_str:
+                body_str = body_str.replace("<head>", f"<head>\n  {base_tag}", 1)
+
+        body = body_str.encode("utf-8")
+        resp_headers["Content-Length"] = str(len(body))
+
+    return Response(body, status=resp.status, headers=resp_headers)
