@@ -12,7 +12,7 @@ import urllib.error
 from pathlib import Path
 from unittest import mock
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parents[2] / "portal"
 sys.path.insert(0, str(HERE))
 import update_check  # noqa: E402
 
