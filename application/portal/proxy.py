@@ -67,8 +67,22 @@ def proxy_to(app_id: str, subpath: str, port_map: dict) -> Response:
 
     try:
         backend_req = _build_proxy_request(target)
-        with urllib.request.urlopen(backend_req, timeout=60) as resp:
+        with urllib.request.urlopen(backend_req, timeout=3600) as resp:
             resp_headers = _filter_headers(dict(resp.headers))
+            content_type = resp.headers.get("Content-Type", "").lower()
+            is_sse = "text/event-stream" in content_type
+
+            if is_sse:
+                def generate():
+                    while True:
+                        chunk = resp.readline()
+                        if not chunk:
+                            break
+                        yield chunk
+                return Response(generate(), status=resp.status,
+                                headers=resp_headers,
+                                content_type="text/event-stream")
+
             body = resp.read()
 
             content_encoding = resp.headers.get("Content-Encoding", "")
@@ -79,7 +93,6 @@ def proxy_to(app_id: str, subpath: str, port_map: dict) -> Response:
                     pass
                 resp_headers.pop("Content-Encoding", None)
 
-            content_type = resp.headers.get("Content-Type", "").lower()
             is_html = any(m in content_type for m in _HTML_MIMES)
             is_js = any(m in content_type for m in _JS_MIMES)
 
