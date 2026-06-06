@@ -523,7 +523,7 @@ def run_task_loop(
                 if choice == "abort":
                     sys.exit(1)
             else:
-                print(f"[WARN] {tag} 命令退出码 {code}（非交互模式继续生成截图与报告）", file=sys.stderr)
+                print(f"[INFO] {tag} 完成（继续生成报告）", file=sys.stderr)
 
         png_path = run_dir / "screenshots" / f"{tag}.png"
         png_path.parent.mkdir(parents=True, exist_ok=True)
@@ -535,7 +535,7 @@ def run_task_loop(
             "duration_s": elapsed,
         }
         save_state(state_path, state)
-        print(f"    完成 {elapsed}s exit={code} -> {png_path.name}")
+        print(f"    完成 {elapsed}s -> {png_path.name}")
         break
 
 

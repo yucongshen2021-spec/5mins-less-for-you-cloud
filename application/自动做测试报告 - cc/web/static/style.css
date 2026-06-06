@@ -169,6 +169,8 @@ body {
 /* Log */
 .log-area {
   flex: 1;
+  max-height: 420px;
+  overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
