@@ -14,7 +14,6 @@ app = Flask(__name__, template_folder="web/templates", static_folder="web/static
 
 CURRENT_DIR = Path(__file__).resolve().parent
 ROOT = CURRENT_DIR
-REPORT_DIR = ROOT / "report"
 SCRIPT = ROOT / "src" / "make_report.py"
 ENGINE_EXE = ROOT / "src" / "make_report.exe"
 
@@ -193,16 +192,6 @@ def _run_worker(task_id: str, cmd: list[str], run_dir: Path, cfg: dict) -> None:
         rel_path = report.relative_to(ROOT / "log")
         q.put(f"[OK] 报告已生成\n")
         q.put(f"__DOWNLOAD__ {rel_path}\n")
-
-        # 复制报告到用户 report/ 文件夹
-        try:
-            REPORT_DIR.mkdir(parents=True, exist_ok=True)
-            import shutil
-            dest = REPORT_DIR / report.name
-            shutil.copy2(report, dest)
-            q.put(f"[OK] 报告已复制到 report/{report.name}\n")
-        except Exception as e:
-            q.put(f"[WARN] 复制到 report/ 失败: {e}\n")
     except Exception as exc:
         q.put(f"[ERROR] {exc}\n")
     finally:

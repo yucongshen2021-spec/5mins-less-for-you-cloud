@@ -168,19 +168,30 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 /* ═══════════════════════════════════════════════════ scrollbar ═══════════════════════════════════════════════════ */
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--hls2);border-radius:3px}
 
-/* ═══════════ 级联场景菜单 ═══════════ */
-.cascade-menu{display:flex;align-items:flex-start;gap:0;position:relative;margin-bottom:10px}
-.cascade-label{font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.8px;padding:6px 10px 6px 0;white-space:nowrap;flex-shrink:0}
-.cascade-col{list-style:none;padding:0;margin:0;min-width:170px;background:var(--sf);border:1px solid var(--hl);border-radius:var(--rm);overflow:visible}
-.cascade-col li{position:relative}
-.cascade-col li a{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;font-size:13px;font-weight:500;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;transition:background .12s}
-.cascade-col li a:hover,.cascade-col li a.active{background:linear-gradient(135deg,rgba(245,78,0,.15),rgba(255,160,110,.06))}
-.cascade-col li a .arr{font-size:10px;color:var(--mu);margin-left:12px}
-.cascade-col .cascade-col{position:absolute;left:100%;top:0;display:none;z-index:5}
-.cascade-col li:hover>.cascade-col{display:block}.cascade-col li.active-path>.cascade-col{display:block}
-.cascade-col li a.leaf .arr{display:none}
-.cascade-col li a.leaf:hover,.cascade-col li a.leaf.selected{background:var(--ink);color:var(--cv)}
-.cascade-col li a.leaf.selected::before{content:'✓ ';font-size:11px}
+/* ═══════════ 场景选择栏 + 芯片 + 级联 dropdown ═══════════ */
+.tpl-scene-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;position:relative;padding-bottom:0;transition:padding-bottom .15s}
+.tpl-scene-bar.dropdown-open{padding-bottom:210px}
+.tpl-scene-bar .cascade-label{font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.88px;white-space:nowrap;flex-shrink:0}
+.tpl-chips{display:flex;gap:6px;flex-wrap:wrap;flex:1;justify-content:flex-end}
+.tpl-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;font-size:11px;font-weight:600;letter-spacing:.88px;text-transform:uppercase;border-radius:9999px;background:var(--sf-strong);color:var(--ink);cursor:pointer;transition:background .12s;border:none;white-space:nowrap}
+.tpl-chip:hover{background:var(--hl-strong)}
+.tpl-chip.active{background:var(--ink);color:var(--cv)}
+.tpl-chip .chip-x{margin-left:2px;font-size:14px;line-height:1;opacity:.5;cursor:pointer}
+.tpl-chip .chip-x:hover{opacity:1}
+/* cascade trigger wrapper */
+.tpl-trigger-wrap{position:relative;display:inline-flex}
+/* cascade dropdown */
+.cascade-dropdown{position:absolute;top:100%;left:0;z-index:20;background:var(--sf);border:1px solid var(--hl);border-radius:var(--rm);box-shadow:0 4px 12px rgba(0,0,0,.08);padding:4px 0;min-width:200px;display:none}
+.cascade-dropdown .cascade-col{list-style:none;padding:0;margin:0;min-width:170px;background:transparent;border:none;border-radius:0;overflow:visible}
+.cascade-dropdown .cascade-col li{position:relative}
+.cascade-dropdown .cascade-col li a{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;font-size:13px;font-weight:500;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;transition:background .12s}
+.cascade-dropdown .cascade-col li a:hover,.cascade-dropdown .cascade-col li a.active{background:linear-gradient(135deg,rgba(245,78,0,.15),rgba(255,160,110,.06))}
+.cascade-dropdown .cascade-col li a .arr{font-size:10px;color:var(--mu);margin-left:12px}
+.cascade-dropdown .cascade-col .cascade-col{position:absolute;left:100%;top:0;display:none;z-index:5}
+.cascade-dropdown .cascade-col li:hover>.cascade-col{display:block}
+.cascade-dropdown .cascade-col li a.leaf .arr{display:none}
+.cascade-dropdown .cascade-col li a.leaf:hover,.cascade-dropdown .cascade-col li a.leaf.selected{background:var(--ink);color:var(--cv)}
+.cascade-dropdown .cascade-col li a.leaf.selected::before{content:'✓ ';font-size:11px}
 </style>
 </head>
 <body>
@@ -413,9 +424,15 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <!-- ═══ 我来定模板 ═══ -->
 <section class="tool-panel" id="panel-templates">
 <div class="panel-header"><h1 class="panel-title">我来定模板</h1><p class="panel-subtitle">可视化编辑：数据头 · 变量映射 · 生成模板 · 预览效果</p></div>
-<div class="cascade-menu" id="tpl-cascade">
-  <span class="cascade-label">场景选择</span>
-  <ul id="tpl-col1"></ul>
+<div class="tpl-scene-bar" id="tpl-scene-bar">
+  <span class="cascade-label">已选场景</span>
+  <span class="tpl-trigger-wrap">
+    <button class="btn btn-sm btn-s" id="tpl-cascade-trigger" onclick="toggleCascade()">+ 选择场景</button>
+    <div class="cascade-dropdown" id="tpl-cascade-dropdown">
+      <ul id="tpl-col1"></ul>
+    </div>
+  </span>
+  <div class="tpl-chips" id="tpl-chips"></div>
 </div>
 <div class="card" style="margin-bottom:10px"><div class="card-h" onclick="tg(this)"><span>初始化默认</span><span class="carr">▼</span></div>
 <div class="card-b" id="tpl-init-body"><span style="color:var(--mu);font-size:12px">选择场景后加载初始化参数…</span></div></div>
@@ -743,7 +760,8 @@ function exportOut(tp){
 function toast(m){let t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
 
 /* Template Editor */
-let ck='';
+let _selKeys=[];
+let _ck='';
 let _tplTree=null;
 function _renderCascadeCol(parentUl, nodes, depth){
   let ul=document.createElement('ul');ul.className='cascade-col';
@@ -758,18 +776,63 @@ function _renderCascadeCol(parentUl, nodes, depth){
     }else if(n.key){
       a.className='leaf';a.href='#';
       a.addEventListener('click',e=>{e.preventDefault();
-        // highlight selected
-        ul.querySelectorAll('a.leaf').forEach(x=>x.classList.remove('selected'));
-        a.classList.add('selected');
-        loadSc(n.key);
-        document.querySelectorAll('#tpl-cascade li.active-path').forEach(x=>x.classList.remove('active-path'));
-        let pli=a.closest('li');while(pli){pli.classList.add('active-path');pli=pli.parentElement?.closest('li');}
+        selScene(n.key);
       });
       li.appendChild(a);
     }
     ul.appendChild(li);
   });
   parentUl.appendChild(ul);
+}
+function selScene(key){
+  if(!_selKeys.includes(key)) _selKeys.push(key);
+  _ck=key;
+  closeCascade();
+  renderChips();
+  loadSc(key);
+}
+function rmScene(key){
+  _selKeys=_selKeys.filter(k=>k!==key);
+  if(_ck===key){
+    _ck=_selKeys.length?_selKeys[_selKeys.length-1]:'';
+    if(_ck) loadSc(_ck); else clearEditor();
+  }
+  renderChips();
+}
+function renderChips(){
+  let container=$('tpl-chips');
+  container.innerHTML=_selKeys.map(k=>{
+    let active=k===_ck?' active':'';
+    let esc=k.replace(/'/g,"\\'");
+    return '<span class="tpl-chip'+active+'" onclick="switchScene(\''+esc+'\')">'+k+'<span class="chip-x" onclick="event.stopPropagation();rmScene(\''+esc+'\')">×</span></span>';
+  }).join('');
+}
+function switchScene(key){
+  _ck=key;
+  renderChips();
+  loadSc(key);
+}
+function clearEditor(){
+  $('tpl-header').value='';
+  $('tpl-mapping').value='';
+  $('tpl-template').value='';
+  $('tpl-preview').value='';
+  $('template-status').textContent='';
+  $('tpl-init-body').innerHTML='<span style="color:var(--mu);font-size:12px">选择场景后加载初始化参数…</span>';
+}
+function toggleCascade(){
+  let dd=$('tpl-cascade-dropdown');
+  if(dd.style.display==='block'){
+    closeCascade();
+  }else{
+    dd.style.display='block';
+    $('tpl-scene-bar').classList.add('dropdown-open');
+    if(!_tplTree) ldScens();
+  }
+}
+function closeCascade(){
+  $('tpl-cascade-dropdown').style.display='none';
+  $('tpl-scene-bar').classList.remove('dropdown-open');
 }
 async function ldScens(){
   if(_tplTree)return;
@@ -781,7 +844,7 @@ async function ldScens(){
     }
   }catch(e){}
 }
-async function loadSc(key){if(!key)return;ck=key;$('template-status').textContent='加载中…';$('template-status').className='status';try{let r=await fetch('/api/template/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});let d=await r.json();if(d.ok){$('tpl-header').value=d.header;$('tpl-mapping').value=d.mapping;$('tpl-template').value=d.template;$('tpl-preview').value='# 请点击【预览模板】按钮生成完整预览\n';$('template-status').textContent='已切换: '+key;$('template-status').className='status status-ok'}loadInitDefaults(key)}catch(e){$('template-status').textContent='加载失败';$('template-status').className='status status-err'}}
+async function loadSc(key){if(!key)return;_ck=key;$('template-status').textContent='加载中…';$('template-status').className='status';try{let r=await fetch('/api/template/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});let d=await r.json();if(d.ok){$('tpl-header').value=d.header;$('tpl-mapping').value=d.mapping;$('tpl-template').value=d.template;$('tpl-preview').value='# 请点击【预览模板】按钮生成完整预览\n';$('template-status').textContent='已切换: '+key;$('template-status').className='status status-ok'}loadInitDefaults(key)}catch(e){$('template-status').textContent='加载失败';$('template-status').className='status status-err'}}
 async function loadInitDefaults(key){try{let r=await fetch('/api/init-defaults/'+encodeURIComponent(key));let d=await r.json();if(d.ok&&d.values){let vs=d.values;let h='<div class=fr2 style=gap:8px>';let i=0;for(let[k,v]of Object.entries(vs)){let val=typeof v==='boolean'?(v?'true':'false'):String(v);let labelMap={'DEFAULT_WAN_ETH':'WAN 接口号','DEFAULT_LAN_ETH':'LAN 接口号','DEFAULT_WAN_CIDR':'WAN IP / CIDR','DEFAULT_LAN_CIDR':'LAN IP / CIDR','DEFAULT_WAN_GW':'WAN 网关','DEFAULT_LAN_GW':'LAN 网关','DEFAULT_WAN_DHCP':'WAN DHCP','DEFAULT_LAN_DHCP':'LAN DHCP','DEFAULT_INNER_NETS':'内网段','DEFAULT_GEN_RETURN_ROUTE':'生成回程路由','DEFAULT_DNS1':'首选 DNS','DEFAULT_DNS2':'备选 DNS','DEFAULT_WAN_IP':'WAN IP / CIDR','DEFAULT_LAN_IP':'LAN IP / CIDR','ER_FL_MAIN_NH_DEFAULT':'主回程下一跳','ER_FL_BACKUP_NH_DEFAULT':'备回程下一跳','ER_NE_MAIN_PE_NH_DEFAULT':'主 PE 对接下一跳','ER_NE_BK_PE_NH_DEFAULT':'备 PE 对接下一跳','ER_NE_MAIN_DUM_DEFAULT':'主新增 IP dum 起始号','ER_NE_BK_DUM_DEFAULT':'备新增 IP dum 起始号','ER_NE_MAIN_NAT_RULE_DEFAULT':'主 NAT rule 起始号','ER_NE_BK_NAT_RULE_DEFAULT':'备 NAT rule 起始号','ER_NE_NAT_SOURCE_CIDR_DEFAULT':'NAT 源网段 CIDR','ER_NE_FNET_PROBE_DEFAULT':'100.100 探测 IP','ER_NE_FNET_EXIT_TUNNEL_DEFAULT':'NAT 出口 Tunnel','ER_NE_FNET_NAT_RULE_DEFAULT':'NAT Rule 号','ER_DS_DOMAINS_DEFAULT':'域名列表','ER_DS_ADDR_GROUP_DEFAULT':'Address Group','ER_DS_RULE_NUM_DEFAULT':'LAN-MAP Rule','ER_DS_TABLE_NUM_DEFAULT':'Static Table 号','ER_DS_SOURCE_CIDR_DEFAULT':'源网段 CIDR','ER_DS_ETH_DEFAULT':'应用接口','ER_DS_DNS1_DEFAULT':'首选 DNS','ER_DS_DNS2_DEFAULT':'备选 DNS','ER_DS_TABLE_NH_PRIMARY_DEFAULT':'递归下一跳','ER_DS_STATIC32_PRIMARY_NH_DEFAULT':'主下一跳 /32','ER_DS_TRACK_NAME_DEFAULT':'Track 名称','ER_DS_STATIC32_BACKUP_NH_DEFAULT':'备下一跳 /32','ER_DS_FNET_PROBE_DEFAULT':'探测 IP','ER_DS_FNET_NAT_RULE_DEFAULT':'NAT Rule','ER_DS_EXIT_TUNNEL_DEFAULT':'出口 Tunnel','ER_DS_EXIT_SNAT_IP_DEFAULT':'主线出口 IP','USG_FL_MAIN_TUN_DEFAULT':'主 Tunnel 号','USG_FL_BK_TUN_DEFAULT':'备 Tunnel 号','USG_NE_MAIN_TUN_DEFAULT':'主 Tunnel 号','USG_NE_BK_TUN_DEFAULT':'备 Tunnel 号','USG_NE_MAIN_LOOP_START_DEFAULT':'主 LoopBack 起始','USG_NE_BK_LOOP_START_DEFAULT':'备 LoopBack 起始','USG_NE_MAIN_NQA_DEFAULT':'主 NQA 名称','USG_NE_BK_NQA_DEFAULT':'备 NQA 名称','DEFAULT_WAN1_PORT':'WAN1 端口 (G口)','DEFAULT_WAN2_PORT':'WAN2 端口 (G口)','DEFAULT_WAN1_IP':'WAN1 IP / CIDR','DEFAULT_WAN2_IP':'WAN2 IP / CIDR','DEFAULT_WAN1_GW':'WAN1 网关','DEFAULT_WAN2_GW':'WAN2 网关','DEFAULT_ZIHUAN_PORT':'自环端口 (G口)','DEFAULT_IPSEC_PORT':'IPSec 端口 (G口)','DJ_WAN1_PORT':'主 WAN 端口 (G口)','DJ_WAN1_IP':'主 WAN IP / CIDR','DJ_WAN1_GW':'主 WAN 网关','DJ_WAN2_PORT':'备 WAN 端口 (G口)','DJ_WAN2_IP':'备 WAN IP / CIDR','DJ_WAN2_GW':'备 WAN 网关','DJ_ZIHUAN1_PORT':'主 自环端口 (G口)','DJ_ZIHUAN2_PORT':'备 自环端口 (G口)','DJ_IPSEC1_PORT':'主 IPSec 端口 (G口)','DJ_IPSEC2_PORT':'备 IPSec 端口 (G口)',
 'ER5_FL_MAIN_NH_DEFAULT':'主回程下一跳','ER5_FL_BACKUP_NH_DEFAULT':'备回程下一跳',
 'ER5_NE_MAIN_PE_NH_DEFAULT':'主 PE 对接下一跳','ER5_NE_BK_PE_NH_DEFAULT':'备 PE 对接下一跳',
@@ -791,14 +854,20 @@ async function loadInitDefaults(key){try{let r=await fetch('/api/init-defaults/'
 'ER5_NE_NAT_SOURCE_CIDR_DEFAULT':'NAT 源网段 CIDR',
 'ER5_NE_FNET_PROBE_DEFAULT':'100.100 探测 IP','ER5_NE_FNET_EXIT_TUNNEL_DEFAULT':'NAT 出口 Tunnel（tun=主线 TUNNEL）',
 'ER5_NE_FNET_NAT_RULE_DEFAULT':'NAT Rule 号'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults()>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults()>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
-async function saveInitDefaults(){let vs={};document.querySelectorAll('#tpl-init-body input').forEach(el=>{let k=el.id.replace('ti_','');if(el.type==='checkbox')vs[k]=el.checked;else vs[k]=el.value});try{let r=await fetch('/api/init-defaults/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:ck,values:vs})});let d=await r.json();toast(d.ok?'已保存':'保存失败: '+d.error)}catch(e){toast('保存失败')}}
-async function resetInitDefaults(){if(!confirm('恢复出厂初始化默认值？'))return;try{let r=await fetch('/api/init-defaults/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:ck})});let d=await r.json();if(d.ok&&d.values){let vs=d.values;for(let[k,v]of Object.entries(vs)){let el=document.getElementById('ti_'+k);if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else el.value=typeof v==='boolean'?(v?'true':'false'):String(v)}
+async function saveInitDefaults(){let vs={};document.querySelectorAll('#tpl-init-body input').forEach(el=>{let k=el.id.replace('ti_','');if(el.type==='checkbox')vs[k]=el.checked;else vs[k]=el.value});try{let r=await fetch('/api/init-defaults/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,values:vs})});let d=await r.json();toast(d.ok?'已保存':'保存失败: '+d.error)}catch(e){toast('保存失败')}}
+async function resetInitDefaults(){if(!confirm('恢复出厂初始化默认值？'))return;try{let r=await fetch('/api/init-defaults/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok&&d.values){let vs=d.values;for(let[k,v]of Object.entries(vs)){let el=document.getElementById('ti_'+k);if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else el.value=typeof v==='boolean'?(v?'true':'false'):String(v)}
       toast('已恢复出厂')}}catch(e){toast('恢复失败')}}
-async function prevTpl(){if(!ck){toast('请先选择场景');return}let tpl=$('tpl-template').value,hdr=$('tpl-header').value,prev=$('tpl-preview'),st=$('template-status');st.textContent='预览中…';st.className='status';try{let r=await fetch('/api/template/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:ck,header:hdr,template:tpl})});let d=await r.json();if(d.ok){let out=d.output||'';if(d.total>0){prev.value='# 预览  ──  已填入 '+d.filled+'/'+d.total+' 个变量\n'+out}else{prev.value=out}st.textContent='预览已刷新'+(d.total?' · '+d.filled+'/'+d.total:'');st.className='status status-ok'}else{prev.value='# 预览失败: '+d.error;st.textContent='错误: '+d.error;st.className='status status-err'}}catch(e){prev.value='# 预览失败: '+e.message;st.textContent='网络错误';st.className='status status-err'}}
-async function saveTpl(){if(!ck){toast('请先选择场景');return}let hdr=$('tpl-header').value,mp=$('tpl-mapping').value,tpl=$('tpl-template').value;try{let r=await fetch('/api/template/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:ck,header:hdr,mapping:mp,template:tpl})});let d=await r.json();if(d.ok){toast('已保存并应用');$('template-status').textContent='已保存';$('template-status').className='status status-ok'}else{toast('保存失败: '+d.error)}}catch(e){toast('保存失败')}}
-async function rstTpl(){if(!ck){toast('请先选择场景');return}if(!confirm('即将恢复为最初模板。\n当前场景未保存的编辑将丢失。是否继续？'))return;try{let r=await fetch('/api/template/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:ck})});let d=await r.json();if(d.ok){$('tpl-header').value=d.header;$('tpl-mapping').value=d.mapping;$('tpl-template').value=d.template;$('tpl-preview').value='# 已恢复最初模板\n';$('template-status').textContent='已恢复';$('template-status').className='status status-ok'}}catch(e){toast('恢复失败')}}
+async function prevTpl(){if(!_ck){toast('请先选择场景');return}let tpl=$('tpl-template').value,hdr=$('tpl-header').value,prev=$('tpl-preview'),st=$('template-status');st.textContent='预览中…';st.className='status';try{let r=await fetch('/api/template/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,header:hdr,template:tpl})});let d=await r.json();if(d.ok){let out=d.output||'';if(d.total>0){prev.value='# 预览  ──  已填入 '+d.filled+'/'+d.total+' 个变量\n'+out}else{prev.value=out}st.textContent='预览已刷新'+(d.total?' · '+d.filled+'/'+d.total:'');st.className='status status-ok'}else{prev.value='# 预览失败: '+d.error;st.textContent='错误: '+d.error;st.className='status status-err'}}catch(e){prev.value='# 预览失败: '+e.message;st.textContent='网络错误';st.className='status status-err'}}
+async function saveTpl(){if(!_ck){toast('请先选择场景');return}let hdr=$('tpl-header').value,mp=$('tpl-mapping').value,tpl=$('tpl-template').value;try{let r=await fetch('/api/template/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,header:hdr,mapping:mp,template:tpl})});let d=await r.json();if(d.ok){toast('已保存并应用');$('template-status').textContent='已保存';$('template-status').className='status status-ok'}else{toast('保存失败: '+d.error)}}catch(e){toast('保存失败')}}
+async function rstTpl(){if(!_ck){toast('请先选择场景');return}if(!confirm('即将恢复为最初模板。\n当前场景未保存的编辑将丢失。是否继续？'))return;try{let r=await fetch('/api/template/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok){$('tpl-header').value=d.header;$('tpl-mapping').value=d.mapping;$('tpl-template').value=d.template;$('tpl-preview').value='# 已恢复最初模板\n';$('template-status').textContent='已恢复';$('template-status').className='status status-ok'}}catch(e){toast('恢复失败')}}
+// click outside cascade dropdown to close
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#tpl-scene-bar')){
+    closeCascade();
+  }
+});
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();let ap=document.querySelector('.tool-panel.active');if(ap){let m={'panel-epoch-fastip':'epoch-fastip','panel-usg-fastip':'usg-fastip','panel-epoch-mpls':'epoch-mpls','panel-ar-sdwan':'ar-sdwan'};if(m[ap.id])gen(m[ap.id])}}});
-window.addEventListener('DOMContentLoaded',()=>{showNetPanel('epoch-fastip','hk');ldNotes('epoch-fastip');ldEx('epoch-fastip');ldInitForm('epoch-fastip');ldScens();arPick(document.querySelector('#ar-device-type .variant-pill'));initFireworks()});
+window.addEventListener('DOMContentLoaded',()=>{showNetPanel('epoch-fastip','hk');ldNotes('epoch-fastip');ldEx('epoch-fastip');ldInitForm('epoch-fastip');arPick(document.querySelector('#ar-device-type .variant-pill'));initFireworks()});
 
 /* ═══════════════════════════════════════════════════════════════════ fireworks + sponsor ═══════════════════════════════════════════════════════════════════ */
 let _fwCvs,_fwCtx,_fwParticles=[],_fwRockets=[],_fwRunning=false,_fwTimer=null;
