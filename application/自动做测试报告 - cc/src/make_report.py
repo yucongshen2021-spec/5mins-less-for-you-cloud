@@ -502,6 +502,11 @@ def run_task_loop(
             else:
                 print(f"[WARN] {tag} 异常（非交互模式继续）：{e}", file=sys.stderr)
                 out, code = f"异常: {e}\n", 1
+        except Exception as e:
+            print(f"[WARN] {tag} 未预期异常（非交互模式继续）：{e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+            out, code = f"未预期异常: {e}\n", 1
         except KeyboardInterrupt:
             print("\n已 Ctrl+C 中断")
             if sys.stdin.isatty() and _INTERACTIVE:
@@ -757,30 +762,50 @@ def main() -> None:
             except Exception:
                 pass
             client = None
-        c = paramiko.SSHClient()
-        # 首次连 CE 常见未知主机指纹；仅影响 SSH 信道，不向设备下发任何配置命令
-        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        print(f"SSH 连接中... {cfg.ce_user}@{cfg.ce_host}:{cfg.ce_port}")
-        sys.stdout.flush()
-        try:
-            c.connect(
-                cfg.ce_host,
-                port=cfg.ce_port,
-                username=cfg.ce_user,
-                password=ce_password,
-                allow_agent=False,
-                look_for_keys=False,
-                timeout=30,
-            )
-        except paramiko.AuthenticationException:
-            raise RuntimeError("SSH 登录失败：用户名或密码错误。")
-        except (paramiko.SSHException, socket.timeout, TimeoutError) as exc:
-            raise RuntimeError(f"SSH 连接失败：无法连接到 CE SSH IP {cfg.ce_host}:{cfg.ce_port}。{exc}")
-        except OSError as exc:
-            raise RuntimeError(f"SSH 连接失败：无法连接到 CE SSH IP {cfg.ce_host}:{cfg.ce_port}。{exc}")
-        print(f"SSH 登录成功：{cfg.ce_user}@{cfg.ce_host}:{cfg.ce_port}")
-        client = c
-        return c
+
+        last_err = None
+        for attempt in range(3):
+            if attempt > 0:
+                wait = attempt * 3
+                print(f"SSH 重试 {attempt + 1}/3（等待 {wait}s）...")
+                sys.stdout.flush()
+                time.sleep(wait)
+            c = paramiko.SSHClient()
+            c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            print(f"SSH 连接中... {cfg.ce_user}@{cfg.ce_host}:{cfg.ce_port}")
+            sys.stdout.flush()
+            try:
+                c.connect(
+                    cfg.ce_host,
+                    port=cfg.ce_port,
+                    username=cfg.ce_user,
+                    password=ce_password,
+                    allow_agent=False,
+                    look_for_keys=False,
+                    timeout=15,
+                )
+                print(f"SSH 登录成功：{cfg.ce_user}@{cfg.ce_host}:{cfg.ce_port}")
+                client = c
+                return c
+            except paramiko.AuthenticationException:
+                raise RuntimeError("SSH 登录失败：用户名或密码错误。")
+            except (paramiko.SSHException, EOFError, socket.timeout, TimeoutError, OSError, ConnectionError) as exc:
+                last_err = exc
+                try:
+                    c.close()
+                except Exception:
+                    pass
+                continue
+            except Exception as exc:
+                last_err = exc
+                try:
+                    c.close()
+                except Exception:
+                    pass
+                continue
+        raise RuntimeError(
+            f"SSH 连接失败（重试 3 次后）：无法连接到 CE SSH IP {cfg.ce_host}:{cfg.ce_port}。{last_err}"
+        )
 
     try:
         for tag, cmd in ce_cmds:
