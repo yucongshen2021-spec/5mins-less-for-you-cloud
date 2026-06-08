@@ -194,9 +194,10 @@ def _verify_zip(zip_path: Path) -> dict | None:
 
 
 def perform_upgrade(download_url: str) -> dict:
-    parent = _PROJECT_ROOT.parent
+    parent = _PROJECT_ROOT / "temp" / "upgrade"
+    parent.mkdir(parents=True, exist_ok=True)
     zip_dest = parent / "__update__.zip"
-    bat_dest = parent / "__update__.bat"
+    bat_dest = parent / "update.bat"
 
     for p in (zip_dest, bat_dest):
         try:
