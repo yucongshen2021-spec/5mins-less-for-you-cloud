@@ -37,7 +37,8 @@ echo   5mins-tools release - Online Upgrade
 echo ============================================
 echo.
 
-set "BUNDLE={bundle_path}"
+:: Compute bundle path from BAT location (bat is at BUNDLE\temp\upgrade\update.bat)
+for %%I in ("%~dp0..\..") do set "BUNDLE=%%~fI"
 set "ERR=0"
 
 :: ---- [1/6] Wait for portal to exit ----
@@ -225,8 +226,7 @@ def perform_upgrade(download_url: str) -> dict:
     conflicts = _scan_zip_for_conflicts(zip_dest)
     new_version = release_info.get("version", "unknown")
 
-    bat_content = UPDATE_BAT_TEMPLATE.replace("{bundle_path}", _PROJECT_DIR)
-    bat_dest.write_text(bat_content, encoding="utf-8")
+    bat_dest.write_text(UPDATE_BAT_TEMPLATE, encoding="ascii")
 
     try:
         subprocess.Popen(
