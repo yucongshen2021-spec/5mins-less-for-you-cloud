@@ -114,7 +114,7 @@ def assert_ce_cmd_allowed(cfg: Config, cmd: str) -> None:
     if cfg.product_type == "er":
         validate_ce_interval_i(cfg.ce_ping_interval_i)
         pat = re.compile(
-            rf"^sudo ping -c 500 -i {re.escape(cfg.ce_ping_interval_i.strip())} "
+            rf"^sudo -S ping -c 500 -i {re.escape(cfg.ce_ping_interval_i.strip())} "
             rf"-s (64|1500) ({IPV4_CORE})$"
         )
         if not pat.match(c):
@@ -122,7 +122,7 @@ def assert_ce_cmd_allowed(cfg: Config, cmd: str) -> None:
         return
     validate_ce_interval_m(cfg.ce_ping_interval_m)
     ping_pat = re.compile(
-        rf"^ping -c 500 -s (64|1500) -m {re.escape(cfg.ce_ping_interval_m.strip())} "
+        rf"^ping -s (64|1500) -c 500 -m {re.escape(cfg.ce_ping_interval_m.strip())} "
         rf"({IPV4_CORE})$"
     )
     if ping_pat.match(c):
@@ -573,17 +573,17 @@ def build_ce_commands(cfg: Config) -> list[tuple[str, str]]:
     if cfg.product_type == "er":
         i = cfg.ce_ping_interval_i.strip()
         return [
-            ("01_ce_main_small", f"sudo ping -c 500 -i {i} -s 64 {cfg.main_ip}"),
-            ("02_ce_main_large", f"sudo ping -c 500 -i {i} -s 1500 {cfg.main_ip}"),
-            ("03_ce_backup_small", f"sudo ping -c 500 -i {i} -s 64 {cfg.backup_ip}"),
-            ("04_ce_backup_large", f"sudo ping -c 500 -i {i} -s 1500 {cfg.backup_ip}"),
+            ("01_ce_main_small", f"sudo -S ping -c 500 -i {i} -s 64 {cfg.main_ip}"),
+            ("02_ce_main_large", f"sudo -S ping -c 500 -i {i} -s 1500 {cfg.main_ip}"),
+            ("03_ce_backup_small", f"sudo -S ping -c 500 -i {i} -s 64 {cfg.backup_ip}"),
+            ("04_ce_backup_large", f"sudo -S ping -c 500 -i {i} -s 1500 {cfg.backup_ip}"),
         ]
     m = cfg.ce_ping_interval_m.strip()
     return [
-        ("01_ce_main_small", f"ping -c 500 -s 64 -m {m} {cfg.main_ip}"),
-        ("02_ce_main_large", f"ping -c 500 -s 1500 -m {m} {cfg.main_ip}"),
-        ("03_ce_backup_small", f"ping -c 500 -s 64 -m {m} {cfg.backup_ip}"),
-        ("04_ce_backup_large", f"ping -c 500 -s 1500 -m {m} {cfg.backup_ip}"),
+        ("01_ce_main_small", f"ping -s 64 -c 500 -m {m} {cfg.main_ip}"),
+        ("02_ce_main_large", f"ping -s 1500 -c 500 -m {m} {cfg.main_ip}"),
+        ("03_ce_backup_small", f"ping -s 64 -c 500 -m {m} {cfg.backup_ip}"),
+        ("04_ce_backup_large", f"ping -s 1500 -c 500 -m {m} {cfg.backup_ip}"),
     ]
 
 
