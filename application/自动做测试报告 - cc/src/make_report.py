@@ -286,12 +286,17 @@ def ssh_exec_ce(client: paramiko.SSHClient, cmd: str, sudo_password: str, cfg: C
         stdin.write(sudo_password + "\n")
         stdin.flush()
     stdin.close()
-    out_b = stdout.read()
-    err_b = stderr.read()
+    out_lines: list[str] = []
+    for line_b in iter(stdout.readline, b""):
+        line = line_b.decode("utf-8", errors="replace")
+        line = strip_ansi(line)
+        out_lines.append(line)
+        sys.stdout.write(line)
+        sys.stdout.flush()
     code = stdout.channel.recv_exit_status()
-    out = (out_b or b"").decode("utf-8", errors="replace")
+    err_b = stderr.read()
+    out = "".join(out_lines)
     err = (err_b or b"").decode("utf-8", errors="replace")
-    out = strip_ansi(out)
     err = strip_ansi(err)
     if err.strip():
         out = out.rstrip() + "\n" + err.strip()
@@ -756,6 +761,8 @@ def main() -> None:
         c = paramiko.SSHClient()
         # 首次连 CE 常见未知主机指纹；仅影响 SSH 信道，不向设备下发任何配置命令
         c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        print(f"SSH 连接中... {cfg.ce_user}@{cfg.ce_host}:{cfg.ce_port}")
+        sys.stdout.flush()
         try:
             c.connect(
                 cfg.ce_host,

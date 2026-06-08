@@ -126,12 +126,12 @@ def api_logs(task_id):
             return
         while True:
             try:
-                line = q.get(timeout=30)
+                line = q.get(timeout=120)
                 yield f"data: {line}\n\n"
                 if line.startswith("__DONE") or line.startswith("[OK] 报告已生成") or line.startswith("[ERROR]") or line.startswith("[WARN] 任务已被中断"):
                     break
             except queue.Empty:
-                yield f"data: [WARN] 等待超时\n\n"
+                yield f"data: [WARN] 日志流超时（120s 无输出）\n\n"
                 break
 
     return Response(
