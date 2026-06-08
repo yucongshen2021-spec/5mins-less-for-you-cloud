@@ -114,7 +114,7 @@ def assert_ce_cmd_allowed(cfg: Config, cmd: str) -> None:
     if cfg.product_type == "er":
         validate_ce_interval_i(cfg.ce_ping_interval_i)
         pat = re.compile(
-            rf"^sudo -S ping -c 500 -i {re.escape(cfg.ce_ping_interval_i.strip())} "
+            rf"^sudo ping -c 500 -i {re.escape(cfg.ce_ping_interval_i.strip())} "
             rf"-s (64|1500) ({IPV4_CORE})$"
         )
         if not pat.match(c):
@@ -287,8 +287,7 @@ def ssh_exec_ce(client: paramiko.SSHClient, cmd: str, sudo_password: str, cfg: C
         stdin.flush()
     stdin.close()
     out_lines: list[str] = []
-    for line_b in iter(stdout.readline, b""):
-        line = line_b.decode("utf-8", errors="replace")
+    for line in iter(stdout.readline, ""):
         line = strip_ansi(line)
         out_lines.append(line)
         sys.stdout.write(line)
@@ -296,7 +295,7 @@ def ssh_exec_ce(client: paramiko.SSHClient, cmd: str, sudo_password: str, cfg: C
     code = stdout.channel.recv_exit_status()
     err_b = stderr.read()
     out = "".join(out_lines)
-    err = (err_b or b"").decode("utf-8", errors="replace")
+    err = (err_b or "") if isinstance(err_b, str) else (err_b or b"").decode("utf-8", errors="replace")
     err = strip_ansi(err)
     if err.strip():
         out = out.rstrip() + "\n" + err.strip()
@@ -578,10 +577,10 @@ def build_ce_commands(cfg: Config) -> list[tuple[str, str]]:
     if cfg.product_type == "er":
         i = cfg.ce_ping_interval_i.strip()
         return [
-            ("01_ce_main_small", f"sudo -S ping -c 500 -i {i} -s 64 {cfg.main_ip}"),
-            ("02_ce_main_large", f"sudo -S ping -c 500 -i {i} -s 1500 {cfg.main_ip}"),
-            ("03_ce_backup_small", f"sudo -S ping -c 500 -i {i} -s 64 {cfg.backup_ip}"),
-            ("04_ce_backup_large", f"sudo -S ping -c 500 -i {i} -s 1500 {cfg.backup_ip}"),
+            ("01_ce_main_small", f"sudo ping -c 500 -i {i} -s 64 {cfg.main_ip}"),
+            ("02_ce_main_large", f"sudo ping -c 500 -i {i} -s 1500 {cfg.main_ip}"),
+            ("03_ce_backup_small", f"sudo ping -c 500 -i {i} -s 64 {cfg.backup_ip}"),
+            ("04_ce_backup_large", f"sudo ping -c 500 -i {i} -s 1500 {cfg.backup_ip}"),
         ]
     m = cfg.ce_ping_interval_m.strip()
     return [
