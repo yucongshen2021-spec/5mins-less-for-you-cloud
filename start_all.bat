@@ -14,7 +14,7 @@ echo ============================================
 echo   Network Tools Portal
 echo ============================================
 echo.
-echo   Python: %PYTHON%
+echo   Using bundled Python runtime
 echo.
 echo   [1/2] Cleaning old processes...
 for %%p in (5003 5002 5001 5004 5000) do call :kill_port %%p
@@ -39,7 +39,6 @@ echo ============================================
 echo.
 cd /d "%~dp0application\portal"
 %PYTHON% app.py
-pause
 goto :eof
 
 :kill_port
