@@ -201,6 +201,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <button class="nav-tab" data-panel="usg-fastip">USG FastIP</button>
 <button class="nav-tab" data-panel="epoch-mpls">Epoch MPLS</button>
 <button class="nav-tab" data-panel="ar-sdwan">AR SD-WAN</button>
+<button class="nav-tab" data-panel="ar-traditional">AR 传统组网</button>
 <button class="nav-tab" data-panel="templates">我来定模板</button>
 <button class="nav-tab" data-panel="thanks">感谢</button>
 </div></nav>
@@ -421,6 +422,52 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 </div>
 </section>
 
+<!-- ═══ AR 传统组网 ═══ -->
+<section class="tool-panel" id="panel-ar-traditional">
+<div class="panel-header"><h1 class="panel-title">AR 传统组网</h1><p class="panel-subtitle">双线 BGP + GRE + IPSec · 华为 AR 配置生成</p></div>
+<div class="variant-bar" data-tool="ar-traditional">
+<button class="variant-pill active" data-variant="dual">双线</button>
+</div>
+<div class="info-row">
+<div class="card"><div class="card-h" onclick="tg(this)"><span>备注说明</span><span class="carr">▼</span></div><div class="card-b"><textarea class="ft notes" id="ar-traditional-notes" readonly></textarea></div></div>
+<div class="card"><div class="card-h" onclick="tg(this)"><span>填写示例</span><span class="carr">▼</span></div><div class="card-b"><textarea class="ft ex" id="ar-traditional-example" readonly></textarea></div></div>
+</div>
+<div class="editor-grid">
+<div class="card"><div class="card-h">数据头输入</div><div class="card-b p0"><textarea class="ft hdr" id="ar-traditional-header" placeholder="粘贴数据头（含主备两条 LineID）…"></textarea></div><div style="padding:6px 12px;border-top:1px solid var(--hls);display:flex;gap:6px"><button class="btn btn-s" onclick="clearAll('ar-traditional')" style="font-size:11px">清除数据头</button></div></div>
+<div class="card"><div class="card-h">参数设置</div><div class="card-b">
+<div class="fg"><label class="fl">Hostname</label><input class="fi" id="ar-traditional-hostname" placeholder="从数据头自动提取"></div>
+<div class="fr2">
+<div class="fg"><label class="fl">WAN 接口</label><input class="fi" id="ar-traditional-wan-if" value="GigabitEthernet0/0/9"></div>
+<div class="fg"><label class="fl">LAN 接口</label><input class="fi" id="ar-traditional-lan-if" value="GigabitEthernet0/0/1"></div>
+</div>
+<div class="fr2">
+<div class="fg"><label class="fl">WAN IP</label><input class="fi" id="ar-traditional-wan-ip" value="173.15.30.40"></div>
+<div class="fg"><label class="fl">WAN 掩码</label><input class="fi" id="ar-traditional-wan-mask" value="255.255.255.0"></div>
+</div>
+<div class="fr2">
+<div class="fg"><label class="fl">LAN IP</label><input class="fi" id="ar-traditional-lan-ip" value="173.15.20.10"></div>
+<div class="fg"><label class="fl">LAN 掩码</label><input class="fi" id="ar-traditional-lan-mask" value="255.255.255.0"></div>
+</div>
+<div class="fr2">
+<div class="fg"><label class="fl">WAN 网关</label><input class="fi" id="ar-traditional-wan-gw" value="173.15.30.254"></div>
+<div class="fg"><label class="fl">LAN 网关</label><input class="fi" id="ar-traditional-lan-gw" value="173.15.30.254"></div>
+</div>
+<div class="fg"><label class="fl">内网段（每行一个，用于 ACL 和回程路由）</label><textarea class="ft ft-sm" id="ar-traditional-inner-nets">192.168.0.0/16
+172.16.0.0/12
+10.0.0.0/8</textarea></div>
+<div class="fg"><label class="fl">BGP 宣告网段（每行一个，如 173.15.30.0）</label><textarea class="ft ft-sm" id="ar-traditional-bgp-nets">173.15.30.0
+173.15.20.0
+173.15.40.0
+173.15.50.0</textarea></div>
+<div style="display:flex;gap:16px">
+<div class="cb"><input type="checkbox" id="ar-traditional-gen-rr"><label for="ar-traditional-gen-rr">生成回程路由</label></div>
+<div class="cb"><input type="checkbox" id="ar-traditional-bypass"><label for="ar-traditional-bypass">旁挂模式（不生成LAN接口）</label></div>
+</div>
+</div></div></div>
+<div class="btn-row"><button class="btn btn-p" onclick="gen('ar-traditional')">生成配置</button><button class="btn btn-s" onclick="copy('ar-traditional-output')">复制输出</button><button class="btn btn-s" onclick="exportOut('ar-traditional')">导出脚本</button><span class="status" id="ar-traditional-status"></span></div>
+<div class="card"><div class="card-h">生成结果（可直接编辑）</div><div class="card-b p0"><textarea class="ft code-out" id="ar-traditional-output" spellcheck="false" placeholder="点击「生成配置」…"></textarea></div></div>
+</section>
+
 <!-- ═══ 我来定模板 ═══ -->
 <section class="tool-panel" id="panel-templates">
 <div class="panel-header"><h1 class="panel-title">我来定模板</h1><p class="panel-subtitle">可视化编辑：数据头 · 变量映射 · 生成模板 · 预览效果</p></div>
@@ -468,7 +515,7 @@ all_in_one<span style="margin:0 6px;color:#4a4038">·</span>Config Generator<spa
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════ all_in_one web ═══════════════════════════════════════════════════════════════════ */
-const TM={'epoch-fastip':'epoch_fastip','epoch-fastip5':'epoch_fastip5','usg-fastip':'usg_fastip','epoch-mpls':'epoch_mpls','ar-sdwan':'ar_sdwan'};
+const TM={'epoch-fastip':'epoch_fastip','epoch-fastip5':'epoch_fastip5','usg-fastip':'usg_fastip','epoch-mpls':'epoch_mpls','ar-sdwan':'ar_sdwan','ar-traditional':'ar_traditional'};
 let erVersion='4';
 function onER5TunnelTypeChange(){
   let v=document.querySelector('input[name="er5-tunnel-type"]:checked');
@@ -658,6 +705,14 @@ function gn(tp){
     else n={USG_NE_MAIN_TUN_DEFAULT:g('ne-main-tun')?.value||'',USG_NE_BK_TUN_DEFAULT:g('ne-bk-tun')?.value||'',USG_NE_MAIN_LOOP_START_DEFAULT:g('ne-main-loop')?.value||'',USG_NE_BK_LOOP_START_DEFAULT:g('ne-bk-loop')?.value||'',USG_NE_MAIN_NQA_DEFAULT:g('ne-main-nqa')?.value||'',USG_NE_BK_NQA_DEFAULT:g('ne-bk-nqa')?.value||''};
   }else if(v==='domain_split'){
     n={ER_DS_DOMAINS_DEFAULT:g('ds-domains')?.value||'',ER_DS_ADDR_GROUP_DEFAULT:g('ds-addr-group')?.value||'',ER_DS_RULE_NUM_DEFAULT:g('ds-rule-num')?.value||'',ER_DS_TABLE_NUM_DEFAULT:g('ds-table-num')?.value||'',ER_DS_SOURCE_CIDR_DEFAULT:g('ds-src-cidr')?.value||'',ER_DS_ETH_DEFAULT:g('ds-eth')?.value||'',ER_DS_DNS1_DEFAULT:g('ds-dns1')?.value||'',ER_DS_DNS2_DEFAULT:g('ds-dns2')?.value||'',ER_DS_TABLE_NH_PRIMARY_DEFAULT:g('ds-nh')?.value||'',ER_DS_STATIC32_PRIMARY_NH_DEFAULT:g('ds-s32-nh')?.value||'',ER_DS_TRACK_NAME_DEFAULT:g('ds-track')?.value||'',ER_DS_STATIC32_BACKUP_NH_DEFAULT:g('ds-s32-bk')?.value||'',ER_DS_FNET_PROBE_DEFAULT:g('ds-probe')?.value||'',ER_DS_FNET_NAT_RULE_DEFAULT:g('ds-nat-rule')?.value||'',ER_DS_EXIT_TUNNEL_DEFAULT:g('ds-exit-tun')?.value||'',ER_DS_EXIT_SNAT_IP_DEFAULT:g('ds-exit-ip')?.value||''};
+  }else if(tp==='ar-traditional'){
+    n={hostname:g('hostname')?.value||'',
+       wan_if:g('wan-if')?.value||'',wan_ip:g('wan-ip')?.value||'',wan_mask:g('wan-mask')?.value||'',
+       lan_if:g('lan-if')?.value||'',lan_ip:g('lan-ip')?.value||'',lan_mask:g('lan-mask')?.value||'',
+       wan_gw:g('wan-gw')?.value||'',lan_gw:g('lan-gw')?.value||'',
+       inner_nets:g('inner-nets')?.value||'',
+       bgp_networks:g('bgp-nets')?.value||'',
+       gen_return_route:cb('gen-rr'),bypass:cb('bypass')};
   }
   return n;
 }
@@ -693,6 +748,7 @@ async function ldInitForm(tp){
   // Load saved init defaults into the formal page form fields
   try{
     let scenarioMap={'epoch-fastip+hk':'Epoch FastIP · HK 香港出口','epoch-fastip+us':'Epoch FastIP · 非香港出口',
+      'ar-traditional+dual':'AR 传统组网 · 双线',
       'usg-fastip+us':'USG FastIP · 非香港出口','usg-fastip+hk':'USG FastIP · HK 香港出口',
       'epoch-mpls+domestic':'Epoch MPLS · 国内配置','epoch-mpls+overseas':'Epoch MPLS · 海外配置','epoch-mpls+ipsec':'Epoch MPLS · IPSec',
       'epoch-fastip5+hk':'Epoch FastIP 5.0 · HK 香港出口',
@@ -717,7 +773,12 @@ async function ldInitForm(tp){
       ER5_NE_NAT_GROUP_DEFAULT:'ne-nat-group',
       ER5_NE_NAT_SOURCE_CIDR_DEFAULT:'ne-nat-src',
       ER5_NE_FNET_PROBE_DEFAULT:'ne-fnet-probe',ER5_NE_FNET_EXIT_TUNNEL_DEFAULT:'ne-fnet-tunnel',
-      ER5_NE_FNET_NAT_RULE_DEFAULT:'ne-fnet-nat-rule'};
+      ER5_NE_FNET_NAT_RULE_DEFAULT:'ne-fnet-nat-rule',
+      wan_if:'wan-if',wan_ip:'wan-ip',wan_mask:'wan-mask',
+      lan_if:'lan-if',lan_ip:'lan-ip',lan_mask:'lan-mask',
+      wan_gw:'wan-gw',lan_gw:'lan-gw',
+      inner_nets:'inner-nets',bgp_networks:'bgp-nets',
+      gen_return_route:'gen-rr',bypass:'bypass'};
     for(let[k,v]of Object.entries(vs)){
       let fid=fieldMap[k];if(!fid)continue;let el=$(lookupTp+'-'+fid);
       if(!el)continue;
@@ -853,7 +914,13 @@ async function loadInitDefaults(key){try{let r=await fetch('/api/init-defaults/'
 'ER5_NE_NAT_GROUP_DEFAULT':'NAT 源网段组名',
 'ER5_NE_NAT_SOURCE_CIDR_DEFAULT':'NAT 源网段 CIDR',
 'ER5_NE_FNET_PROBE_DEFAULT':'100.100 探测 IP','ER5_NE_FNET_EXIT_TUNNEL_DEFAULT':'NAT 出口 Tunnel（tun=主线 TUNNEL）',
-'ER5_NE_FNET_NAT_RULE_DEFAULT':'NAT Rule 号'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults()>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults()>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
+'ER5_NE_FNET_NAT_RULE_DEFAULT':'NAT Rule 号',
+    'wan_if':'WAN 接口','lan_if':'LAN 接口',
+    'wan_ip':'WAN IP','wan_mask':'WAN 掩码',
+    'lan_ip':'LAN IP','lan_mask':'LAN 掩码',
+    'wan_gw':'WAN 网关','lan_gw':'LAN 网关',
+    'inner_nets':'内网段','bgp_networks':'BGP 宣告网段',
+    'gen_return_route':'生成回程路由','bypass':'旁挂模式'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults()>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults()>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
 async function saveInitDefaults(){let vs={};document.querySelectorAll('#tpl-init-body input').forEach(el=>{let k=el.id.replace('ti_','');if(el.type==='checkbox')vs[k]=el.checked;else vs[k]=el.value});try{let r=await fetch('/api/init-defaults/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,values:vs})});let d=await r.json();toast(d.ok?'已保存':'保存失败: '+d.error)}catch(e){toast('保存失败')}}
 async function resetInitDefaults(){if(!confirm('恢复出厂初始化默认值？'))return;try{let r=await fetch('/api/init-defaults/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok&&d.values){let vs=d.values;for(let[k,v]of Object.entries(vs)){let el=document.getElementById('ti_'+k);if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else el.value=typeof v==='boolean'?(v?'true':'false'):String(v)}
       toast('已恢复出厂')}}catch(e){toast('恢复失败')}}
@@ -866,7 +933,7 @@ document.addEventListener('click',e=>{
     closeCascade();
   }
 });
-document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();let ap=document.querySelector('.tool-panel.active');if(ap){let m={'panel-epoch-fastip':'epoch-fastip','panel-usg-fastip':'usg-fastip','panel-epoch-mpls':'epoch-mpls','panel-ar-sdwan':'ar-sdwan'};if(m[ap.id])gen(m[ap.id])}}});
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();let ap=document.querySelector('.tool-panel.active');if(ap){let m={'panel-epoch-fastip':'epoch-fastip','panel-usg-fastip':'usg-fastip','panel-epoch-mpls':'epoch-mpls','panel-ar-sdwan':'ar-sdwan'};if(m[ap.id])gen(m[ap.id]);else if(ap.id==='panel-ar-traditional')gen('ar-traditional')}}});
 window.addEventListener('DOMContentLoaded',()=>{showNetPanel('epoch-fastip','hk');ldNotes('epoch-fastip');ldEx('epoch-fastip');ldInitForm('epoch-fastip');arPick(document.querySelector('#ar-device-type .variant-pill'));initFireworks()});
 
 /* ═══════════════════════════════════════════════════════════════════ fireworks + sponsor ═══════════════════════════════════════════════════════════════════ */
