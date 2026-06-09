@@ -30,8 +30,19 @@ ike proposal 10
  authentication-method pre-share
  integrity-algorithm hmac-sha2-256
  prf hmac-sha2-256
+ike proposal 11
+ encryption-algorithm 3des
+ dh group2
+ authentication-algorithm sha1
+ sa duration 28800
+ authentication-method pre-share
+ integrity-algorithm hmac-sha2-256
+ prf hmac-sha2-256
 #
 ipsec proposal ipsectran1
+ esp authentication-algorithm sha1
+ esp encryption-algorithm 3des
+ipsec proposal ipsectran2
  esp authentication-algorithm sha1
  esp encryption-algorithm 3des
 #
@@ -49,7 +60,7 @@ ike peer backup
  version 1
  undo version 2
  pre-shared-key cipher {backup_psk}
- ike-proposal 10
+ ike-proposal 11
  dpd idle-time 10
  dpd type on-demand
  dpd retransmit-interval 2
@@ -64,7 +75,7 @@ ipsec policy S2S-IPSEC 20 isakmp
  security acl 3334
  pfs dh-group2
  ike-peer backup
- proposal ipsectran1
+ proposal ipsectran2
 #
 interface LoopBack1000
  description To IPSec main
