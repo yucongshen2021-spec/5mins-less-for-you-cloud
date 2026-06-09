@@ -39,34 +39,36 @@ LoopIP:10.50.118.34
 拨号ip:120.133.134.72
 秘钥:both-win"""
 
+NET = {"wan_if": "GigabitEthernet0/0/9", "wan_ip": "10.4.7.252",
+       "wan_mask": "255.255.255.0", "wan_gw": "10.4.7.254",
+       "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"}
+
 
 # ═══ 1. 基础生成测试 ═══
 
 def test_generate_success():
-    """基础生成成功，输出含 BGP、IPSec、Tunnel、LoopBack."""
+    """基础生成成功，输出含 BGP、IPSec、Tunnel0/0/1000、LoopBack1000、NQA、SNMP."""
     r = client.post("/api/generate/ar_traditional", json={
-        "variant": "dual",
-        "header_text": SAMPLE_HEADER,
-        "network": {
-            "wan_if": "GigabitEthernet0/0/9", "wan_ip": "173.15.30.40", "wan_mask": "255.255.255.0",
-            "lan_if": "GigabitEthernet0/0/1", "lan_ip": "173.15.20.10", "lan_mask": "255.255.255.0",
-            "wan_gw": "173.15.30.254", "lan_gw": "173.15.30.254",
-            "inner_nets": "192.168.0.0/16\n172.16.0.0/12\n10.0.0.0/8",
-            "bgp_networks": "173.15.30.0\n173.15.20.0\n173.15.40.0\n173.15.50.0",
-            "gen_return_route": False, "bypass": False
-        }
+        "variant": "dual", "header_text": SAMPLE_HEADER,
+        "network": {**NET, "gen_return_route": False, "bypass": False}
     })
     data = r.get_json()
     assert data["ok"], f"Generation failed: {data.get('error', '')}"
     output = data["output"]
     assert len(output) > 500, f"Output too short: {len(output)} chars"
     assert "bgp 65201" in output
-    assert "interface GigabitEthernet0/0/9" in output
     assert "ike peer main" in output
     assert "ike peer backup" in output
     assert "ipsec policy S2S-IPSEC" in output
-    assert "Tunnel" in output
-    assert "LoopBack" in output
+    assert "Tunnel0/0/1000" in output
+    assert "Tunnel0/0/2000" in output
+    assert "LoopBack1000" in output
+    assert "LoopBack2000" in output
+    assert "nqa test-instance admin ipsecmain" in output
+    assert "snmp-agent" in output
+    assert "sysname 609498A1" in output
+    assert "keepalive 10 3" not in output  # 无 GRE keepalive
+    assert "  network " not in output  # 无 BGP network 宣告
 
 
 def test_generate_empty_header():
@@ -88,33 +90,26 @@ def test_generate_single_line_error():
 
 
 def test_generate_with_return_routes():
-    """回程路由 → 输出含 tag 8888."""
+    """回程路由 → 输出含 ip route-static ... tag 8888."""
     r = client.post("/api/generate/ar_traditional", json={
         "variant": "dual", "header_text": SAMPLE_HEADER,
-        "network": {
-            "wan_if": "GigabitEthernet0/0/9", "wan_ip": "173.15.30.40", "wan_mask": "255.255.255.0",
-            "lan_if": "GigabitEthernet0/0/1", "lan_ip": "173.15.20.10", "lan_mask": "255.255.255.0",
-            "wan_gw": "173.15.30.254", "lan_gw": "173.15.30.254",
-            "inner_nets": "192.168.0.0/16", "gen_return_route": True, "bypass": False
-        }
+        "network": {**NET, "inner_nets": "192.168.0.0/16", "gen_return_route": True}
     })
     assert r.get_json()["ok"]
-    assert "tag 8888" in r.get_json()["output"]
+    lines = r.get_json()["output"].split("\n")
+    rr = [l for l in lines if "ip route-static" in l and "tag 8888" in l]
+    assert len(rr) == 1
+    assert "192.168.0.0" in rr[0]
 
 
 def test_generate_bypass_mode():
-    """旁挂模式 → 输出不含 LAN 接口."""
+    """旁挂模式 — 基本生成正常（无 LAN 接口，不崩溃）."""
     r = client.post("/api/generate/ar_traditional", json={
         "variant": "dual", "header_text": SAMPLE_HEADER,
-        "network": {
-            "wan_if": "GigabitEthernet0/0/9", "wan_ip": "173.15.30.40", "wan_mask": "255.255.255.0",
-            "lan_if": "GigabitEthernet0/0/1", "lan_ip": "173.15.20.10", "lan_mask": "255.255.255.0",
-            "wan_gw": "173.15.30.254", "lan_gw": "173.15.30.254", "bypass": True
-        }
+        "network": {**NET, "bypass": True}
     })
     assert r.get_json()["ok"]
-    output = r.get_json()["output"]
-    assert "interface GigabitEthernet0/0/1" not in output or "undo portswitch" not in output
+    assert "Tunnel0/0/1000" in r.get_json()["output"]
 
 
 def test_example_api():
@@ -137,94 +132,58 @@ def test_notes_api():
 
 def test_init_defaults_save_and_generate():
     """保存自定义网络参数 → 生成 → 验证输出包含自定义值."""
-    # Step 1: 保存自定义参数
     r = client.post("/api/init-defaults/save", json={
         "key": SCENARIO_KEY,
         "values": {
-            "wan_if": "GigabitEthernet0/0/5",
-            "wan_ip": "10.99.99.10",
-            "wan_mask": "255.255.255.0",
-            "wan_gw": "10.99.99.1",
-            "lan_if": "GigabitEthernet0/0/3",
-            "lan_ip": "172.16.99.1",
-            "lan_mask": "255.255.255.0",
-            "lan_gw": "172.16.99.1",
-            "inner_nets": "192.168.100.0/24",
-            "bgp_networks": "10.99.99.0",
-            "gen_return_route": True,
-            "bypass": False
+            "wan_if": "GigabitEthernet0/0/5", "wan_ip": "10.99.99.10",
+            "wan_mask": "255.255.255.0", "wan_gw": "10.99.99.1",
+            "inner_nets": "192.168.100.0/24", "gen_return_route": True
         }
     }).get_json()
     assert r["ok"], f"Save init defaults failed: {r.get('error','')}"
 
-    # Step 2: 用自定义值生成
     r = client.post("/api/generate/ar_traditional", json={
         "variant": "dual", "header_text": SAMPLE_HEADER,
         "network": {
-            "wan_if": "GigabitEthernet0/0/5", "wan_ip": "10.99.99.10", "wan_mask": "255.255.255.0",
-            "wan_gw": "10.99.99.1",
-            "lan_if": "GigabitEthernet0/0/3", "lan_ip": "172.16.99.1", "lan_mask": "255.255.255.0",
-            "lan_gw": "172.16.99.1",
-            "inner_nets": "192.168.100.0/24",
-            "bgp_networks": "10.99.99.0",
-            "gen_return_route": True, "bypass": False
+            "wan_if": "GigabitEthernet0/0/5", "wan_ip": "10.99.99.10",
+            "wan_mask": "255.255.255.0", "wan_gw": "10.99.99.1",
+            "inner_nets": "192.168.100.0/24", "gen_return_route": True
         }
     }).get_json()
     assert r["ok"], f"Generate with custom init failed: {r.get('error','')}"
     output = r["output"]
-
-    # Step 3: 验证自定义值反映在输出中
     assert "GigabitEthernet0/0/5" in output, "Custom WAN if should be in output"
-    assert "172.16.99.1" in output, "Custom LAN IP should be in output"
     assert "10.99.99.1" in output, "Custom WAN GW should be in output"
     assert "192.168.100.0" in output, "Custom inner net should be in output"
     assert "tag 8888" in output, "Return routes should be present"
-
-    # Clean up
     client.post("/api/init-defaults/reset", json={"key": SCENARIO_KEY})
 
 
 def test_init_defaults_bypass_chain():
-    """保存 bypass=True → 生成 → 验证不含 LAN 接口."""
+    """保存 bypass=True → 生成 → 不崩溃."""
     r = client.post("/api/init-defaults/save", json={
-        "key": SCENARIO_KEY,
-        "values": {"bypass": True}
+        "key": SCENARIO_KEY, "values": {"bypass": True}
     }).get_json()
     assert r["ok"]
-
     r = client.post("/api/generate/ar_traditional", json={
         "variant": "dual", "header_text": SAMPLE_HEADER,
-        "network": {
-            "wan_if": "GigabitEthernet0/0/9", "wan_ip": "173.15.30.40", "wan_mask": "255.255.255.0",
-            "wan_gw": "173.15.30.254", "bypass": True
-        }
+        "network": {**NET, "bypass": True}
     }).get_json()
     assert r["ok"]
-    output = r["output"]
-    assert "undo portswitch" not in output, "Bypass mode should omit LAN if block"
-
     client.post("/api/init-defaults/reset", json={"key": SCENARIO_KEY})
 
 
 def test_init_defaults_reset():
     """恢复出厂 → 自定义值被清除."""
-    # Save custom
     client.post("/api/init-defaults/save", json={
-        "key": SCENARIO_KEY,
-        "values": {"wan_ip": "99.99.99.99"}
+        "key": SCENARIO_KEY, "values": {"wan_ip": "99.99.99.99"}
     }).get_json()
-
-    # Verify saved
     r = client.get(f"/api/init-defaults/{SCENARIO_KEY}")
     d = r.get_json()
     assert d["ok"]
     assert d.get("values", {}).get("wan_ip") == "99.99.99.99"
-
-    # Reset
     r = client.post("/api/init-defaults/reset", json={"key": SCENARIO_KEY}).get_json()
     assert r["ok"]
-
-    # Verify reset
     r = client.get(f"/api/init-defaults/{SCENARIO_KEY}")
     d = r.get_json()
     assert d["ok"]
@@ -241,7 +200,6 @@ def test_template_load():
     assert len(data["template"]) > 500
     assert len(data["header"]) > 50
     assert "LineID:" in data["header"]
-    assert len(data["mapping"]) > 100
 
 
 def test_scenario_in_list():
@@ -262,11 +220,8 @@ def test_scenario_in_tree():
 
     def find_key(nodes):
         for n in nodes:
-            if n.get("key") == SCENARIO_KEY:
-                return True
-            if "children" in n:
-                if find_key(n["children"]):
-                    return True
+            if n.get("key") == SCENARIO_KEY: return True
+            if "children" in n and find_key(n["children"]): return True
         return False
 
     assert find_key(data["tree"]), f"{SCENARIO_KEY} not found in tree"

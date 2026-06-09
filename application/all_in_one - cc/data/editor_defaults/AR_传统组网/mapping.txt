@@ -1,59 +1,30 @@
-hostname  设备主机名 (默认取 LineID)
-main_lineid  主线 LineID
-main_pe  主线 PE 名称
-main_tunnel  主线 Tunnel 接口
-main_wanip  主线 WAN IP/CIDR
-main_pe_docking  主线 PE 对接 IP
-main_ce_docking  主线 CE 对接 IP
-main_pe_as  主线 PE AS 号
-main_ce_as  主线 CE AS 号
-main_zihuan  主线自环网段
-main_dial_pe  主线拨号 PE
-main_dial_docking_ip  主线拨号对接 IP
-main_loop_ip  主线 LoopBack IP
-main_dial_ip  主线拨号 IP (IPSec 远端)
+﻿hostname  设备主机名（默认取 LineID）
+hostname  设备主机名
+acl_2707_block  ACL 2707规则块
+main_loop_ip  主线LoopBack IP
+main_pe_docking  主线PE对接IP
+backup_loop_ip  备线LoopBack IP
+backup_pe_docking  备线PE对接IP
 main_psk  主线预共享密钥
-backup_lineid  备线 LineID
-backup_pe  备线 PE 名称
-backup_tunnel  备线 Tunnel 接口
-backup_wanip  备线 WAN IP/CIDR
-backup_pe_docking  备线 PE 对接 IP
-backup_ce_docking  备线 CE 对接 IP
-backup_pe_as  备线 PE AS 号
-backup_ce_as  备线 CE AS 号
-backup_zihuan  备线自环网段
-backup_dial_pe  备线拨号 PE
-backup_dial_docking_ip  备线拨号对接 IP
-backup_loop_ip  备线 LoopBack IP
-backup_dial_ip  备线拨号 IP (IPSec 远端)
+main_dial_ip  主线拨号IP(IPSec远端)
 backup_psk  备线预共享密钥
-wan_if_name  WAN 接口名
-wan_ip  WAN IP
-wan_mask  WAN 子网掩码
-lan_if_name  LAN 接口名
-lan_ip  LAN IP
-lan_mask  LAN 子网掩码
-wan_gw  WAN 网关
-lan_gw  LAN 网关
-ce_as  CE AS 号
+backup_dial_ip  备线拨号IP(IPSec远端)
+main_pe  主线PE
+main_tunnel  主线Tunnel(数据头)
+main_tunnel_local_ip  主线Tunnel本地IP
+backup_pe  备线PE
+backup_tunnel  备线Tunnel
+backup_tunnel_local_ip  备线Tunnel本地IP
+wan_if_block  WAN接口块
+main_tunnel_remote_ip  主线Tunnel远端IP
+backup_tunnel_remote_ip  备线Tunnel远端IP
+static_routes_block  静态路由块
+return_routes_block  回程路由块
+bgp_filter_prefix_block  BGP Filter Prefix块
+ce_as  CE AS号
 bgp_router_id  BGP Router ID
-peer_main_ip  BGP 主 Peer IP
-peer_main_as  BGP 主 Peer AS
-peer_backup_ip  BGP 备 Peer IP
-peer_backup_as  BGP 备 Peer AS
-bgp_networks_block  BGP 宣告网段
-bgp_filter_prefix_block  BGP Filter Prefix List
-acl_inner_rules_block  内网段 ACL 规则
-static_routes_block  静态路由
-return_routes_block  回程路由
-lan_if_block  LAN 接口配置
-wan_if_block  WAN 接口配置
-loopback_main_block  主线 LoopBack
-loopback_backup_block  备线 LoopBack
-tunnel_main_block  主线 GRE Tunnel
-tunnel_backup_block  备线 GRE Tunnel
-ike_peer_main_block  主线 IKE Peer
-ike_peer_backup_block  备线 IKE Peer
-ipsec_acl_main_block  主线 IPSec ACL
-ipsec_acl_backup_block  备线 IPSec ACL
-ipsec_policy_block  IPSec Policy
+peer_main_ip  BGP主Peer IP
+peer_main_as  BGP主Peer AS
+peer_backup_ip  BGP备Peer IP
+peer_backup_as  BGP备Peer AS
+main_wan_ip_plain  主线WAN IP(纯)

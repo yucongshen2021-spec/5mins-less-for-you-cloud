@@ -2425,11 +2425,9 @@ def _snapshot_factory_defaults():
     _BOOL_DEFAULTS = {"DEFAULT_WAN_DHCP": False, "DEFAULT_LAN_DHCP": True,
                       "DEFAULT_GEN_RETURN_ROUTE": False, "gen_return_route": False, "bypass": False}
     _STR_DEFAULTS_AR_TRAD = {
-        "wan_if": "GigabitEthernet0/0/9", "wan_ip": "173.15.30.40", "wan_mask": "255.255.255.0",
-        "lan_if": "GigabitEthernet0/0/1", "lan_ip": "173.15.20.10", "lan_mask": "255.255.255.0",
-        "wan_gw": "173.15.30.254", "lan_gw": "173.15.30.254",
-        "inner_nets": "192.168.0.0/16\n172.16.0.0/12\n10.0.0.0/8",
-        "bgp_networks": "173.15.30.0\n173.15.20.0\n173.15.40.0\n173.15.50.0",
+        "wan_if": "GigabitEthernet0/0/9", "wan_ip": "10.4.7.252", "wan_mask": "255.255.255.0",
+        "wan_gw": "10.4.7.254",
+        "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16",
     }
     for info in _SCENARIO_LIST:
         ns = _load_module(info["source"])
@@ -2702,9 +2700,8 @@ def _get_init_keys(slot):
                 "DEFAULT_LAN_ETH","DEFAULT_LAN_CIDR","DEFAULT_LAN_GW",
                 "DEFAULT_WAN_DHCP","DEFAULT_LAN_DHCP","DEFAULT_INNER_NETS","DEFAULT_GEN_RETURN_ROUTE"]
     if slot == "TEMPLATE_AR_TRADITIONAL":
-        return ["wan_if","wan_ip","wan_mask","lan_if","lan_ip","lan_mask",
-                "wan_gw","lan_gw","inner_nets","bgp_networks",
-                "gen_return_route","bypass"]
+        return ["wan_if","wan_ip","wan_mask","wan_gw",
+                "inner_nets","gen_return_route","bypass"]
     if "TEMPLATE_AR_" in slot:  # AR SD-WAN templates (OPS/Factory)
         return ["DEFAULT_WAN1_PORT","DEFAULT_WAN1_IP","DEFAULT_WAN1_GW",
                 "DEFAULT_WAN2_PORT","DEFAULT_WAN2_IP","DEFAULT_WAN2_GW",
