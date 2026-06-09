@@ -461,7 +461,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 173.15.50.0</textarea></div>
 <div style="display:flex;gap:16px">
 <div class="cb"><input type="checkbox" id="ar-traditional-gen-rr"><label for="ar-traditional-gen-rr">生成回程路由</label></div>
-<div class="cb"><input type="checkbox" id="ar-traditional-bypass"><label for="ar-traditional-bypass">旁挂模式（不生成LAN接口）</label></div>
+<div class="cb"><input type="checkbox" id="ar-traditional-bypass" onchange="bypassToggleARTraditional()"><label for="ar-traditional-bypass">旁挂模式（不生成LAN接口）</label></div>
 </div>
 </div></div></div>
 <div class="btn-row"><button class="btn btn-p" onclick="gen('ar-traditional')">生成配置</button><button class="btn btn-s" onclick="copy('ar-traditional-output')">复制输出</button><button class="btn btn-s" onclick="exportOut('ar-traditional')">导出脚本</button><span class="status" id="ar-traditional-status"></span></div>
@@ -637,6 +637,22 @@ function bypassToggle(tp){
   })
 }
 
+// AR 传统组网 bypass toggle — uses lan-if/lan-ip/lan-mask/lan-gw (not lan-eth/lan-cidr/lan-gw/lan-dhcp)
+function bypassToggleARTraditional(){
+  let on=$('ar-traditional-bypass')?.checked||false;
+  ['lan-if','lan-ip','lan-mask','lan-gw'].forEach(f=>{
+    let el=$('ar-traditional-'+f); if(!el)return;
+    if(on){
+      if(!el.disabled)el.dataset.prev=el.value;
+      el.value=''; el.disabled=true; el.style.color='var(--mu)';
+    }else{
+      el.disabled=false; el.style.color='';
+      el.value=el.dataset.prev||el.getAttribute('data-default')||'';
+      delete el.dataset.prev;
+    }
+  })
+}
+
 // Save default values as data-default attributes for restore
 function _stashDefaults(tp){
   ['wan-eth','wan-cidr','wan-gw','lan-eth','lan-cidr','lan-gw'].forEach(f=>{
@@ -796,6 +812,7 @@ async function ldInitForm(tp){
         else if(oldRadio)oldRadio.checked=true;
       }
       _applyToggles(lookupTp)
+      if(lookupTp==='ar-traditional')bypassToggleARTraditional()
   }catch(e){}
 }
 async function ldNotes(tp){let el=$(tp+'-notes');if(!el)return;let v=tp==='ar-sdwan'?'default':gv(tp);if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/notes/'+tm+'?variant='+v+'&_='+Date.now());let d=await r.json();el.value=d.ok?d.notes:''}catch(e){}}
