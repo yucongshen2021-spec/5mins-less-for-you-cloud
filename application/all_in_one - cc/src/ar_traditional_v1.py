@@ -305,10 +305,21 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
                         or network.get("DEFAULT_GEN_RETURN_ROUTE")
                         or False)
 
-    bgp_networks = network.get("bgp_networks") or []
+    bgp_networks_raw = network.get("bgp_networks") or ""
     inner_nets_raw = (network.get("inner_nets")
                       or network.get("DEFAULT_INNER_NETS")
                       or "")
+    # Parse both into lists (they may arrive as newline/comma-separated strings from frontend)
+    bgp_networks = []
+    for token in re.split(r'[\n,，\s]+', str(bgp_networks_raw)):
+        t = token.strip()
+        if t:
+            bgp_networks.append(t)
+    inner_nets = []
+    for token in re.split(r'[\n,，\s]+', inner_nets_raw):
+        t = token.strip()
+        if t:
+            inner_nets.append(t)
 
     # ── 构建基础字段 ──
     d = {}
@@ -437,11 +448,7 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
     # --- ACL inner rules 块 ---
     acl_inner_lines = []
     # 合并 bgp_networks + inner_nets_raw
-    all_inner_nets = list(bgp_networks)
-    for token in re.split(r'[\n,，\s]+', inner_nets_raw or ""):
-        t = token.strip()
-        if t:
-            all_inner_nets.append(t)
+    all_inner_nets = list(bgp_networks) + list(inner_nets)
 
     rule_num = 10
     for net in all_inner_nets:
@@ -573,7 +580,7 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
     # --- 回程路由块（tag 8888，下一跳 = WAN 网关）---
     return_lines = []
     if gen_return_route and wan_gw:
-        for net in bgp_networks:
+        for net in inner_nets:
             net_str = str(net).strip()
             if not net_str:
                 continue
