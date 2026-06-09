@@ -1,0 +1,247 @@
+user_activity 生成记录
+ts: 2026-06-08T09:41:33+08:00
+event: generate.config
+tool: epoch_mpls
+variant: ipsec
+data_header_chars: 1056
+output_script_lines: 175
+
+=== data_header ===
+LineID:608614D1
+PE:hkg1-upe2
+Tunnel:Tunnel0/0/1401
+wanip:10.30.139.20/30
+PE 对接:10.200.200.28
+CE 对接:10.50.59.46
+PE AS号:65139
+CE AS号:65204
+
+拨号PE:hkg1-upe2
+对接IP:10.200.200.28
+LoopIP:10.50.59.46
+拨号ip:43.229.117.51
+秘钥:both-win
+
+--- IKE (ike-peer IPSEC) ---
+key-exchange: ikev1/ikev2
+proposal 1:
+  dh-group: 2
+  encryption: aes256 aes128 3des
+  hash: sha1
+  prf: hmac-sha2-256
+dead-peer-detection: yes
+  type: ondemand
+  idle-time: 10
+
+--- IPsec proposal (IPSEC) ---
+proposal 1:
+  encryption: aes256 aes128 3des
+  hash: sha1
+
+LineID:608614D2
+PE:hkj-upe2
+Tunnel:Tunnel0/0/1705
+wanip:10.33.62.120/30
+PE 对接:10.200.200.71
+CE 对接:10.50.124.226
+PE AS号:65532
+CE AS号:65204
+
+拨号PE:hkj-upe2
+对接IP:10.200.200.71
+LoopIP:10.50.124.226
+拨号ip:157.120.224.206
+秘钥:both-win
+
+--- IKE (ike-peer IPSEC) ---
+key-exchange: ikev1/ikev2
+proposal 1:
+  dh-group: 2
+  encryption: aes256 aes128 3des
+  hash: sha256 sha1
+  prf: hmac-sha2-256
+dead-peer-detection: yes
+  type: ondemand
+  idle-time: 10
+
+--- IPsec proposal (IPSEC) ---
+proposal 1:
+  encryption: aes256 aes128 3des
+  hash: sha256 sha1
+
+=== output_script ===
+# ==========================================================
+# Epoch MPLS IPSec 配置  Hostname: 608614D
+# 主线 Tunnel:tun1401  PE:hkg1-upe2  Public:43.229.117.51
+# 备线 Tunnel:tun1705  PE:hkj-upe2  Public:157.120.224.206
+# ==========================================================
+set firewall all-ping 'enable'
+set firewall broadcast-ping 'disable'
+set firewall config-trap 'disable'
+set firewall group network-group GROUP-FNET-Whitelist network '43.229.117.226/32'
+set firewall group network-group GROUP-FNET-Whitelist network '43.229.119.251/32'
+set firewall group network-group GROUP-FNET-Whitelist network '120.76.31.146/32'
+set firewall group network-group GROUP-FNET-Whitelist network '202.104.174.178/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.112.236.97/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.112.238.8/29'
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.55.250/32'
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.55.10/32'
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.55.11/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.99/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.100/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.101/32'
+set firewall group network-group GROUP-FNET-Whitelist network '10.0.0.0/8'
+set firewall group network-group GROUP-FNET-Whitelist network '172.16.0.0/12'
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.0.0/16'
+set firewall group network-group GROUP-FNET-Whitelist network '100.68.250.0/24'
+set firewall group network-group GROUP-FNET-Whitelist network '224.0.0.0/4'
+set firewall ipv6-receive-redirects 'disable'
+set firewall ipv6-src-route 'disable'
+set firewall ip-src-route 'disable'
+set firewall log-martians 'enable'
+set firewall name WAN2LOCAL default-action 'drop'
+set firewall name WAN2LOCAL rule 1005 action 'accept'
+set firewall name WAN2LOCAL rule 1005 state established 'enable'
+set firewall name WAN2LOCAL rule 1005 state related 'enable'
+set firewall name WAN2LOCAL rule 1010 action 'accept'
+set firewall name WAN2LOCAL rule 1010 source group network-group 'GROUP-FNET-Whitelist'
+set firewall name WAN2LOCAL rule 1210 action 'accept'
+set firewall name WAN2LOCAL rule 1210 protocol 'gre'
+set firewall name WAN2LOCAL rule 1220 action 'accept'
+set firewall name WAN2LOCAL rule 1220 protocol 'ipip'
+set firewall options interface tun1705 adjust-mss '1400'
+set firewall options interface tun1401 adjust-mss '1400'
+set firewall receive-redirects 'disable'
+set firewall send-redirects 'disable'
+set firewall source-validation 'disable'
+set firewall syn-cookies 'enable'
+set firewall twa-hazards-protection 'disable'
+set interfaces dummy dum0 address '10.50.59.46/32'
+set interfaces dummy dum0 description 'MAIN-loip'
+set interfaces dummy dum1 address '10.50.124.226/32'
+set interfaces dummy dum1 description 'BK-loip'
+set interfaces ethernet eth0 address '10.129.0.179'
+
+set interfaces tunnel tun1705 address '10.33.62.122/30'
+set interfaces tunnel tun1705 description 'BK_hkj-upe2'
+set interfaces tunnel tun1705 encapsulation 'gre'
+set interfaces tunnel tun1705 firewall local name 'WAN2LOCAL'
+set interfaces tunnel tun1705 mtu '1476'
+set interfaces tunnel tun1705 multicast 'disable'
+set interfaces tunnel tun1705 parameters ip ttl '255'
+set interfaces tunnel tun1705 remote '10.200.200.71'
+set interfaces tunnel tun1705 source-address '10.50.124.226'
+set interfaces tunnel tun1401 address '10.30.139.22/30'
+set interfaces tunnel tun1401 description 'MAIN_hkg1-upe2'
+set interfaces tunnel tun1401 encapsulation 'gre'
+set interfaces tunnel tun1401 firewall local name 'WAN2LOCAL'
+set interfaces tunnel tun1401 mtu '1476'
+set interfaces tunnel tun1401 multicast 'disable'
+set interfaces tunnel tun1401 parameters ip ttl '255'
+set interfaces tunnel tun1401 remote '10.200.200.28'
+set interfaces tunnel tun1401 source-address '10.50.59.46'
+set openfalcon endpoint-name '608614D'
+set openfalcon server-address '192.168.237.86'
+
+set policy route-map AS65204-OUT rule 10 action 'permit'
+set policy route-map AS65204-OUT rule 10 match ip address prefix-list 'AS65204-OUT'
+set policy route-map AS65204-OUT rule 20 action 'deny'
+set policy route-map bgp-from--BACKUP rule 10 action 'permit'
+set policy route-map bgp-from--BACKUP rule 10 set local-preference '50'
+set protocols bgp 65204 address-family ipv4-unicast redistribute connected route-map 'AS65204-OUT'
+set protocols bgp 65204 address-family ipv4-unicast redistribute static route-map 'AS65204-OUT'
+set protocols bgp 65204 neighbor 10.30.139.21 address-family ipv4-unicast prefix-list export 'AS65204-OUT'
+set protocols bgp 65204 neighbor 10.30.139.21 address-family ipv4-unicast soft-reconfiguration inbound
+set protocols bgp 65204 neighbor 10.30.139.21 remote-as '65139'
+set protocols bgp 65204 neighbor 10.30.139.21 update-source '10.30.139.22'
+set protocols bgp 65204 neighbor 10.33.62.121 address-family ipv4-unicast prefix-list export 'AS65204-OUT'
+set protocols bgp 65204 neighbor 10.33.62.121 address-family ipv4-unicast route-map import 'bgp-from--BACKUP'
+set protocols bgp 65204 neighbor 10.33.62.121 address-family ipv4-unicast soft-reconfiguration inbound
+set protocols bgp 65204 neighbor 10.33.62.121 remote-as '65532'
+set protocols bgp 65204 neighbor 10.33.62.121 update-source '10.33.62.122'
+set protocols bgp 65204 timers holdtime '15'
+set protocols bgp 65204 timers keepalive '5'
+set protocols static route 0.0.0.0/0 next-hop 10.129.0.1 distance '222'
+set protocols static route 1.1.1.1/32 next-hop 10.129.0.1
+set protocols static route 10.200.200.28/32 next-hop 1.1.1.1
+set protocols static route 10.200.200.71/32 next-hop 1.1.1.1
+set protocols static route 114.113.245.99/32 next-hop 10.30.139.21
+set protocols static route 114.113.245.100/32 next-hop 10.33.62.121
+set protocols static route 43.229.117.51/32 next-hop 1.1.1.1
+set protocols static route 157.120.224.206/32 next-hop 1.1.1.1
+set protocols static route 192.168.55.250/32 next-hop 10.30.139.21 track 'tun1401'
+set protocols static route 192.168.55.250/32 next-hop 10.33.62.121 distance '5'
+set protocols static route 192.168.237.86/32 next-hop 10.30.139.21 track 'tun1401'
+set protocols static route 192.168.237.86/32 next-hop 10.33.62.121 distance '5'
+
+set service ssh disable-host-validation
+set service ssh port '2707'
+set system config-management commit-revisions '100'
+set system conntrack modules ftp
+set system conntrack modules h323
+set system conntrack modules nfs
+set system conntrack modules pptp
+set system conntrack modules sip
+set system conntrack modules sqlnet
+set system conntrack modules tftp
+set system console device ttyS0 speed '115200'
+set system host-name '608614D'
+set system ipv6 disable
+set system login user bothwin authentication plaintext-password 'Tfe28@w%'
+set system name-server 'eth0'
+set system ntp server 192.168.55.250
+set system ntp server ntp.aliyun.com
+set system ntp server time1.vyos.net
+set system option performance 'throughput'
+set system option reboot-on-panic
+set system syslog global facility all level 'info'
+set system syslog global facility protocols level 'debug'
+set system time-zone 'Asia/Shanghai'
+set track name tun1401 failure-count '2'
+set track name tun1401 success-count '2'
+set track name tun1401 test 10 resp-time '5'
+set track name tun1401 test 10 target '10.30.139.21'
+set track name tun1401 test 10 ttl-limit '1'
+set track name tun1401 test 10 type 'ping'
+set vpn ipsec esp-group ESP-1E compression 'disable'
+set vpn ipsec esp-group ESP-1E lifetime '3600'
+set vpn ipsec esp-group ESP-1E mode 'tunnel'
+set vpn ipsec esp-group ESP-1E pfs 'dh-group2'
+set vpn ipsec esp-group ESP-1E proposal 1 encryption '3des'
+set vpn ipsec esp-group ESP-1E proposal 1 hash 'sha1'
+set vpn ipsec ike-group IKE-1E close-action 'none'
+set vpn ipsec ike-group IKE-1E dead-peer-detection action 'restart'
+set vpn ipsec ike-group IKE-1E dead-peer-detection interval '30'
+set vpn ipsec ike-group IKE-1E dead-peer-detection timeout '120'
+set vpn ipsec ike-group IKE-1E ikev2-reauth 'no'
+set vpn ipsec ike-group IKE-1E key-exchange 'ikev1'
+set vpn ipsec ike-group IKE-1E lifetime '28800'
+set vpn ipsec ike-group IKE-1E proposal 1 dh-group '2'
+set vpn ipsec ike-group IKE-1E proposal 1 encryption '3des'
+set vpn ipsec ike-group IKE-1E proposal 1 hash 'sha1'
+set vpn ipsec ipsec-interfaces interface 'eth0'
+set vpn ipsec nat-traversal 'enable'
+set vpn ipsec site-to-site peer 43.229.117.51 authentication mode 'pre-shared-secret'
+set vpn ipsec site-to-site peer 43.229.117.51 authentication pre-shared-secret 'both-win'
+set vpn ipsec site-to-site peer 43.229.117.51 authentication remote-id '43.229.117.51'
+set vpn ipsec site-to-site peer 43.229.117.51 connection-type 'initiate'
+set vpn ipsec site-to-site peer 43.229.117.51 default-esp-group 'ESP-1E'
+set vpn ipsec site-to-site peer 43.229.117.51 ike-group 'IKE-1E'
+set vpn ipsec site-to-site peer 43.229.117.51 ikev2-reauth 'inherit'
+set vpn ipsec site-to-site peer 43.229.117.51 local-address '10.129.0.179'
+set vpn ipsec site-to-site peer 43.229.117.51 tunnel 1 allow-nat-networks 'disable'
+set vpn ipsec site-to-site peer 43.229.117.51 tunnel 1 allow-public-networks 'disable'
+set vpn ipsec site-to-site peer 43.229.117.51 tunnel 1 local prefix '10.50.59.46/32'
+set vpn ipsec site-to-site peer 43.229.117.51 tunnel 1 remote prefix '10.200.200.28/32'
+set vpn ipsec site-to-site peer 157.120.224.206 authentication mode 'pre-shared-secret'
+set vpn ipsec site-to-site peer 157.120.224.206 authentication pre-shared-secret 'both-win'
+set vpn ipsec site-to-site peer 157.120.224.206 authentication remote-id '157.120.224.206'
+set vpn ipsec site-to-site peer 157.120.224.206 connection-type 'initiate'
+set vpn ipsec site-to-site peer 157.120.224.206 default-esp-group 'ESP-1E'
+set vpn ipsec site-to-site peer 157.120.224.206 ike-group 'IKE-1E'
+set vpn ipsec site-to-site peer 157.120.224.206 ikev2-reauth 'inherit'
+set vpn ipsec site-to-site peer 157.120.224.206 local-address '10.129.0.179'
+set vpn ipsec site-to-site peer 157.120.224.206 tunnel 1 allow-nat-networks 'disable'
+set vpn ipsec site-to-site peer 157.120.224.206 tunnel 1 allow-public-networks 'disable'
+set vpn ipsec site-to-site peer 157.120.224.206 tunnel 1 local prefix '10.50.124.226/32'
+set vpn ipsec site-to-site peer 157.120.224.206 tunnel 1 remote prefix '10.200.200.71/32'

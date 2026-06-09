@@ -1,0 +1,857 @@
+user_activity 生成记录
+ts: 2026-06-08T11:52:11+08:00
+event: generate.config
+tool: usg_fastip
+variant: us
+data_header_chars: 601
+output_script_lines: 808
+
+=== data_header ===
+*
+主 IPSEC_PE: szd-ape3
+拨号IP：116.31.80.163
+loIP：10.18.16.76
+感兴趣流：10.18.16.76/32 ～ 10.255.108.0/22
+认证ID：609687A1
+预共享密钥：both-win
+
+
+*
+LineID:609687A1
+PE： lax1-fgpe1
+WANIP: 10.22.110.128/30
+TUNNEL: tun1284
+PE对接：10.255.110.6
+CE对接：10.18.16.76
+出口ip：
+10.61.10.160-64.81.20.108
+
+*
+备 IPSEC_PE: szc-apebk2
+拨号IP：120.133.138.20
+loIP：10.18.14.187
+感兴趣流：10.18.16.76/32 ～ 10.255.108.0/22
+感兴趣流：10.18.14.187/32 ～ 10.255.111.128/25
+认证ID：609687A2
+预共享密钥：both-win
+
+
+*
+LineID:609687A2
+PE： sjc1-fgpe2
+WANIP: 10.22.106.160/30
+TUNNEL: tun1273
+PE对接：10.255.111.158
+CE对接：10.18.14.187
+出口ip：
+10.60.76.102-172.16.23.104(163.192.17.160)
+
+=== output_script ===
+
+主 IPSEC_PE: szd-ape3
+拨号IP：116.31.80.163
+loIP：10.18.16.76
+感兴趣流：10.18.16.76/32 ～ 10.255.108.0/22
+认证ID：609687A1
+预共享密钥：both-win
+
+LineID:609687A1
+PE: lax1-fgpe1
+WANIP: 10.22.110.128/30
+TUNNEL: tun1284
+隧道IP(PE侧): 10.22.110.129
+隧道IP(CE侧): 10.22.110.130
+PE对接：10.255.110.6
+CE对接：10.18.16.76
+出口ip：
+10.61.10.160
+
+备 IPSEC_PE: szc-apebk2
+拨号IP：120.133.138.20
+loIP：10.18.14.187
+感兴趣流：10.18.16.76/32 ～ 10.255.108.0/22
+感兴趣流：10.18.14.187/32 ～ 10.255.111.128/25
+认证ID：609687A2
+预共享密钥：both-win
+
+LineID:609687A1
+PE: sjc1-fgpe2
+WANIP: 10.22.106.160/30
+TUNNEL: tun1273
+隧道IP(PE侧): 10.22.106.161
+隧道IP(CE侧): 10.22.106.162
+PE对接：10.255.111.158
+CE对接：10.18.14.187
+出口ip：
+10.60.76.102
+
+模版是非香港出口，WAN口静态上网，LAN口DHCP下发地址
+一、初始化配置
+1.1、SD卡格式化
+system
+diagnose
+#查看当前SD-Card的状态，未格式化时是"未注册"状态，格式化后是注册状态
+display device disk
+#格式化SD-Card，失败就再格式化一次
+format disk partition nlog
+Y
+return
+disk offline
+Y
+disk online
+Y
+system
+diagnose 
+display device disk
+#查看log日志盘大小是否与SD-Card一致
+display disk partition nlog  
+quit
+
+1.2、NTP配置
+clock timezone Beijing add 08:00:00
+ntp unicast-server 192.168.55.250
+ntp unicast-server 203.107.6.88
+
+1.3、Log流量、策略日志开启
+log type policy enable
+log type traffic enable
+log type traffic-report enable
+
+1.4、威胁防护&资产扫描
+asset threat-insight enable
+asset monitor-host ip 10.0.0.0 mask 8
+asset monitor-host ip 172.16.0.0 mask 12
+asset monitor-host ip 192.168.0.0 mask 16
+
+1.5、特征库更新升级
+update schedule ips-sdb daily 02:44
+update schedule av-sdb daily 03:34
+update schedule sa-sdb daily 04:20
+
+1.6、创建bothwin账号以及3A认证
+#配置tacacs认证登录
+hwtacacs-server template fnetlink_tacacs
+ hwtacacs-server authentication 192.168.55.250
+ hwtacacs-server authorization 192.168.55.250
+ hwtacacs-server accounting 192.168.55.250
+ hwtacacs-server shared-key cipher bothwin
+y
+#
+aaa
+ authentication-scheme fnet_tac
+  authentication-mode hwtacacs local
+ authorization-scheme fnet_tac
+  authorization-mode hwtacacs local
+  authorization-cmd 3 hwtacacs local
+ accounting-scheme fnet_tac
+  accounting-mode hwtacacs
+ recording-scheme fnet_tac
+  recording-mode hwtacacs fnetlink_tacacs
+ cmd recording-scheme fnet_tac
+ service-scheme fnet_tac
+  admin-user privilege level 3
+ domain fnet_tac
+  authentication-scheme fnet_tac  
+  accounting-scheme fnet_tac
+  authorization-scheme fnet_tac
+  hwtacacs-server fnetlink_tacacs
+domain fnet_tac admin
+#
+aaa
+ local-aaa-user password policy administrator
+  password history record number 0
+  password expire 0
+  quit
+ local-user bothwin password irreversible-cipher .x12Tfe192Ti.2024
+ local-user bothwin password-force-change disable
+ local-user bothwin privilege level 3
+y
+ local-user bothwin service-type terminal telnet http ssh
+y
+local-user bothwin@default password irreversible-cipher .x12Tfe192Ti.2024
+local-user bothwin@default password-force-change disable
+local-user bothwin@default privilege level 3
+y
+local-user bothwin@default service-type terminal telnet http ssh
+y
+
+1.7、开启web登录权限
+web-manager enable port 8443
+web-manager http forward enable
+web-manager server-source -i GE0/0/0
+y
+web-manager server-source all-interface
+y
+
+
+1.8、开启ssh登录权限
+stelnet server enable
+ssh ipv4 server port 2707
+Y
+ssh server rsa-key min-length 1024
+ssh user bothwin
+ssh user bothwin authentication-type password
+ssh user bothwin service-type all
+ssh user bothwin sftp-directory flash:
+ssh user bothwin@default 
+ssh user bothwin@default authentication-type password
+ssh user bothwin@default service-type all
+ssh user bothwin@default sftp-directory flash:
+ssh server-source all-interface
+Y
+#
+ssh server cipher aes256_gcm aes128_gcm aes256_ctr aes192_ctr aes128_ctr
+ssh server hmac sha2_256_96 sha2_256 sha1 sha1_96 md5 md5_96
+ssh server key-exchange dh_group_exchange_sha256 dh_group16_sha512 curve25519_sha256
+ssh server publickey ecc x509v3-ssh-rsa rsa_sha2_256 rsa_sha2_512
+#               
+ssh server dh-exchange min-len 1024
+#
+ssh client first-time enable
+#
+ssh client publickey x509v3-ssh-rsa rsa_sha2_256 rsa_sha2_512
+#
+1.9、设置acl白名单登录设备
+acl number 3999
+ rule 5 permit ip source 202.104.174.178 0
+ rule 10 permit ip source 100.64.0.0 0.63.255.255
+ rule 15 permit ip source 113.105.190.147 0
+ rule 20 permit ip source 114.112.238.8 0.0.0.7
+ rule 25 permit ip source 114.113.245.101 0
+ rule 30 permit ip source 120.76.31.146 0
+ rule 35 permit ip source 127.0.0.1 0
+ rule 40 permit ip source 172.16.0.0 0.15.255.255
+ rule 45 permit ip source 183.61.239.168 0
+ rule 50 permit ip source 192.168.0.0 0.0.255.255
+ rule 55 permit ip source 192.168.55.250 0
+ rule 65 permit ip source 59.37.126.140 0
+ rule 70 permit ip source 10.0.0.0 0.255.255.255
+ rule 71 permit ip source 119.145.21.125 0
+ rule 72 permit ip source 43.229.117.21 0
+ rule 73 permit ip source 119.145.21.126 0
+ rule 74 permit ip source 43.229.119.246 0
+#
+ web-manager acl 3999
+ y
+
+user-interface vty 0 15
+ acl 3999 inbound
+ authentication-mode aaa
+ protocol inbound ssh
+#串口
+user-interface console 0    
+ authentication-mode aaa
+
+#
+1.10、设置全局接口tcp-mss
+firewall tcp-mss 1200
+
+1.11、中控配置解锁
+undo configuration exclusive by-user-name huawei
+
+1.12、关闭状态检测
+undo firewall session link-state check
+
+二、接口配置
+2.1、新建IPSec的VRF
+ip vpn-instance ipsecnat1
+ ipv4-family
+2.2.3、静态IP地址
+#WAN接口，允许http、ping通过wanip登录设备
+interface GE0/0/9
+ description WAN-CT-GW-192.168.1.1
+ ip address 192.168.1.190 255.255.255.0
+ service-manage all permit
+ 
+#
+#配置静态默认路由以及IPsec对接路由
+ip route-static 1.1.1.1 32 192.168.1.1
+ip route-static 0.0.0.0 0.0.0.0 1.1.1.1 preference 222
+
+2.3、LAN口配置
+
+dhcp enable
+
+interface GE0/0/8
+ ip address 192.168.8.1 255.255.255.0
+ dhcp select interface
+ dhcp server ip-range 192.168.8.2 192.168.8.254
+ dhcp server gateway-list 192.168.8.1
+ dhcp server dns-list 192.168.8.1
+ service-manage all permit
+
+
+---------------------------------------------------------
+2.4、LoopBack接口
+2.4.1、ipsec主-LoopBack
+interface LoopBack10
+ description FastIP-Main-lo 
+ ip address 10.18.16.76 255.255.255.255
+
+2.4.2、ipsec备-LoopBack
+interface LoopBack11
+ description FastIP-Back-lo
+ ip address 10.18.14.187 255.255.255.255
+
+2.4.3、海外出口假IP接口
+interface LoopBack100
+ description Main-OUT-1(64.81.20.108)
+ ip address 10.61.10.160 255.255.255.255
+interface LoopBack200
+ description Backup-OUT-1(172.16.23.104)
+ ip address 10.60.76.102 255.255.255.255
+
+
+
+2.5、自环接口
+interface GE0/0/7.100
+ description Main_Table_WAN_Customer
+ ip address 100.66.1.1 255.255.255.252
+ dot1q termination vid 100
+ service-manage all permit
+
+interface GE0/0/6.100
+ description IPsec_to_ Main_Table_WAN
+ ip binding vpn-instance ipsecnat1
+ ip address 100.66.1.2 255.255.255.252
+ dot1q termination vid 100
+ service-manage all permit
+
+2.6、自环感兴趣流路由
+#全局添加感兴趣流路由指向自环的VRF，VRF添加本地感兴趣流IP回程路由指回全局
+ip route-static 10.255.108.0 255.255.252.0 100.66.1.2
+ip route-static 10.255.111.128 25 100.66.1.2
+ip route-static vpn-instance ipsecnat1 10.18.16.76 32 100.66.1.1
+ip route-static vpn-instance ipsecnat1 10.18.14.187 32 100.66.1.1
+三、IPSec配置
+3.1、IPSec兴趣流
+#主IPSEC感兴趣流
+acl number 3004
+ rule 5 permit ip vpn-instance ipsecnat1 source 10.18.16.76 0 destination 10.255.108.0 0.0.3.255
+
+#备IPSEC感兴趣流
+acl number 3005
+ rule 5 permit ip vpn-instance ipsecnat1 source 10.18.16.76 0 destination 10.255.108.0 0.0.3.255
+ rule 10 permit ip vpn-instance ipsecnat1 source 10.18.14.187 0 destination 10.255.111.128 0.0.0.127
+
+3.2、IPSec策略
+ipsec remote traffic-identical accept
+ ike proposal 1
+ encryption-algorithm aes-256
+ dh group14
+ authentication-algorithm sha2-256
+ authentication-method pre-share
+ integrity-algorithm hmac-sha2-384
+ prf hmac-sha2-384
+#
+ipsec proposal 1
+ encapsulation-mode auto
+ undo esp authentication-algorithm
+ esp encryption-algorithm aes-128-gcm-128
+
+3.3、主线IKE配置
+ike peer fastip1
+ pre-shared-key both-win
+ ike-proposal 1
+ local-id-type fqdn
+ remote-id-type none
+ local-id 609687A1
+ dpd type periodic
+ sa binding vpn-instance ipsecnat1
+ remote-address vpn-instance ipsecnat1 116.31.80.163
+ negotiate route inject enable
+ y
+
+3.4、备线IKE配置
+ike peer fastip2
+ pre-shared-key both-win
+ ike-proposal 1
+ local-id-type fqdn
+ remote-id-type none
+ local-id 609687A2
+ dpd type periodic
+ sa binding vpn-instance ipsecnat1
+ remote-address vpn-instance ipsecnat1 120.133.138.20
+ negotiate route inject enable
+ y
+
+3.5、主线IPSec配置
+ipsec policy S2S-Fastip1 10 isakmp
+ security acl 3004
+ ike-peer fastip1
+ proposal 1
+ tunnel local 100.66.1.2
+ alias FastIP-Main
+ sa trigger-mode auto
+ sa duration traffic-based 0
+ sa duration time-based 3600
+ route inject dynamic preference 10
+
+3.6、备线IPSec配置
+ipsec policy S2S-Fastip2 10 isakmp
+ security acl 3005
+ ike-peer fastip2
+ proposal 1
+ tunnel local 100.66.1.2
+ alias FastIP-Back
+ sa trigger-mode auto
+ sa duration traffic-based 0
+ sa duration time-based 3600
+ route inject dynamic preference 20
+
+3.7、主IPSec虚拟接口
+interface tunnel1
+ description FastIP-Main-Tunnnel1
+ ip binding vpn-instance ipsecnat1
+ ip address unnumbered interface GE0/0/6.100
+ tunnel-protocol ipsec
+ service-manage all permit
+ ipsec policy S2S-Fastip1
+
+3.8、备IPSec虚拟接口
+interface tunnel2
+ description FastIP-Back-Tunnnel2
+ ip binding vpn-instance ipsecnat1
+ ip address unnumbered interface GE0/0/6.100
+ tunnel-protocol ipsec
+ service-manage all permit
+ ipsec policy S2S-Fastip2
+
+四、GRE Tunnel 配置
+4.1、主出口GRE
+interface Tunnel1000
+ description Main-lax1-fgpe1-tun1284
+ mtu 1300
+ ip address 10.22.110.130 255.255.255.252
+ tunnel-protocol gre
+ source LoopBack10
+ destination 10.255.110.6
+ service-manage all permit
+
+4.2、备出口GRE
+interface Tunnel2000
+ description BK-sjc1-fgpe2-tun1273
+ mtu 1300
+ ip address 10.22.106.162 255.255.255.252
+ tunnel-protocol gre
+ source LoopBack11
+ destination 10.255.111.158
+ service-manage all permit
+
+
+-----------------------------------------------------------------------------
+五、安全区域配置
+5.1、untrust区域
+firewall zone untrust
+add interface GE0/0/9
+
+add interface tunnel1
+add interface tunnel2
+add interface Tunnel1000
+add interface Tunnel2000
+
+
+
+5.2、trust区域
+firewall zone trust
+add interface GE0/0/5
+add interface GE0/0/8
+5.3、ipsecZone区域
+firewall zone name ipsecZone
+add interface GE0/0/6.100
+add interface GE0/0/7.100
+
+六、静态路由配置
+6.1、默认路由
+ip route-static 0.0.0.0 0.0.0.0 1.1.1.1 preference 222
+ip route-static 1.1.1.1 32 192.168.1.1
+6.2、IPSec对接路由
+ip route-static 120.133.138.20 255.255.255.255 1.1.1.1
+ip route-static 116.31.80.163 255.255.255.255 1.1.1.1
+
+6.3、IPSec自环路由
+ip route-static vpn-instance ipsecnat1 0.0.0.0 0.0.0.0 100.66.1.1
+
+6.4、乾坤云路由
+ip route-static 119.145.21.126 255.255.255.255 1.1.1.1 description qiankunyun
+ip route-static 119.145.21.124 255.255.255.255 1.1.1.1 description qiankunyun
+
+6.5、GRE监控路由
+ip route-static 114.113.245.99 255.255.255.255 10.22.110.129 description to-mian-zabbix
+ip route-static 192.168.55.11 255.255.255.255 10.22.106.161 description to-backup-zabbix
+
+6.6、公网BGP路由
+ip route-static 103.252.18.206 255.255.255.255 10.22.110.129 description hkg1-bgpserver5
+ip route-static 103.252.19.206 255.255.255.255 10.22.110.129 description hkg1-bgpserver6
+ip route-static 43.229.117.207 255.255.255.255 10.22.106.161 description szd-bgpserver5
+ip route-static 43.229.119.206 255.255.255.255 10.22.106.161 description szd-bgpserver6
+#
+ip route-static 103.252.18.206 255.255.255.255 NULL0 preference 65 description hkg1-bgpserver5
+ip route-static 103.252.19.206 255.255.255.255 NULL0 preference 65 description hkg1-bgpserver6
+ip route-static 43.229.117.207 255.255.255.255 NULL0 preference 65 description szd-bgpserver5
+ip route-static 43.229.119.206 255.255.255.255 NULL0 preference 65 description szd-bgpserver6
+
+七、NAT配置
+7.1、创建IPSec对端PE兴趣流地址组
+ip address-set FastIP-PE-lo type object
+ address 0 10.255.108.0  mask 22
+ address 1 10.255.111.128 mask 25
+
+7.2、排除PE兴趣流地址SNAT
+nat-policy
+ rule name ipsec-NOT-NAT
+  destination-address address-set FastIP-PE-lo
+  action no-nat
+7.3、排除监控地址SNAT
+rule name ToMainZabbix
+  egress-interface Tunnel1000
+  destination-address 114.113.245.99 mask 255.255.255.255
+  destination-address 192.168.55.10 mask 255.255.255.255
+  action no-nat
+
+rule name ToBackZabbix
+  egress-interface Tunnel2000
+  destination-address 114.113.245.100 mask 255.255.255.255
+  destination-address 192.168.55.11 mask 255.255.255.255
+  action no-nat
+
+7.4、创建自环接口地址对
+ip address-set IPsec-vrf type object
+ address 0 100.66.1.0 mask 30
+
+7.5、自环接口地址对SNAT
+nat-policy
+rule name ipsec-VRF-to-WAN
+  source-zone ipsecZone
+  egress-interface GE0/0/9
+  source-address address-set IPsec-vrf
+  action source-nat easy-ip
+
+7.6、创建内网LAN-IP组
+ip address-set LAN-IP type object
+ address 0 10.0.0.0 mask 8
+ address 1 172.16.0.0 mask 12
+ address 2 192.168.0.0 mask 16
+
+7.7、创建主出口NAT地址组
+nat address-group MAIN-OUT-IP1
+ mode pat
+ section 0 10.61.10.160 10.61.10.160
+
+7.8、创建备出口NAT地址组
+nat address-group BACKUP-OUT-IP1
+ mode pat
+ section 0 10.60.76.102 10.60.76.102
+
+
+
+
+7.9、创建所有IP的地址组（用于DNS拦截）
+ip address-set ALL-IP type object
+ address 0 0.0.0.0 mask 1
+ address 1 128.0.0.0 mask 1
+
+7.10、创建DNS拦截成接口IP（用于DNS拦截）
+destination-nat address-group DNS-IP 1
+ section 0 192.168.1.190 192.168.1.190
+
+7.11、海外主出口SNAT
+nat-policy
+rule name ToMainOUT-1
+  source-zone trust
+  source-zone untrust
+  egress-interface Tunnel1000
+  source-address address-set LAN-IP
+  action source-nat address-group MAIN-OUT-IP1
+
+7.12、海外备出口SNAT
+nat-policy
+rule name ToBackOUT-1
+  source-zone trust
+  source-zone untrust
+  egress-interface Tunnel2000
+  source-address address-set LAN-IP
+  action source-nat address-group BACKUP-OUT-IP1
+
+7.13、国内上网SNAT
+nat-policy
+ rule name ToChinaOUT
+  source-zone local
+  source-zone trust
+  source-zone untrust
+  egress-interface GE0/0/9
+  source-address address-set LAN-IP
+  action source-nat easy-ip
+
+7.14、DNS拦截DNAT
+nat-policy
+ rule name DNS-jiechi
+ disable
+  source-zone untrust
+  source-zone trust
+  source-address address-set LAN-IP
+  destination-address address-set ALL-IP
+  service dns
+  action destination-nat address-group DNS-IP
+  Y
+
+八、NQA配置
+8.1、主IPSec兴趣流NQA
+#注意 NQA 探测联动时间建议在1分钟或者以上，规避 assistant 周期内 因ipsec 未恢复建立而引起循环重置   切换参数按需修改
+nqa test-instance admin ipsec1_nqa
+ test-type icmp
+ destination-address ipv4 10.255.110.6
+ source-address ipv4 10.18.16.76
+ send-trap probefailure
+ send-trap testfailure
+ test-failtimes 2
+ probe-count 4
+ frequency 30
+ start now
+
+8.2、备IPSec兴趣流NQA
+nqa test-instance admin ipsec2_nqa
+ test-type icmp 
+ destination-address ipv4 10.255.111.158
+ source-address ipv4 10.18.14.187
+ send-trap probefailure
+ send-trap testfailure
+ test-failtimes 2
+ probe-count 4
+ frequency 30
+ start now
+
+8.3、海外主GRE隧道NQA
+nqa test-instance fastip main
+ test-type icmp
+ destination-address ipv4 10.22.110.129
+ probe-count 1
+ frequency 5
+ start now
+
+8.4、海外备GRE隧道NQA
+nqa test-instance fastip backup
+ test-type icmp
+ destination-address ipv4 10.22.106.161
+ probe-count 1
+ frequency 5
+ start now
+8.5、跳板机路由
+ip route-static 192.168.55.250 255.255.255.255 10.22.110.129 track nqa fastip main
+ip route-static 192.168.55.250 255.255.255.255 10.22.106.161 preference 70
+
+
+
+
+九、BGP分流配置
+9.1、community-list 配置
+#to_OUT
+ip community-filter 80 index 10 permit 65000:9939
+#to_ct
+ip community-filter 81 index 10 permit 65000:4134
+#to_cnc
+ip community-filter 82 index 10 permit 65000:4837
+#to_cn_other
+ip community-filter 83 index 10 permit 65000:9808
+#to_google
+ip community-filter 88 index 10 permit 65000:9008
+#to_office365
+ip community-filter 91 index 10 permit 65000:9009
+
+9.2、BGP分流下一跳配置
+9.2.1、主线
+route-policy bgp-from--RSVR permit node 100
+ description to-main-out
+ if-match community-filter 80
+ apply ip-address next-hop 10.22.110.129
+#
+route-policy bgp-from--RSVR permit node 200
+ description to-china
+ if-match community-filter 81
+ apply ip-address next-hop 1.1.1.1
+#
+route-policy bgp-from--RSVR permit node 300
+ description to-china
+ if-match community-filter 82
+ apply ip-address next-hop 1.1.1.1
+#
+route-policy bgp-from--RSVR permit node 400
+ description to-china
+ if-match community-filter 83
+ apply ip-address next-hop 1.1.1.1
+#
+route-policy bgp-from--RSVR permit node 500
+ description to-main-out
+ if-match community-filter 91
+ apply ip-address next-hop 10.22.110.129
+#
+route-policy bgp-from--RSVR deny node 999
+#
+9.2.2、备线
+route-policy bgp-from--RSVR2 permit node 100
+ description to-back-out
+ if-match community-filter 80
+ apply ip-address next-hop 10.22.106.161
+ apply local-preference 50
+#
+route-policy bgp-from--RSVR2 permit node 200
+ description to-china
+ if-match community-filter 81
+ apply ip-address next-hop 1.1.1.1
+ apply local-preference 50
+#
+route-policy bgp-from--RSVR2 permit node 300
+ description to-china
+ if-match community-filter 82
+ apply ip-address next-hop 1.1.1.1
+ apply local-preference 50
+#
+route-policy bgp-from--RSVR2 permit node 400
+ description to-china
+ if-match community-filter 83
+ apply ip-address next-hop 1.1.1.1
+ apply local-preference 50
+#
+route-policy bgp-from--RSVR2 permit node 500
+ description to-back-out
+ if-match community-filter 91
+ apply ip-address next-hop 10.22.106.161
+ apply local-preference 50
+#
+route-policy bgp-from--RSVR2 deny node 999
+#
+9.2.3、拒绝发布路由给BGPServer
+route-policy bgp-from--deny deny node 999
+#
+9.3、BGP配置
+bgp 65000
+ router-id 10.61.10.160
+ timer keepalive 5 hold 15
+ y
+ private-4-byte-as enable
+ peer 103.252.18.206 as-number 65000
+ peer 103.252.18.206 connect-interface LoopBack100
+ peer 103.252.19.206 as-number 65000
+ peer 103.252.19.206 connect-interface LoopBack100
+ peer 43.229.117.207 as-number 65000
+ peer 43.229.117.207 connect-interface LoopBack200
+ peer 43.229.119.206 as-number 65000
+ peer 43.229.119.206 connect-interface LoopBack200
+ #
+ ipv4-family unicast
+  preference 20 50 200
+  peer 103.252.18.206 route-policy bgp-from--RSVR import
+  peer 103.252.18.206 route-policy bgp-from--deny export
+  peer 103.252.19.206 enable
+  peer 103.252.19.206 route-policy bgp-from--RSVR import
+  peer 103.252.19.206 route-policy bgp-from--deny export
+  peer 43.229.117.207 enable
+  peer 43.229.117.207 route-policy bgp-from--RSVR2 import
+  peer 43.229.117.207 route-policy bgp-from--deny export
+  peer 43.229.119.206 enable
+  peer 43.229.119.206 route-policy bgp-from--RSVR2 import
+  peer 43.229.119.206 route-policy bgp-from--deny export
+#
+十、安全策略
+10.1、创建邮件规则
+profile type mail-filter name Mail_Protect
+anti-spam filter enable
+
+10.2、创建f-guard安全策略
+security-policy
+ default packet-filter intrazone enable
+ rule name f-guard
+  source-zone dmz
+  source-zone ipsecZone
+  source-zone local
+  source-zone trust
+  source-zone untrust
+  destination-zone dmz
+  destination-zone ipsecZone
+  destination-zone local
+  destination-zone trust
+  destination-zone untrust
+  policy logging
+  session logging
+  profile av default
+  profile ips default
+  profile url-filter default
+  profile data-filter default
+  profile file-block default
+  profile dns-filter default
+  profile mail-filter Mail_Protect
+  action permit 
+
+
+
+十二、DNS配置
+#USG6000F-dns是全局系统概念 、dns查询路由才有vrf概念、所以dns服务开启代理是对系统生效、不同vrf和接口都可以通用一个智能dns服务
+#机制说明：
+#1、source-interface需要与dns服务器都在同一个vpn内，或者都在_public_内，否则不生效
+#2、dns server X.X.X.X vpn-instance ipsecnat1可以指定dns服务器的vpn
+#3、10.255.108.6和  source-interface在同一vpn，因此会正确走感兴趣流访问dns服务器
+#4、223.5.5.5和source-interface不在同一vpn，因此按默认设定走_public_的路由，
+#5、使用出接口IP作为源地址
+#6、如果dns server bind的IP在vpn内，需要指定其vpn，否则不生效
+#7、例如：dns server bind local-ip 192.168.250.1 vpn-instance LAN1
+#8、先删除旧配置，不然旧的DNS配置可能会影响解析结果
+undo dns server
+dns resolve
+dns server 10.255.108.7
+dns server 10.255.108.58
+
+
+dns server source-interface LoopBack10
+不要写，否则DNS劫持不生效
+#dns server bind local-ip 192.168.8.1
+dns-server-select-algorithm fixed
+dns proxy enable
+dns proxy forward-any-response
+dns forward retry-number 0
+dns forward retry-timeout 1
+ #DNS透明代理测试模板
+#dns-transparent-policy
+#dns transparent-proxy enable
+#dns transparent-proxy exclude domain *.faw.cn server preferred 10.10.10.241
+#dns transparent-proxy exclude domain faw.cn server preferred 10.10.10.241
+#mode based-on-multi-interface
+#rule name dns
+# action tpdns
+
+
+十三、OPS配置
+13.1、重置IKE会话
+ops
+ assistant ipsec1_ike
+  execute 1 command reset firewall session table destination global 116.31.80.163
+  condition event feature ike name IKE_NEGO_FAIL PeerAddress eq 116.31.80.163
+
+ assistant ipsec1_sa
+  execute 1 command reset firewall session table destination global 116.31.80.163
+  condition event feature ipsec name IPSEC_TUNNEL_TEARED_DOWN peer-address eq 116.31.80.163
+
+ assistant ipsec1_nqa
+  execute 1 command reset firewall session table destination global 116.31.80.163
+  condition event feature nqa name TEST_FAILED TestName eq ipsec1_nqa
+
+assistant ipsec1_nqa_log
+  execute 1 command reset firewall session table destination global 116.31.80.163
+  condition event feature nqa name nqaResultsProbeFailed TestName eq ipsec1_nqa
+
+ assistant ipsec2_ike
+  execute 1 command reset firewall session table destination global 120.133.138.20
+  condition event feature ike name IKE_NEGO_FAIL PeerAddress eq 120.133.138.20
+
+ assistant ipsec2_sa
+  execute 1 command reset firewall session table destination global 120.133.138.20
+  condition event feature ipsec name IPSEC_TUNNEL_TEARED_DOWN peer-address eq 120.133.138.20
+
+ assistant ipsec2_nqa
+  execute 1 command reset firewall session table destination global 120.133.138.20
+  condition event feature nqa name TEST_FAILED TestName eq ipsec2_nqa
+
+assistant ipsec2_nqa_log
+  execute 1 command reset firewall session table destination global 120.133.138.20
+  condition event feature nqa name nqaResultsProbeFailed TestName eq ipsec2_nqa
+
+
