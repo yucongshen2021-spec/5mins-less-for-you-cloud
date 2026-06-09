@@ -6,7 +6,16 @@ clock timezone bj add 08:00
 ntp-service unicast-server 192.168.55.250
 #
 acl number 2707
-{acl_2707_block}
+ rule 10 permit source 192.168.0.0 0.0.0.255
+ rule 20 permit source 172.16.0.0 0.15.255.255
+ rule 30 permit source 10.0.0.0 0.255.255.255
+ rule 40 permit source 114.112.238.8 0.0.0.7
+ rule 50 permit source 192.168.55.250 0
+ rule 60 permit source 113.105.190.147 0
+ rule 70 permit source 202.104.174.178 0
+ rule 80 permit source 120.76.31.146 0
+ rule 90 permit source 59.37.126.140 0
+ rule 100 permit source 183.61.239.168 0
 #
 acl number 3333
  rule 1 permit ip source {main_loop_ip} 0 destination {main_pe_docking} 0
@@ -104,7 +113,6 @@ nqa test-instance admin ipsecbackup
  start now
 #
 {static_routes_block}
-{return_routes_block}
 #
 {bgp_filter_prefix_block}
 #
@@ -170,7 +178,7 @@ hwtacacs-server template fnetlink_tacacs
  hwtacacs-server authentication 192.168.55.250
  hwtacacs-server authorization 192.168.55.250
  hwtacacs-server accounting 192.168.55.250
- hwtacacs-server source-ip {main_wan_ip_plain}
+ hwtacacs-server source-ip {main_tunnel_local_ip}
  hwtacacs-server shared-key cipher both-win
 #
 aaa

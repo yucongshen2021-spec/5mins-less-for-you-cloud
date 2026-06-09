@@ -2423,7 +2423,7 @@ def _snapshot_factory_defaults():
     if _FACTORY_INIT_DEFAULTS:
         return
     _BOOL_DEFAULTS = {"DEFAULT_WAN_DHCP": False, "DEFAULT_LAN_DHCP": True,
-                      "DEFAULT_GEN_RETURN_ROUTE": False, "gen_return_route": False, "bypass": False}
+                      "DEFAULT_GEN_RETURN_ROUTE": False}
     _STR_DEFAULTS_AR_TRAD = {
         "wan_if": "GigabitEthernet0/0/9", "wan_ip": "10.4.7.252", "wan_mask": "255.255.255.0",
         "wan_gw": "10.4.7.254",
@@ -2444,9 +2444,6 @@ def _snapshot_factory_defaults():
             for k, v in _STR_DEFAULTS_AR_TRAD.items():
                 if k in keys and k not in values:
                     values[k] = v
-            for k in ("gen_return_route", "bypass"):
-                if k in keys and k not in values:
-                    values[k] = False
         _FACTORY_INIT_DEFAULTS[info["key"]] = values
 
 
@@ -2700,8 +2697,7 @@ def _get_init_keys(slot):
                 "DEFAULT_LAN_ETH","DEFAULT_LAN_CIDR","DEFAULT_LAN_GW",
                 "DEFAULT_WAN_DHCP","DEFAULT_LAN_DHCP","DEFAULT_INNER_NETS","DEFAULT_GEN_RETURN_ROUTE"]
     if slot == "TEMPLATE_AR_TRADITIONAL":
-        return ["wan_if","wan_ip","wan_mask","wan_gw",
-                "inner_nets","gen_return_route","bypass"]
+        return ["wan_if","wan_ip","wan_mask","wan_gw","inner_nets"]
     if "TEMPLATE_AR_" in slot:  # AR SD-WAN templates (OPS/Factory)
         return ["DEFAULT_WAN1_PORT","DEFAULT_WAN1_IP","DEFAULT_WAN1_GW",
                 "DEFAULT_WAN2_PORT","DEFAULT_WAN2_IP","DEFAULT_WAN2_GW",

@@ -447,10 +447,6 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <div class="fg"><label class="fl">内网段（每行一个CIDR，用于 ACL、BGP prefix-list、静态路由）</label><textarea class="ft ft-sm" id="ar-traditional-inner-nets">10.0.0.0/8
 172.16.0.0/12
 192.168.0.0/16</textarea></div>
-<div style="display:flex;gap:16px">
-<div class="cb"><input type="checkbox" id="ar-traditional-gen-rr"><label for="ar-traditional-gen-rr">生成回程路由</label></div>
-<div class="cb"><input type="checkbox" id="ar-traditional-bypass" onchange="bypassToggleARTraditional()"><label for="ar-traditional-bypass">旁挂模式（不生成LAN接口）</label></div>
-</div>
 </div></div></div>
 <div class="btn-row"><button class="btn btn-p" onclick="gen('ar-traditional')">生成配置</button><button class="btn btn-s" onclick="copy('ar-traditional-output')">复制输出</button><button class="btn btn-s" onclick="exportOut('ar-traditional')">导出脚本</button><span class="status" id="ar-traditional-status"></span></div>
 <div class="card"><div class="card-h">生成结果（可直接编辑）</div><div class="card-b p0"><textarea class="ft code-out" id="ar-traditional-output" spellcheck="false" placeholder="点击「生成配置」…"></textarea></div></div>
@@ -625,12 +621,6 @@ function bypassToggle(tp){
   })
 }
 
-// AR 传统组网 bypass toggle — 旁挂模式下无 LAN 接口
-function bypassToggleARTraditional(){
-  // 旁挂模式不生成 LAN 接口，模板中无 LAN 字段需要联动
-  // keep for compatibility with _applyToggles call in ldInitForm
-}
-
 // Save default values as data-default attributes for restore
 function _stashDefaults(tp){
   ['wan-eth','wan-cidr','wan-gw','lan-eth','lan-cidr','lan-gw'].forEach(f=>{
@@ -703,8 +693,7 @@ function gn(tp){
     n={hostname:g('hostname')?.value||'',
        wan_if:g('wan-if')?.value||'',wan_ip:g('wan-ip')?.value||'',wan_mask:g('wan-mask')?.value||'',
        wan_gw:g('wan-gw')?.value||'',
-       inner_nets:g('inner-nets')?.value||'',
-       gen_return_route:cb('gen-rr'),bypass:cb('bypass')};
+       inner_nets:g('inner-nets')?.value||''};
   }
   return n;
 }
@@ -768,8 +757,7 @@ async function ldInitForm(tp){
       ER5_NE_FNET_NAT_RULE_DEFAULT:'ne-fnet-nat-rule',
       wan_if:'wan-if',wan_ip:'wan-ip',wan_mask:'wan-mask',
       wan_gw:'wan-gw',
-      inner_nets:'inner-nets',
-      gen_return_route:'gen-rr',bypass:'bypass'};
+      inner_nets:'inner-nets'};
     for(let[k,v]of Object.entries(vs)){
       let fid=fieldMap[k];if(!fid)continue;let el=$(lookupTp+'-'+fid);
       if(!el)continue;
@@ -787,7 +775,6 @@ async function ldInitForm(tp){
         else if(oldRadio)oldRadio.checked=true;
       }
       _applyToggles(lookupTp)
-      if(lookupTp==='ar-traditional')bypassToggleARTraditional()
   }catch(e){}
 }
 async function ldNotes(tp){let el=$(tp+'-notes');if(!el)return;let v=tp==='ar-sdwan'?'default':gv(tp);if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/notes/'+tm+'?variant='+v+'&_='+Date.now());let d=await r.json();el.value=d.ok?d.notes:''}catch(e){}}
@@ -910,8 +897,7 @@ async function loadInitDefaults(key){try{let r=await fetch('/api/init-defaults/'
     'wan_if':'WAN 接口',
     'wan_ip':'WAN IP','wan_mask':'WAN 掩码',
     'wan_gw':'WAN 网关',
-    'inner_nets':'内网段',
-    'gen_return_route':'生成回程路由','bypass':'旁挂模式'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults()>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults()>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
+    'inner_nets':'内网段'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults()>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults()>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
 async function saveInitDefaults(){let vs={};document.querySelectorAll('#tpl-init-body input').forEach(el=>{let k=el.id.replace('ti_','');if(el.type==='checkbox')vs[k]=el.checked;else vs[k]=el.value});try{let r=await fetch('/api/init-defaults/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,values:vs})});let d=await r.json();toast(d.ok?'已保存':'保存失败: '+d.error)}catch(e){toast('保存失败')}}
 async function resetInitDefaults(){if(!confirm('恢复出厂初始化默认值？'))return;try{let r=await fetch('/api/init-defaults/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok&&d.values){let vs=d.values;for(let[k,v]of Object.entries(vs)){let el=document.getElementById('ti_'+k);if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else el.value=typeof v==='boolean'?(v?'true':'false'):String(v)}
       toast('已恢复出厂')}}catch(e){toast('恢复失败')}}

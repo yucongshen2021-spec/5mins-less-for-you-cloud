@@ -47,10 +47,9 @@ NET = {"wan_if": "GigabitEthernet0/0/9", "wan_ip": "10.4.7.252",
 # ═══ 1. 基础生成测试 ═══
 
 def test_generate_success():
-    """基础生成成功，输出含 BGP、IPSec、Tunnel0/0/1000、LoopBack1000、NQA、SNMP."""
+    """基础生成成功，246 行，含 Tunnel0/0/1000+2000, LoopBack1000+2000, NQA, SNMP."""
     r = client.post("/api/generate/ar_traditional", json={
-        "variant": "dual", "header_text": SAMPLE_HEADER,
-        "network": {**NET, "gen_return_route": False, "bypass": False}
+        "variant": "dual", "header_text": SAMPLE_HEADER, "network": NET
     })
     data = r.get_json()
     assert data["ok"], f"Generation failed: {data.get('error', '')}"
@@ -67,8 +66,20 @@ def test_generate_success():
     assert "nqa test-instance admin ipsecmain" in output
     assert "snmp-agent" in output
     assert "sysname 609498A1" in output
+    # 不应出现的项
     assert "keepalive 10 3" not in output  # 无 GRE keepalive
-    assert "  network " not in output  # 无 BGP network 宣告
+    assert "  network " not in output       # 无 BGP network 宣告
+    tag_routes = [l for l in output.split("\n") if "ip route-static" in l and "tag 8888" in l]
+    assert len(tag_routes) == 0  # 不生成带 tag 8888 的静态路由
+    # 应出现的静态路由
+    assert "zabbix_main" in output
+    assert "To_center" in output
+    assert "To_Syslog" in output
+    # ACL 2707 硬编码
+    assert "rule 10 permit source 192.168.0.0" in output
+    assert "rule 100 permit source 183.61.239.168" in output
+    # hwtacacs source-ip 应为 tunnel local IP
+    assert "hwtacacs-server source-ip 10.55.19.237" in output
 
 
 def test_generate_empty_header():
@@ -87,29 +98,6 @@ def test_generate_single_line_error():
         "network": {}
     })
     assert not r.get_json()["ok"]
-
-
-def test_generate_with_return_routes():
-    """回程路由 → 输出含 ip route-static ... tag 8888."""
-    r = client.post("/api/generate/ar_traditional", json={
-        "variant": "dual", "header_text": SAMPLE_HEADER,
-        "network": {**NET, "inner_nets": "192.168.0.0/16", "gen_return_route": True}
-    })
-    assert r.get_json()["ok"]
-    lines = r.get_json()["output"].split("\n")
-    rr = [l for l in lines if "ip route-static" in l and "tag 8888" in l]
-    assert len(rr) == 1
-    assert "192.168.0.0" in rr[0]
-
-
-def test_generate_bypass_mode():
-    """旁挂模式 — 基本生成正常（无 LAN 接口，不崩溃）."""
-    r = client.post("/api/generate/ar_traditional", json={
-        "variant": "dual", "header_text": SAMPLE_HEADER,
-        "network": {**NET, "bypass": True}
-    })
-    assert r.get_json()["ok"]
-    assert "Tunnel0/0/1000" in r.get_json()["output"]
 
 
 def test_example_api():
@@ -137,7 +125,7 @@ def test_init_defaults_save_and_generate():
         "values": {
             "wan_if": "GigabitEthernet0/0/5", "wan_ip": "10.99.99.10",
             "wan_mask": "255.255.255.0", "wan_gw": "10.99.99.1",
-            "inner_nets": "192.168.100.0/24", "gen_return_route": True
+            "inner_nets": "192.168.100.0/24"
         }
     }).get_json()
     assert r["ok"], f"Save init defaults failed: {r.get('error','')}"
@@ -147,29 +135,14 @@ def test_init_defaults_save_and_generate():
         "network": {
             "wan_if": "GigabitEthernet0/0/5", "wan_ip": "10.99.99.10",
             "wan_mask": "255.255.255.0", "wan_gw": "10.99.99.1",
-            "inner_nets": "192.168.100.0/24", "gen_return_route": True
+            "inner_nets": "192.168.100.0/24"
         }
     }).get_json()
     assert r["ok"], f"Generate with custom init failed: {r.get('error','')}"
     output = r["output"]
     assert "GigabitEthernet0/0/5" in output, "Custom WAN if should be in output"
     assert "10.99.99.1" in output, "Custom WAN GW should be in output"
-    assert "192.168.100.0" in output, "Custom inner net should be in output"
-    assert "tag 8888" in output, "Return routes should be present"
-    client.post("/api/init-defaults/reset", json={"key": SCENARIO_KEY})
-
-
-def test_init_defaults_bypass_chain():
-    """保存 bypass=True → 生成 → 不崩溃."""
-    r = client.post("/api/init-defaults/save", json={
-        "key": SCENARIO_KEY, "values": {"bypass": True}
-    }).get_json()
-    assert r["ok"]
-    r = client.post("/api/generate/ar_traditional", json={
-        "variant": "dual", "header_text": SAMPLE_HEADER,
-        "network": {**NET, "bypass": True}
-    }).get_json()
-    assert r["ok"]
+    assert "192.168.100.0" in output, "Custom inner net should be in prefix-list"
     client.post("/api/init-defaults/reset", json={"key": SCENARIO_KEY})
 
 

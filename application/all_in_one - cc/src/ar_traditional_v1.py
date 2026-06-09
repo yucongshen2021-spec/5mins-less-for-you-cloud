@@ -199,8 +199,7 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
         backup_line: 备线字段字典
         network: 网络参数字典。支持的键：
             hostname, wan_if, wan_ip, wan_mask, wan_gw,
-            inner_nets（内网段，同时用于 ACL/BGP prefix/静态路由）,
-            gen_return_route, bypass
+            inner_nets（内网段，用于 BGP prefix-list + 静态路由）
 
     Returns:
         (dict, None) — 成功时返回格式字典；失败时返回 (None, (kind, message))。
@@ -227,11 +226,7 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
 
     wan_gw = (network.get("wan_gw") or network.get("DEFAULT_WAN_GW") or "")
 
-    bypass = bool(network.get("bypass") or network.get("DEFAULT_BYPASS") or False)
-    gen_return_route = bool(network.get("gen_return_route")
-                            or network.get("DEFAULT_GEN_RETURN_ROUTE") or False)
-
-    # 内网段（单一输入，用于 ACL / BGP prefix-list / 静态路由）
+    # 内网段（用于 BGP prefix-list + 静态路由）
     inner_nets_raw = (network.get("inner_nets")
                       or network.get("DEFAULT_INNER_NETS")
                       or "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16")
@@ -298,43 +293,12 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
 
     # ── 计算模板块 ──
 
-    # --- ACL 2707（内网段 + 固定管理 IP）---
-    acl_2707_lines = []
-    rule_num = 10
-    for net in inner_nets:
-        wm = _wildcard_mask(str(net.netmask))
-        acl_2707_lines.append(
-            f" rule {rule_num} permit source {net.network_address} {wm}"
-        )
-        rule_num += 10
-    # 固定管理 IP
-    _MGMT_IPS = [
-        ("114.112.238.8", "0.0.0.7"),
-        ("192.168.55.250", "0"),
-        ("113.105.190.147", "0"),
-        ("202.104.174.178", "0"),
-        ("120.76.31.146", "0"),
-        ("59.37.126.140", "0"),
-        ("183.61.239.168", "0"),
-    ]
-    for ip, wm in _MGMT_IPS:
-        acl_2707_lines.append(f" rule {rule_num} permit source {ip} {wm}")
-        rule_num += 10
-    d["acl_2707_block"] = "\n".join(acl_2707_lines)
-
     # --- WAN 接口块 ---
     d["wan_if_block"] = (
         f"interface {wan_if_name}\n"
         f" ip address {wan_ip} {wan_mask}\n"
         f" ipsec policy S2S-IPSEC"
     )
-
-    # --- LAN 接口块（旁挂时为空）---
-    if bypass:
-        d["lan_if_block"] = ""
-    else:
-        # 不生成固定 LAN 接口 — 用户模板无 LAN 口
-        d["lan_if_block"] = ""
 
     # --- 静态路由块 ---
     static_lines = []
@@ -422,16 +386,6 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
 
     d["static_routes_block"] = "\n".join(static_lines)
 
-    # --- 回程路由块（tag 8888，route-policy node 200 放行） ---
-    return_lines = []
-    if gen_return_route and wan_gw:
-        for net in inner_nets:
-            return_lines.append(
-                f"ip route-static {net.network_address} {net.netmask} "
-                f"{wan_gw} tag 8888"
-            )
-    d["return_routes_block"] = "\n".join(return_lines)
-
     # --- BGP filter prefix-list（从 inner_nets 生成） ---
     filter_lines = []
     idx = 10
@@ -458,7 +412,16 @@ clock timezone bj add 08:00
 ntp-service unicast-server 192.168.55.250
 #
 acl number 2707
-{acl_2707_block}
+ rule 10 permit source 192.168.0.0 0.0.0.255
+ rule 20 permit source 172.16.0.0 0.15.255.255
+ rule 30 permit source 10.0.0.0 0.255.255.255
+ rule 40 permit source 114.112.238.8 0.0.0.7
+ rule 50 permit source 192.168.55.250 0
+ rule 60 permit source 113.105.190.147 0
+ rule 70 permit source 202.104.174.178 0
+ rule 80 permit source 120.76.31.146 0
+ rule 90 permit source 59.37.126.140 0
+ rule 100 permit source 183.61.239.168 0
 #
 acl number 3333
  rule 1 permit ip source {main_loop_ip} 0 destination {main_pe_docking} 0
@@ -556,7 +519,6 @@ nqa test-instance admin ipsecbackup
  start now
 #
 {static_routes_block}
-{return_routes_block}
 #
 {bgp_filter_prefix_block}
 #
@@ -622,7 +584,7 @@ hwtacacs-server template fnetlink_tacacs
  hwtacacs-server authentication 192.168.55.250
  hwtacacs-server authorization 192.168.55.250
  hwtacacs-server accounting 192.168.55.250
- hwtacacs-server source-ip {main_wan_ip_plain}
+ hwtacacs-server source-ip {main_tunnel_local_ip}
  hwtacacs-server shared-key cipher both-win
 #
 aaa
