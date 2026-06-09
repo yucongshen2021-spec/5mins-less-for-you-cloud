@@ -437,27 +437,17 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <div class="card"><div class="card-h">参数设置</div><div class="card-b">
 <div class="fg"><label class="fl">Hostname</label><input class="fi" id="ar-traditional-hostname" placeholder="从数据头自动提取"></div>
 <div class="fr2">
-<div class="fg"><label class="fl">WAN 接口</label><input class="fi" id="ar-traditional-wan-if" value="GigabitEthernet0/0/9"></div>
-<div class="fg"><label class="fl">LAN 接口</label><input class="fi" id="ar-traditional-lan-if" value="GigabitEthernet0/0/1"></div>
+<div class="fg"><label class="fl">WAN 接口号</label><div class="field-row"><input class="fi" id="ar-traditional-wan-eth" value="0"><div class="cb"><input type="checkbox" id="ar-traditional-wan-dhcp" disabled><label for="ar-traditional-wan-dhcp" style="color:var(--mu)">DHCP</label></div></div></div>
+<div class="fg"><label class="fl">LAN 接口号</label><div class="field-row"><input class="fi" id="ar-traditional-lan-eth" value="1"><div class="cb"><input type="checkbox" id="ar-traditional-lan-dhcp" disabled><label for="ar-traditional-lan-dhcp" style="color:var(--mu)">DHCP</label></div></div></div>
 </div>
-<div class="fr2">
-<div class="fg"><label class="fl">WAN IP</label><input class="fi" id="ar-traditional-wan-ip" value="10.4.7.252"></div>
-<div class="fg"><label class="fl">WAN 掩码</label><input class="fi" id="ar-traditional-wan-mask" value="255.255.255.0"></div>
-</div>
-<div class="fr2">
-<div class="fg"><label class="fl">WAN 网关</label><input class="fi" id="ar-traditional-wan-gw" value="10.4.7.254"></div>
-<div class="fg"><label class="fl">LAN IP</label><input class="fi" id="ar-traditional-lan-ip" value="173.15.20.10"></div>
-</div>
-<div class="fr2">
-<div class="fg"><label class="fl">LAN 掩码</label><input class="fi" id="ar-traditional-lan-mask" value="255.255.255.0"></div>
-<div class="fg"><label class="fl">LAN 网关</label><input class="fi" id="ar-traditional-lan-gw" value="173.15.20.254"></div>
-</div>
+<div class="fr2"><div class="fg"><label class="fl">WAN IP / CIDR</label><input class="fi" id="ar-traditional-wan-cidr" value="10.4.7.252/24"></div><div class="fg"><label class="fl">WAN 网关</label><input class="fi" id="ar-traditional-wan-gw" value="10.4.7.254"></div></div>
+<div class="fr2"><div class="fg"><label class="fl">LAN IP / CIDR</label><input class="fi" id="ar-traditional-lan-cidr" value="173.15.20.10/24"></div><div class="fg"><label class="fl">LAN 网关</label><input class="fi" id="ar-traditional-lan-gw" value="173.15.20.254"></div></div>
 <div class="fg"><label class="fl">内网段（每行一个CIDR，用于 BGP prefix-list、静态路由、回程路由）</label><textarea class="ft ft-sm" id="ar-traditional-inner-nets">10.0.0.0/8
 172.16.0.0/12
 192.168.0.0/16</textarea></div>
 <div style="display:flex;gap:16px">
 <div class="cb"><input type="checkbox" id="ar-traditional-gen-rr"><label for="ar-traditional-gen-rr">生成回程路由</label></div>
-<div class="cb"><input type="checkbox" id="ar-traditional-bypass" onchange="bypassToggleARTraditional()"><label for="ar-traditional-bypass">旁挂模式（不生成LAN接口）</label></div>
+<div class="cb"><input type="checkbox" id="ar-traditional-bypass" onchange="_applyToggles('ar-traditional')"><label for="ar-traditional-bypass">旁挂模式（不生成LAN接口）</label></div>
 </div>
 </div></div></div>
 <div class="btn-row"><button class="btn btn-p" onclick="gen('ar-traditional')">生成配置</button><button class="btn btn-s" onclick="copy('ar-traditional-output')">复制输出</button><button class="btn btn-s" onclick="exportOut('ar-traditional')">导出脚本</button><span class="status" id="ar-traditional-status"></span></div>
@@ -634,21 +624,6 @@ function bypassToggle(tp){
 }
 
 // Save default values as data-default attributes for restore
-function bypassToggleARTraditional(){
-  let on=$('ar-traditional-bypass')?.checked||false;
-  ['lan-if','lan-ip','lan-mask','lan-gw'].forEach(f=>{
-    let el=$('ar-traditional-'+f); if(!el)return;
-    if(on){
-      if(!el.disabled)el.dataset.prev=el.value;
-      el.value=''; el.disabled=true; el.style.color='var(--mu)';
-    }else{
-      el.disabled=false; el.style.color='';
-      el.value=el.dataset.prev||el.getAttribute('data-default')||'';
-      delete el.dataset.prev;
-    }
-  })
-}
-
 function _stashDefaults(tp){
   ['wan-eth','wan-cidr','wan-gw','lan-eth','lan-cidr','lan-gw'].forEach(f=>{
     let el=$(tp+'-'+f); if(el&&!el.disabled)el.setAttribute('data-default',el.value)
@@ -718,9 +693,10 @@ function gn(tp){
     n={ER_DS_DOMAINS_DEFAULT:g('ds-domains')?.value||'',ER_DS_ADDR_GROUP_DEFAULT:g('ds-addr-group')?.value||'',ER_DS_RULE_NUM_DEFAULT:g('ds-rule-num')?.value||'',ER_DS_TABLE_NUM_DEFAULT:g('ds-table-num')?.value||'',ER_DS_SOURCE_CIDR_DEFAULT:g('ds-src-cidr')?.value||'',ER_DS_ETH_DEFAULT:g('ds-eth')?.value||'',ER_DS_DNS1_DEFAULT:g('ds-dns1')?.value||'',ER_DS_DNS2_DEFAULT:g('ds-dns2')?.value||'',ER_DS_TABLE_NH_PRIMARY_DEFAULT:g('ds-nh')?.value||'',ER_DS_STATIC32_PRIMARY_NH_DEFAULT:g('ds-s32-nh')?.value||'',ER_DS_TRACK_NAME_DEFAULT:g('ds-track')?.value||'',ER_DS_STATIC32_BACKUP_NH_DEFAULT:g('ds-s32-bk')?.value||'',ER_DS_FNET_PROBE_DEFAULT:g('ds-probe')?.value||'',ER_DS_FNET_NAT_RULE_DEFAULT:g('ds-nat-rule')?.value||'',ER_DS_EXIT_TUNNEL_DEFAULT:g('ds-exit-tun')?.value||'',ER_DS_EXIT_SNAT_IP_DEFAULT:g('ds-exit-ip')?.value||''};
   }else if(tp==='ar-traditional'){
     n={hostname:g('hostname')?.value||'',
-       wan_if:g('wan-if')?.value||'',wan_ip:g('wan-ip')?.value||'',wan_mask:g('wan-mask')?.value||'',
-       lan_if:g('lan-if')?.value||'',lan_ip:g('lan-ip')?.value||'',lan_mask:g('lan-mask')?.value||'',
-       wan_gw:g('wan-gw')?.value||'',lan_gw:g('lan-gw')?.value||'',
+       wan_eth:g('wan-eth')?.value||'',wan_cidr:g('wan-cidr')?.value||'',
+       wan_gw:g('wan-gw')?.value||'',
+       lan_eth:g('lan-eth')?.value||'',lan_cidr:g('lan-cidr')?.value||'',
+       lan_gw:g('lan-gw')?.value||'',
        inner_nets:g('inner-nets')?.value||'',
        gen_return_route:cb('gen-rr'),bypass:cb('bypass')};
   }
@@ -784,9 +760,9 @@ async function ldInitForm(tp){
       ER5_NE_NAT_SOURCE_CIDR_DEFAULT:'ne-nat-src',
       ER5_NE_FNET_PROBE_DEFAULT:'ne-fnet-probe',ER5_NE_FNET_EXIT_TUNNEL_DEFAULT:'ne-fnet-tunnel',
       ER5_NE_FNET_NAT_RULE_DEFAULT:'ne-fnet-nat-rule',
-      DEFAULT_WAN_ETH:'wan-if',DEFAULT_WAN_IP:'wan-ip',DEFAULT_WAN_MASK:'wan-mask',
+      DEFAULT_WAN_ETH:'wan-eth',DEFAULT_WAN_IP:'wan-cidr',
       DEFAULT_WAN_GW:'wan-gw',
-      DEFAULT_LAN_ETH:'lan-if',DEFAULT_LAN_IP:'lan-ip',DEFAULT_LAN_MASK:'lan-mask',
+      DEFAULT_LAN_ETH:'lan-eth',DEFAULT_LAN_IP:'lan-cidr',
       DEFAULT_LAN_GW:'lan-gw',
       DEFAULT_INNER_NETS:'inner-nets',
       DEFAULT_GEN_RETURN_ROUTE:'gen-rr',DEFAULT_BYPASS:'bypass'};
@@ -807,7 +783,6 @@ async function ldInitForm(tp){
         else if(oldRadio)oldRadio.checked=true;
       }
       _applyToggles(lookupTp)
-      if(lookupTp==='ar-traditional')bypassToggleARTraditional()
   }catch(e){}
 }
 async function ldNotes(tp){let el=$(tp+'-notes');if(!el)return;let v=tp==='ar-sdwan'?'default':gv(tp);if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/notes/'+tm+'?variant='+v+'&_='+Date.now());let d=await r.json();el.value=d.ok?d.notes:''}catch(e){}}
@@ -927,9 +902,9 @@ async function loadInitDefaults(key){try{let r=await fetch('/api/init-defaults/'
 'ER5_NE_NAT_SOURCE_CIDR_DEFAULT':'NAT 源网段 CIDR',
 'ER5_NE_FNET_PROBE_DEFAULT':'100.100 探测 IP','ER5_NE_FNET_EXIT_TUNNEL_DEFAULT':'NAT 出口 Tunnel（tun=主线 TUNNEL）',
 'ER5_NE_FNET_NAT_RULE_DEFAULT':'NAT Rule 号',
-    'DEFAULT_WAN_ETH':'WAN 接口','DEFAULT_WAN_IP':'WAN IP','DEFAULT_WAN_MASK':'WAN 掩码',
+    'DEFAULT_WAN_ETH':'WAN 接口号','DEFAULT_WAN_IP':'WAN IP / CIDR',
     'DEFAULT_WAN_GW':'WAN 网关',
-    'DEFAULT_LAN_ETH':'LAN 接口','DEFAULT_LAN_IP':'LAN IP','DEFAULT_LAN_MASK':'LAN 掩码',
+    'DEFAULT_LAN_ETH':'LAN 接口号','DEFAULT_LAN_IP':'LAN IP / CIDR',
     'DEFAULT_LAN_GW':'LAN 网关',
     'DEFAULT_INNER_NETS':'内网段',
     'DEFAULT_GEN_RETURN_ROUTE':'生成回程路由','DEFAULT_BYPASS':'旁挂模式'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults()>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults()>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}

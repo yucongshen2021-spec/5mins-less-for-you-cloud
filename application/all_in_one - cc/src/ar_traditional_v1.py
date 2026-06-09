@@ -51,15 +51,13 @@ except ImportError:
 # 初始化默认值（模块级变量，供 factory defaults snapshot 读取）
 # =====================================================================
 DEFAULT_WAN_ETH = "GigabitEthernet0/0/9"
-DEFAULT_WAN_IP = "10.4.7.252"
-DEFAULT_WAN_MASK = "255.255.255.0"
+DEFAULT_WAN_IP = "10.4.7.252/24"
 DEFAULT_WAN_GW = "10.4.7.254"
 DEFAULT_LAN_ETH = "GigabitEthernet0/0/1"
-DEFAULT_LAN_IP = "173.15.20.10"
-DEFAULT_LAN_MASK = "255.255.255.0"
+DEFAULT_LAN_IP = "173.15.20.10/24"
 DEFAULT_LAN_GW = "173.15.20.254"
 DEFAULT_INNER_NETS = "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"
-DEFAULT_GEN_RETURN_ROUTE = False
+DEFAULT_GEN_RETURN_ROUTE = True
 DEFAULT_BYPASS = False
 
 
@@ -248,18 +246,22 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
         _n("wan_if") or _n("wan_if_name") or _n("wan_eth")
         or _n("DEFAULT_WAN_ETH") or "9"
     )
-    wan_ip = (_n("wan_ip") or _ip_plain(_n("wan_cidr") or _n("DEFAULT_WAN_CIDR") or "") or "")
-    wan_mask = (_n("wan_mask") or _cidr_mask(_n("wan_cidr") or _n("DEFAULT_WAN_CIDR") or "") or "")
+    # WAN IP — 优先 CIDR 格式，其次独立 IP + mask
+    _wan_cidr = (_n("wan_cidr") or _n("DEFAULT_WAN_IP") or "")
+    wan_ip = (_n("wan_ip") or _ip_plain(_wan_cidr) or "")
+    wan_mask = (_n("wan_mask") or _cidr_mask(_wan_cidr) or "")
+
     wan_gw = _n("wan_gw", _n("DEFAULT_WAN_GW") or "")
 
     lan_if_name = _expand_if_name(
         _n("lan_if") or _n("lan_if_name") or _n("lan_eth")
         or _n("DEFAULT_LAN_ETH") or "1"
     )
-    lan_ip = (_n("lan_ip") or _ip_plain(_n("lan_cidr") or _n("DEFAULT_LAN_CIDR") or "")
-              or DEFAULT_LAN_IP)
-    lan_mask = (_n("lan_mask") or _cidr_mask(_n("lan_cidr") or _n("DEFAULT_LAN_CIDR") or "")
-                or DEFAULT_LAN_MASK)
+    # LAN IP — 优先 CIDR 格式，其次独立 IP + mask
+    _lan_cidr = (_n("lan_cidr") or _n("DEFAULT_LAN_IP") or "")
+    lan_ip = (_n("lan_ip") or _ip_plain(_lan_cidr) or "")
+    lan_mask = (_n("lan_mask") or _cidr_mask(_lan_cidr) or "")
+
     lan_gw = (_n("lan_gw") or _n("DEFAULT_LAN_GW") or lan_ip)
 
     bypass = bool(_n("bypass", DEFAULT_BYPASS))
