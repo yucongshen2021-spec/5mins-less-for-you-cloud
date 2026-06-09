@@ -156,6 +156,10 @@ def _get_ar():
     return _load_module("ar_sdwan_zihuan_v4.py")
 
 
+def _get_ar_traditional():
+    return _load_module("ar_traditional_v1.py")
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 def _apply_network_to_widgets(widget, ns: dict) -> None:
@@ -717,6 +721,13 @@ def api_tools():
                         {"id": "single_factory", "name": "单机单WAN · Factory"},
                         {"id": "dual_ops_pri", "name": "双机主 OPS"},
                         {"id": "dual_ops_bak", "name": "双机备 OPS"},
+                    ],
+                },
+                {
+                    "id": "ar_traditional",
+                    "name": "AR 传统组网",
+                    "variants": [
+                        {"id": "dual", "name": "双线"},
                     ],
                 },
             ]
@@ -1349,6 +1360,40 @@ def generate_ar_sdwan():
         return jsonify({"ok": False, "error": _humanize_error(e, variant)}), 500
 
 
+@app.route("/api/generate/ar_traditional", methods=["POST"])
+def generate_ar_traditional():
+    data = request.get_json(force=True)
+    variant = data.get("variant", "dual")
+    hdr_text = data.get("header_text", "")
+    network = data.get("network", {})
+    tool_id = "ar_traditional"
+
+    try:
+        mod = _get_ar_traditional()
+        parse_fn = mod.get("parse_ar_traditional_headers")
+        builder_fn = mod.get("build_ar_traditional_format_dict")
+        tpl = mod.get("TEMPLATE_AR_TRADITIONAL", "")
+
+        if not parse_fn or not builder_fn:
+            return jsonify({"ok": False, "error": _humanize_error("Builder not found", variant)}), 500
+
+        main_line, backup_line, err = parse_fn(hdr_text)
+        if err:
+            return jsonify({"ok": False, "error": _humanize_error(err, variant)}), 400
+
+        d = builder_fn(main_line, backup_line, network)
+        output = tpl.format(**d) if d and tpl else str(d)
+
+        return _log_and_return(tool_id, variant, hdr_text, output,
+                              jsonify({"ok": True, "output": output}))
+    except KeyError as e:
+        return jsonify({"ok": False, "error": f"模板变量缺失: {e}"}), 500
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": _humanize_error(e, variant)}), 500
+
+
 # ── Example Data API ────────────────────────────────────────────────────
 
 _EXAMPLE_MAP = {
@@ -1373,6 +1418,7 @@ _EXAMPLE_MAP = {
     ("epoch_fastip5", "flink"): ("er_fastip_5in1_v1.py", "ER5_FLINK_EXAMPLE"),
     ("epoch_fastip5", "new_exit"): ("er_fastip_5in1_v1.py", "ER5_NEW_EXIT_EXAMPLE"),
     ("epoch_fastip5", "domain_split"): ("er_fastip_5in1_v1.py", "HK5_EXAMPLE"),
+    ("ar_traditional", "dual"): ("ar_traditional_v1.py", "AR_TRAD_EXAMPLE"),
 }
 
 
@@ -1538,6 +1584,16 @@ _NOTES = {
             "• 配置仅供参考，使用仍需谨慎。"
         ),
     },
+    "ar_traditional": {
+        "dual": (
+            "AR 传统组网 · 双线\n\n"
+            "• 粘贴包含主备两条 LineID 的完整数据头\n"
+            "• WAN/LAN 接口不支持 DHCP（传统组网均为静态 IP）\n"
+            "• 勾选「回程路由」为内网段生成回程静态路由（tag 8888）\n"
+            "• 勾选「旁挂模式」不生成 LAN 接口配置\n"
+            "• 配置仅供参考，使用仍需谨慎。"
+        ),
+    },
 }
 
 
@@ -1582,6 +1638,7 @@ _DISK_ALIASES = {
     "Epoch MPLS · 国内配置": "ER MPLS · 国内配置",
     "Epoch MPLS · 海外配置": "ER MPLS · 海外配置",
     "Epoch MPLS · IPSec": "Epoch MPLS · IPSec",
+    "AR 传统组网 · 双线": "AR_传统组网",
 }
 
 # Compact variable descriptions for auto-generated mapping
@@ -1604,6 +1661,36 @@ _VAR_DESC_SMALL = {
     "main_lineid": "主线LineID", "main_ce_docking": "主线CE对接",
     "main_psk": "主线PSK", "bk_lineid": "备线LineID", "bk_ce_docking": "备线CE对接",
     "bk_psk": "备线PSK", "south_primary": "南向主IP", "south_backup": "南向备IP",
+    "main_pe": "主线PE", "main_tunnel": "主线Tunnel",
+    "main_wanip": "主线WAN IP", "main_wan_ip_plain": "主线WAN IP(纯IP)",
+    "main_pe_docking": "主线PE对接", "main_pe_as": "主线PE AS", "main_ce_as": "主线CE AS",
+    "main_zihuan": "主线自环网段", "main_dial_pe": "主线拨号PE",
+    "main_dial_docking_ip": "主线拨号对接IP", "main_loop_ip": "主线LoopIP",
+    "main_dial_ip": "主线拨号IP", "main_tunnel_local_ip": "主线Tunnel本地IP",
+    "main_tunnel_remote_ip": "主线Tunnel远端IP",
+    "backup_lineid": "备线LineID", "backup_pe": "备线PE", "backup_tunnel": "备线Tunnel",
+    "backup_wanip": "备线WAN IP", "backup_wan_ip_plain": "备线WAN IP(纯IP)",
+    "backup_pe_docking": "备线PE对接", "backup_ce_docking": "备线CE对接",
+    "backup_pe_as": "备线PE AS", "backup_ce_as": "备线CE AS",
+    "backup_zihuan": "备线自环网段", "backup_dial_pe": "备线拨号PE",
+    "backup_dial_docking_ip": "备线拨号对接IP", "backup_loop_ip": "备线LoopIP",
+    "backup_dial_ip": "备线拨号IP", "backup_psk": "备线PSK",
+    "backup_tunnel_local_ip": "备线Tunnel本地IP", "backup_tunnel_remote_ip": "备线Tunnel远端IP",
+    "lan_ip": "LAN IP", "lan_mask": "LAN掩码", "wan_ip": "WAN IP", "wan_mask": "WAN掩码",
+    "wan_if_name": "WAN接口", "lan_if_name": "LAN接口",
+    "ce_as": "CE AS号", "bgp_router_id": "BGP Router ID",
+    "peer_main_ip": "BGP主Peer", "peer_main_as": "BGP主Peer AS",
+    "peer_backup_ip": "BGP备Peer", "peer_backup_as": "BGP备Peer AS",
+    "bgp_networks_block": "BGP宣告网段", "bgp_filter_prefix_block": "BGP Filter Prefix",
+    "acl_inner_rules_block": "内网ACL规则", "static_routes_block": "静态路由",
+    "wan_if_block": "WAN接口块",
+    "loopback_main_block": "主线LoopBack块", "loopback_backup_block": "备线LoopBack块",
+    "tunnel_main_block": "主线GRE Tunnel块", "tunnel_backup_block": "备线GRE Tunnel块",
+    "ike_peer_main_block": "主线IKE Peer块", "ike_peer_backup_block": "备线IKE Peer块",
+    "ipsec_acl_main_block": "主线IPSec ACL块", "ipsec_acl_backup_block": "备线IPSec ACL块",
+    "ipsec_policy_block": "IPSec Policy块", "wan_if_num": "WAN接口号", "lan_if_num": "LAN接口号",
+    "lan_ip_full": "LAN IP/掩码", "wan_ip_full": "WAN IP/掩码",
+    "lineid_main": "主线LineID", "lineid_backup": "备线LineID",
 }
 
 
@@ -1636,6 +1723,7 @@ _SCENARIO_LIST = [
     {"key": "AR SD-WAN · 双机备 OPS", "source": "ar_sdwan_zihuan_v4.py", "tpl_slot": "TEMPLATE_AR_OPS_DUAL_BACKUP"},
     {"key": "AR SD-WAN · 双机主 Factory", "source": "ar_sdwan_zihuan_v4.py", "tpl_slot": "TEMPLATE_AR_FACTORY_DUAL_PRIMARY"},
     {"key": "AR SD-WAN · 双机备 Factory", "source": "ar_sdwan_zihuan_v4.py", "tpl_slot": "TEMPLATE_AR_FACTORY_DUAL_BACKUP"},
+    {"key": "AR 传统组网 · 双线", "source": "ar_traditional_v1.py", "tpl_slot": "TEMPLATE_AR_TRADITIONAL"},
 ]
 
 
@@ -1716,6 +1804,12 @@ _SCENARIO_TREE = [
                     {"label": "备 Factory", "key": "AR SD-WAN · 双机备 Factory"},
                 ],
             },
+        ],
+    },
+    {
+        "label": "AR 传统组网",
+        "children": [
+            {"label": "双线", "key": "AR 传统组网 · 双线"},
         ],
     },
 ]
@@ -1821,6 +1915,7 @@ def api_template_load():
             "TEMPLATE_AR_OPS_DUAL_BACKUP": "ZH_EXAMPLE",
             "TEMPLATE_AR_FACTORY_DUAL_PRIMARY": "ZH_EXAMPLE",
             "TEMPLATE_AR_FACTORY_DUAL_BACKUP": "ZH_EXAMPLE",
+            "TEMPLATE_AR_TRADITIONAL": "AR_TRAD_EXAMPLE",
         }
         example_var = example_keys.get(slot, "")
         if example_var:
@@ -1929,6 +2024,7 @@ def api_template_reset():
         "TEMPLATE_USG_NEW_EXIT_VISUAL": "USG_NEW_EXIT_EXAMPLE",
         "TEMPLATE_MPLS_DOMESTIC": "CN_EXAMPLE", "TEMPLATE_MPLS_OVERSEAS": "OV_EXAMPLE",
         "TEMPLATE_MPLS_IPSEC": "MPLS_IPSEC_EXAMPLE",
+        "TEMPLATE_AR_TRADITIONAL": "AR_TRAD_EXAMPLE",
     }
     example_var = example_keys.get(slot, "")
     hdr = str(ns.get(example_var, "")) if example_var else ""
@@ -2238,6 +2334,18 @@ def api_template_preview():
                     parsed = parse_fn(hdr_text)
                     init_cfg = {"mode": "ops", "device_type": "single", "device_role": "pri"}
                     rendered = ops_fn(parsed, init_cfg)
+            elif slot == "TEMPLATE_AR_TRADITIONAL":
+                parse_fn = ns.get("parse_ar_traditional_headers")
+                builder_fn = ns.get("build_ar_traditional_format_dict")
+                if parse_fn and builder_fn and tpl:
+                    main_line, backup_line, err = parse_fn(hdr_text)
+                    if not err:
+                        d = builder_fn(main_line, backup_line)
+                        if d:
+                            try:
+                                rendered = tpl.format(**d)
+                            except Exception:
+                                rendered = ""
 
         if not rendered:
             if parse_err:
