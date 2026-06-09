@@ -92,6 +92,7 @@ interface Tunnel0/0/2000
  mtu 1476
  tcp adjust-mss 1300
 #
+{lan_if_block}
 {wan_if_block}
 #
 nqa event 1 log
@@ -113,6 +114,7 @@ nqa test-instance admin ipsecbackup
  start now
 #
 {static_routes_block}
+{return_routes_block}
 #
 {bgp_filter_prefix_block}
 #

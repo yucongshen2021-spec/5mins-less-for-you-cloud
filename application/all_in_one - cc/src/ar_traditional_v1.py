@@ -226,6 +226,22 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
 
     wan_gw = (network.get("wan_gw") or network.get("DEFAULT_WAN_GW") or "")
 
+    lan_if_name = _expand_if_name(
+        network.get("lan_if") or network.get("lan_if_name")
+        or network.get("lan_eth") or network.get("DEFAULT_LAN_ETH") or "1"
+    )
+    lan_ip = (network.get("lan_ip")
+              or _ip_plain(network.get("lan_cidr") or network.get("DEFAULT_LAN_CIDR") or "")
+              or "173.15.20.10")
+    lan_mask = (network.get("lan_mask")
+                or _cidr_mask(network.get("lan_cidr") or network.get("DEFAULT_LAN_CIDR") or "")
+                or "255.255.255.0")
+    lan_gw = (network.get("lan_gw") or network.get("DEFAULT_LAN_GW") or lan_ip)
+
+    bypass = bool(network.get("bypass") or network.get("DEFAULT_BYPASS") or False)
+    gen_return_route = bool(network.get("gen_return_route")
+                            or network.get("DEFAULT_GEN_RETURN_ROUTE") or False)
+
     # 内网段（用于 BGP prefix-list + 静态路由）
     inner_nets_raw = (network.get("inner_nets")
                       or network.get("DEFAULT_INNER_NETS")
@@ -282,6 +298,10 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
     d["wan_ip"]     = wan_ip
     d["wan_mask"]   = wan_mask
     d["wan_gw"]     = wan_gw
+    d["lan_if"]     = lan_if_name
+    d["lan_ip"]     = lan_ip
+    d["lan_mask"]   = lan_mask
+    d["lan_gw"]     = lan_gw
     d["ce_as"]      = main_line.get("ce_as", "")
     d["bgp_router_id"] = main_line.get("tunnel_local_ip", "")
 
@@ -299,6 +319,16 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
         f" ip address {wan_ip} {wan_mask}\n"
         f" ipsec policy S2S-IPSEC"
     )
+
+    # --- LAN 接口块（旁挂时不生成）---
+    if bypass:
+        d["lan_if_block"] = ""
+    else:
+        d["lan_if_block"] = (
+            f"interface {lan_if_name}\n"
+            f" undo portswitch\n"
+            f" ip address {lan_ip} {lan_mask}"
+        )
 
     # --- 静态路由块 ---
     static_lines = []
@@ -385,6 +415,16 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
         )
 
     d["static_routes_block"] = "\n".join(static_lines)
+
+    # --- 回程路由块（gen_return_route 勾选 + 非旁挂时生成，无 tag，走 route-policy node 300）---
+    return_lines = []
+    if gen_return_route and not bypass:
+        route_gw = lan_gw if lan_gw else wan_gw
+        for net in inner_nets:
+            return_lines.append(
+                f"ip route-static {net.network_address} {net.netmask} {route_gw}"
+            )
+    d["return_routes_block"] = "\n".join(return_lines)
 
     # --- BGP filter prefix-list（从 inner_nets 生成） ---
     filter_lines = []
@@ -498,6 +538,7 @@ interface Tunnel0/0/2000
  mtu 1476
  tcp adjust-mss 1300
 #
+{lan_if_block}
 {wan_if_block}
 #
 nqa event 1 log
@@ -519,6 +560,7 @@ nqa test-instance admin ipsecbackup
  start now
 #
 {static_routes_block}
+{return_routes_block}
 #
 {bgp_filter_prefix_block}
 #
