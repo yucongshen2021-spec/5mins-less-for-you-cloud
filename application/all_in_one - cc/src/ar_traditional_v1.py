@@ -48,6 +48,22 @@ except ImportError:
 
 
 # =====================================================================
+# 初始化默认值（模块级变量，供 factory defaults snapshot 读取）
+# =====================================================================
+DEFAULT_WAN_ETH = "GigabitEthernet0/0/9"
+DEFAULT_WAN_IP = "10.4.7.252"
+DEFAULT_WAN_MASK = "255.255.255.0"
+DEFAULT_WAN_GW = "10.4.7.254"
+DEFAULT_LAN_ETH = "GigabitEthernet0/0/1"
+DEFAULT_LAN_IP = "173.15.20.10"
+DEFAULT_LAN_MASK = "255.255.255.0"
+DEFAULT_LAN_GW = "173.15.20.254"
+DEFAULT_INNER_NETS = "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"
+DEFAULT_GEN_RETURN_ROUTE = False
+DEFAULT_BYPASS = False
+
+
+# =====================================================================
 # 内部工具函数
 # =====================================================================
 def _ip_plain(cidr):
@@ -207,45 +223,52 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
     if network is None:
         network = {}
 
-    # ── 提取网络参数 ──
-    hostname = (network.get("hostname") or "").strip()
+    # ── 提取网络参数（优先 network dict，其次 DEFAULT_* 模块全局变量）──
+    def _n(key, default=""):
+        """从 network dict 或模块全局变量取值。兼容短键名和 DEFAULT_ 前缀。"""
+        v = network.get(key)
+        if v is not None:
+            return v
+        # 尝试 DEFAULT_ 前缀
+        dk = f"DEFAULT_{key.upper()}" if not key.startswith("DEFAULT_") else key
+        v = network.get(dk)
+        if v is not None:
+            return v
+        # 尝试模块全局变量
+        v = globals().get(dk)
+        if v is not None and not callable(v):
+            return v
+        return default
+
+    hostname = (_n("hostname") or "").strip()
     if not hostname:
         hostname = main_line.get("lineid", "") or "AR-TRAD"
 
     wan_if_name = _expand_if_name(
-        network.get("wan_if") or network.get("wan_if_name")
-        or network.get("wan_eth") or network.get("DEFAULT_WAN_ETH") or "9"
+        _n("wan_if") or _n("wan_if_name") or _n("wan_eth")
+        or _n("DEFAULT_WAN_ETH") or "9"
     )
-
-    wan_ip = (network.get("wan_ip")
-              or _ip_plain(network.get("wan_cidr") or network.get("DEFAULT_WAN_CIDR") or "")
-              or "")
-    wan_mask = (network.get("wan_mask")
-                or _cidr_mask(network.get("wan_cidr") or network.get("DEFAULT_WAN_CIDR") or "")
-                or "")
-
-    wan_gw = (network.get("wan_gw") or network.get("DEFAULT_WAN_GW") or "")
+    wan_ip = (_n("wan_ip") or _ip_plain(_n("wan_cidr") or _n("DEFAULT_WAN_CIDR") or "") or "")
+    wan_mask = (_n("wan_mask") or _cidr_mask(_n("wan_cidr") or _n("DEFAULT_WAN_CIDR") or "") or "")
+    wan_gw = _n("wan_gw", _n("DEFAULT_WAN_GW") or "")
 
     lan_if_name = _expand_if_name(
-        network.get("lan_if") or network.get("lan_if_name")
-        or network.get("lan_eth") or network.get("DEFAULT_LAN_ETH") or "1"
+        _n("lan_if") or _n("lan_if_name") or _n("lan_eth")
+        or _n("DEFAULT_LAN_ETH") or "1"
     )
-    lan_ip = (network.get("lan_ip")
-              or _ip_plain(network.get("lan_cidr") or network.get("DEFAULT_LAN_CIDR") or "")
-              or "173.15.20.10")
-    lan_mask = (network.get("lan_mask")
-                or _cidr_mask(network.get("lan_cidr") or network.get("DEFAULT_LAN_CIDR") or "")
-                or "255.255.255.0")
-    lan_gw = (network.get("lan_gw") or network.get("DEFAULT_LAN_GW") or lan_ip)
+    lan_ip = (_n("lan_ip") or _ip_plain(_n("lan_cidr") or _n("DEFAULT_LAN_CIDR") or "")
+              or DEFAULT_LAN_IP)
+    lan_mask = (_n("lan_mask") or _cidr_mask(_n("lan_cidr") or _n("DEFAULT_LAN_CIDR") or "")
+                or DEFAULT_LAN_MASK)
+    lan_gw = (_n("lan_gw") or _n("DEFAULT_LAN_GW") or lan_ip)
 
-    bypass = bool(network.get("bypass") or network.get("DEFAULT_BYPASS") or False)
-    gen_return_route = bool(network.get("gen_return_route")
-                            or network.get("DEFAULT_GEN_RETURN_ROUTE") or False)
+    bypass = bool(_n("bypass", DEFAULT_BYPASS))
+    gen_return_route = bool(_n("gen_return_route", DEFAULT_GEN_RETURN_ROUTE))
 
     # 内网段（用于 BGP prefix-list + 静态路由）
-    inner_nets_raw = (network.get("inner_nets")
-                      or network.get("DEFAULT_INNER_NETS")
-                      or "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16")
+    inner_nets_raw = (_n("inner_nets")
+                      or _n("DEFAULT_INNER_NETS")
+                      or DEFAULT_INNER_NETS)
     inner_nets = []
     for token in re.split(r'[\n,，\s]+', inner_nets_raw):
         t = token.strip()

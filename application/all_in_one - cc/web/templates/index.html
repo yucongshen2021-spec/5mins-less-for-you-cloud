@@ -784,11 +784,12 @@ async function ldInitForm(tp){
       ER5_NE_NAT_SOURCE_CIDR_DEFAULT:'ne-nat-src',
       ER5_NE_FNET_PROBE_DEFAULT:'ne-fnet-probe',ER5_NE_FNET_EXIT_TUNNEL_DEFAULT:'ne-fnet-tunnel',
       ER5_NE_FNET_NAT_RULE_DEFAULT:'ne-fnet-nat-rule',
-      wan_if:'wan-if',wan_ip:'wan-ip',wan_mask:'wan-mask',
-      lan_if:'lan-if',lan_ip:'lan-ip',lan_mask:'lan-mask',
-      wan_gw:'wan-gw',lan_gw:'lan-gw',
-      inner_nets:'inner-nets',
-      gen_return_route:'gen-rr',bypass:'bypass'};
+      DEFAULT_WAN_ETH:'wan-if',DEFAULT_WAN_IP:'wan-ip',DEFAULT_WAN_MASK:'wan-mask',
+      DEFAULT_WAN_GW:'wan-gw',
+      DEFAULT_LAN_ETH:'lan-if',DEFAULT_LAN_IP:'lan-ip',DEFAULT_LAN_MASK:'lan-mask',
+      DEFAULT_LAN_GW:'lan-gw',
+      DEFAULT_INNER_NETS:'inner-nets',
+      DEFAULT_GEN_RETURN_ROUTE:'gen-rr',DEFAULT_BYPASS:'bypass'};
     for(let[k,v]of Object.entries(vs)){
       let fid=fieldMap[k];if(!fid)continue;let el=$(lookupTp+'-'+fid);
       if(!el)continue;
@@ -926,12 +927,12 @@ async function loadInitDefaults(key){try{let r=await fetch('/api/init-defaults/'
 'ER5_NE_NAT_SOURCE_CIDR_DEFAULT':'NAT 源网段 CIDR',
 'ER5_NE_FNET_PROBE_DEFAULT':'100.100 探测 IP','ER5_NE_FNET_EXIT_TUNNEL_DEFAULT':'NAT 出口 Tunnel（tun=主线 TUNNEL）',
 'ER5_NE_FNET_NAT_RULE_DEFAULT':'NAT Rule 号',
-    'wan_if':'WAN 接口','lan_if':'LAN 接口',
-    'wan_ip':'WAN IP','wan_mask':'WAN 掩码',
-    'lan_ip':'LAN IP','lan_mask':'LAN 掩码',
-    'wan_gw':'WAN 网关','lan_gw':'LAN 网关',
-    'inner_nets':'内网段',
-    'gen_return_route':'生成回程路由','bypass':'旁挂模式'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults()>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults()>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
+    'DEFAULT_WAN_ETH':'WAN 接口','DEFAULT_WAN_IP':'WAN IP','DEFAULT_WAN_MASK':'WAN 掩码',
+    'DEFAULT_WAN_GW':'WAN 网关',
+    'DEFAULT_LAN_ETH':'LAN 接口','DEFAULT_LAN_IP':'LAN IP','DEFAULT_LAN_MASK':'LAN 掩码',
+    'DEFAULT_LAN_GW':'LAN 网关',
+    'DEFAULT_INNER_NETS':'内网段',
+    'DEFAULT_GEN_RETURN_ROUTE':'生成回程路由','DEFAULT_BYPASS':'旁挂模式'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults()>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults()>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
 async function saveInitDefaults(){let vs={};document.querySelectorAll('#tpl-init-body input').forEach(el=>{let k=el.id.replace('ti_','');if(el.type==='checkbox')vs[k]=el.checked;else vs[k]=el.value});try{let r=await fetch('/api/init-defaults/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,values:vs})});let d=await r.json();toast(d.ok?'已保存':'保存失败: '+d.error)}catch(e){toast('保存失败')}}
 async function resetInitDefaults(){if(!confirm('恢复出厂初始化默认值？'))return;try{let r=await fetch('/api/init-defaults/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok&&d.values){let vs=d.values;for(let[k,v]of Object.entries(vs)){let el=document.getElementById('ti_'+k);if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else el.value=typeof v==='boolean'?(v?'true':'false'):String(v)}
       toast('已恢复出厂')}}catch(e){toast('恢复失败')}}
