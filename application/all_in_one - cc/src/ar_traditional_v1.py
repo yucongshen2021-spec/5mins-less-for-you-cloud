@@ -433,23 +433,18 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
             f"ip route-static 0.0.0.0 0.0.0.0 {wan_gw} tag 7777"
         )
 
-    # 内网路由（不走 tag，由 route-policy node 300 引入 BGP）
-    for net in inner_nets:
-        static_lines.append(
-            f"ip route-static {net.network_address} {net.netmask} {wan_gw}"
-        )
+    # 内网路由（gen_return_route 控制是否生成；旁挂走 WAN GW，正常走 LAN GW；无 tag，经 BGP node 300 引入）
+    if gen_return_route:
+        route_gw = wan_gw if bypass else (lan_gw or wan_gw)
+        for net in inner_nets:
+            static_lines.append(
+                f"ip route-static {net.network_address} {net.netmask} {route_gw}"
+            )
 
     d["static_routes_block"] = "\n".join(static_lines)
 
-    # --- 回程路由块（gen_return_route 勾选 + 非旁挂时生成，无 tag，走 route-policy node 300）---
-    return_lines = []
-    if gen_return_route and not bypass:
-        route_gw = lan_gw if lan_gw else wan_gw
-        for net in inner_nets:
-            return_lines.append(
-                f"ip route-static {net.network_address} {net.netmask} {route_gw}"
-            )
-    d["return_routes_block"] = "\n".join(return_lines)
+    # 回程路由块（已合并到静态路由，保留空块避免模板报错）
+    d["return_routes_block"] = ""
 
     # --- BGP filter prefix-list（从 inner_nets 生成） ---
     filter_lines = []
