@@ -257,6 +257,7 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
         hostname = main_line.get("lineid", "") or "AR-TRAD"
 
     wan_if_name = (network.get("wan_if_name")
+                   or network.get("wan_if")
                    or network.get("wan_eth")
                    or network.get("DEFAULT_WAN_ETH")
                    or network.get("wan_if_num")
@@ -264,6 +265,7 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
     wan_if_name = _expand_if_name(wan_if_name)
 
     lan_if_name = (network.get("lan_if_name")
+                   or network.get("lan_if")
                    or network.get("lan_eth")
                    or network.get("DEFAULT_LAN_ETH")
                    or network.get("lan_if_num")
@@ -273,14 +275,23 @@ def build_ar_traditional_format_dict(main_line, backup_line, network=None):
     wan_cidr = (network.get("wan_cidr")
                 or network.get("DEFAULT_WAN_CIDR")
                 or "")
-    wan_ip = _ip_plain(wan_cidr)
-    wan_mask = _cidr_mask(wan_cidr)
+    # Accept separate IP + mask from frontend if CIDR not provided
+    wan_ip = (network.get("wan_ip")
+              or _ip_plain(wan_cidr)
+              or "")
+    wan_mask = (network.get("wan_mask")
+                or _cidr_mask(wan_cidr)
+                or "")
 
     lan_cidr = (network.get("lan_cidr")
                 or network.get("DEFAULT_LAN_CIDR")
                 or "")
-    lan_ip = _ip_plain(lan_cidr)
-    lan_mask = _cidr_mask(lan_cidr)
+    lan_ip = (network.get("lan_ip")
+              or _ip_plain(lan_cidr)
+              or "")
+    lan_mask = (network.get("lan_mask")
+                or _cidr_mask(lan_cidr)
+                or "")
 
     wan_gw = (network.get("wan_gw")
               or network.get("DEFAULT_WAN_GW")

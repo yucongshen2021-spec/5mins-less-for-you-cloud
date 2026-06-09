@@ -1382,6 +1382,10 @@ def generate_ar_traditional():
             return jsonify({"ok": False, "error": _humanize_error(err, variant)}), 400
 
         d = builder_fn(main_line, backup_line, network)
+        if isinstance(d, tuple):
+            d = d[0]  # unpack (dict, error) tuple
+        if not isinstance(d, dict):
+            return jsonify({"ok": False, "error": "Builder returned invalid data type"}), 500
         output = tpl.format(**d) if d and tpl else str(d)
 
         return _log_and_return(tool_id, variant, hdr_text, output,
@@ -2341,7 +2345,9 @@ def api_template_preview():
                     main_line, backup_line, err = parse_fn(hdr_text)
                     if not err:
                         d = builder_fn(main_line, backup_line)
-                        if d:
+                        if isinstance(d, tuple):
+                            d = d[0]
+                        if isinstance(d, dict):
                             try:
                                 rendered = tpl.format(**d)
                             except Exception:
