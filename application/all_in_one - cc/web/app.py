@@ -2423,7 +2423,14 @@ def _snapshot_factory_defaults():
     if _FACTORY_INIT_DEFAULTS:
         return
     _BOOL_DEFAULTS = {"DEFAULT_WAN_DHCP": False, "DEFAULT_LAN_DHCP": True,
-                      "DEFAULT_GEN_RETURN_ROUTE": False}
+                      "DEFAULT_GEN_RETURN_ROUTE": False, "gen_return_route": False, "bypass": False}
+    _STR_DEFAULTS_AR_TRAD = {
+        "wan_if": "GigabitEthernet0/0/9", "wan_ip": "173.15.30.40", "wan_mask": "255.255.255.0",
+        "lan_if": "GigabitEthernet0/0/1", "lan_ip": "173.15.20.10", "lan_mask": "255.255.255.0",
+        "wan_gw": "173.15.30.254", "lan_gw": "173.15.30.254",
+        "inner_nets": "192.168.0.0/16\n172.16.0.0/12\n10.0.0.0/8",
+        "bgp_networks": "173.15.30.0\n173.15.20.0\n173.15.40.0\n173.15.50.0",
+    }
     for info in _SCENARIO_LIST:
         ns = _load_module(info["source"])
         slot = info["tpl_slot"]
@@ -2435,6 +2442,13 @@ def _snapshot_factory_defaults():
                 values[k] = str(v) if not isinstance(v, bool) else v
             elif k in _BOOL_DEFAULTS:
                 values[k] = _BOOL_DEFAULTS[k]
+        if slot == "TEMPLATE_AR_TRADITIONAL":
+            for k, v in _STR_DEFAULTS_AR_TRAD.items():
+                if k in keys and k not in values:
+                    values[k] = v
+            for k in ("gen_return_route", "bypass"):
+                if k in keys and k not in values:
+                    values[k] = False
         _FACTORY_INIT_DEFAULTS[info["key"]] = values
 
 
@@ -2614,7 +2628,8 @@ def api_init_defaults_reset():
     slot = info["tpl_slot"]
     keys = _get_init_keys(slot)
     values = {}
-    _BOOL_KEYS = {"DEFAULT_WAN_DHCP", "DEFAULT_LAN_DHCP", "DEFAULT_GEN_RETURN_ROUTE", "DEFAULT_BYPASS"}
+    _BOOL_KEYS = {"DEFAULT_WAN_DHCP", "DEFAULT_LAN_DHCP", "DEFAULT_GEN_RETURN_ROUTE", "DEFAULT_BYPASS",
+                  "gen_return_route", "bypass"}
     for k in keys:
         v = ns.get(k)
         if v is not None:
@@ -2686,7 +2701,11 @@ def _get_init_keys(slot):
         return ["DEFAULT_WAN_ETH","DEFAULT_WAN_CIDR","DEFAULT_WAN_GW",
                 "DEFAULT_LAN_ETH","DEFAULT_LAN_CIDR","DEFAULT_LAN_GW",
                 "DEFAULT_WAN_DHCP","DEFAULT_LAN_DHCP","DEFAULT_INNER_NETS","DEFAULT_GEN_RETURN_ROUTE"]
-    if "TEMPLATE_AR_" in slot:
+    if slot == "TEMPLATE_AR_TRADITIONAL":
+        return ["wan_if","wan_ip","wan_mask","lan_if","lan_ip","lan_mask",
+                "wan_gw","lan_gw","inner_nets","bgp_networks",
+                "gen_return_route","bypass"]
+    if "TEMPLATE_AR_" in slot:  # AR SD-WAN templates (OPS/Factory)
         return ["DEFAULT_WAN1_PORT","DEFAULT_WAN1_IP","DEFAULT_WAN1_GW",
                 "DEFAULT_WAN2_PORT","DEFAULT_WAN2_IP","DEFAULT_WAN2_GW",
                 "DEFAULT_ZIHUAN_PORT","DEFAULT_IPSEC_PORT",
