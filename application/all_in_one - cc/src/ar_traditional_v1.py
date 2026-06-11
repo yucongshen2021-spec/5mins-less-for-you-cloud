@@ -3,8 +3,8 @@
 """AR 传统组网 — 双线 BGP+GRE+IPSec 华为 AR 配置生成工具 v1
 
 - 双线组网：主线 + 备线，每条线含基本信息和拨号信息
-- GRE 隧道固定 Tunnel0/0/1000（主）/ Tunnel0/0/2000（备）
-- LoopBack 固定 1000（主）/ 2000（备）
+- GRE 隧道固定 Tunnel0/0/1000（主）/ Tunnel0/0/1001（备）
+- LoopBack 固定 1000（主）/ 1001（备）
 - 隧道 source = LoopBack，destination = PE 对接 IP
 - 无 BGP network 宣告，通过 import-route + route-policy 控制
 - 内网段同时用于 ACL 2707、BGP prefix-list、静态路由
@@ -551,7 +551,7 @@ interface LoopBack1000
  description To IPSec main
  ip address {main_loop_ip} 255.255.255.255
 #
-interface LoopBack2000
+interface LoopBack1001
  description To IPSec backup
  ip address {backup_loop_ip} 255.255.255.255
 #
@@ -564,11 +564,11 @@ interface Tunnel0/0/1000
  mtu 1476
  tcp adjust-mss 1300
 #
-interface Tunnel0/0/2000
+interface Tunnel0/0/1001
  description 'back to {backup_pe} {backup_tunnel}'
  ip address {backup_tunnel_local_ip} 255.255.255.252
  tunnel-protocol gre
- source LoopBack2000
+ source LoopBack1001
  destination {backup_pe_docking}
  mtu 1476
  tcp adjust-mss 1300
