@@ -536,3 +536,20 @@ make_report.py 崩溃：`EOFError: EOF when reading a line`。
   3. Playwright 测试要点：点击每个按钮 → 检查状态变化 → 读取显示文字
      → 检查无乱码 → 检查 CSS 布局（高度/溢出/z-index）→ 检查 console 无报错。
   4. 这条规则已写入 CLAUDE.md 规则 2，每次改 UI 前必读。
+
+## 53. wanip_hosts 返回 (PE侧=奇数, CE侧=偶数)，AR 传统组网把 PE侧赋给了"本机"
+
+**现象**: AR 传统组网的 GRE 隧道本机 IP 是奇数位（.237），但用户说"本机隧道 IP 应该是 /30 的偶数位"。
+
+**根因**: `wanip_hosts(cidr)` 返回 `(hosts[0]=奇数=PE侧, hosts[1]=偶数=CE侧)`。
+  `ar_traditional_v1.py` 写 `t_local, t_remote = wanip_hosts(wanip)`，按位置把 odd→local, even→remote。
+  但 AR 路由器是 CE 侧设备，"本机" = CE 侧，应该拿偶数位 `hosts[1]`，不是奇数位 `hosts[0]`。
+  函数 docstring 写了"PE 侧 / CE 侧"但调用者没有按语义解构，而是按位置直接赋值。
+
+**修复**: `_pe_ip, _ce_ip = wanip_hosts(wanip); t_local = _ce_ip; t_remote = _pe_ip`
+
+**避免**:
+  1. `wanip_hosts` 这类带语义顺序的共享函数，调用时必须用带语义的变量名（`_pe_ip, _ce_ip`）
+     而不是泛化名（`t_local, t_remote`），强迫自己思考谁是 PE 谁是 CE。
+  2. 举一反三: ER FastIP (`pe_ip, ce_ip`)、MPLS (`pe_ip, ce_ip`)、AR SD-WAN (`wan_peer_ip, wan_ce_ip`)
+     都正确使用了语义变量名——只有 AR 传统组网用了泛化变量名，这是 bug 的前兆信号。

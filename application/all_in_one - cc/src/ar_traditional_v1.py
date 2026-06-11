@@ -25,7 +25,7 @@ except NameError:
 
 
     def wanip_hosts(cidr):
-        """从 CIDR 网段获取前两个可用主机地址。"""
+        """从 CIDR 中返回前两个可用主机 IP。返回 (PE侧=奇数, CE侧=偶数)。"""
         try:
             hosts = list(ipaddress.ip_network(cidr.strip(), strict=False).hosts())
             if len(hosts) >= 2:
@@ -176,7 +176,11 @@ def parse_ar_traditional_headers(text):
         psk = _get(r"秘钥\s*[:：]\s*([^\n]+)", block) or "both-win"
 
         # 从 wanip CIDR 计算隧道两端 IP
-        t_local, t_remote = wanip_hosts(wanip)
+        # wanip_hosts 返回 (PE侧=奇数, CE侧=偶数)
+        # AR 路由器是 CE 侧，本机隧道 IP 应为 偶数位
+        _pe_ip, _ce_ip = wanip_hosts(wanip)
+        t_local = _ce_ip   # 本机 = CE侧 = 偶数位
+        t_remote = _pe_ip  # 远端 = PE侧 = 奇数位
 
         return {
             "lineid": lineid, "pe": pe, "tunnel": tunnel, "wanip": wanip,

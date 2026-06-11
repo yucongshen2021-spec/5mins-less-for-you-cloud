@@ -107,6 +107,7 @@ try:
     _cidr_hosts = wanip_hosts  # shared_utils 的 wanip_hosts 等同于 _cidr_hosts
 except NameError:
     def _cidr_hosts(cidr):
+        """从 CIDR 中返回前两个可用主机 IP。返回 (PE侧=奇数, CE侧=偶数)。"""
         try:
             hosts = list(ipaddress.ip_network(cidr.strip(), strict=False).hosts())
             if len(hosts) >= 2:

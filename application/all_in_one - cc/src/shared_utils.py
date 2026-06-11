@@ -96,7 +96,7 @@ def ip_host_only(addr: str) -> str:
 
 
 def wanip_hosts(cidr: str) -> tuple[str, str]:
-    """从 CIDR 中返回前两个可用主机 IP（PE 侧 / CE 侧）。"""
+    """从 CIDR 中返回前两个可用主机 IP。返回 (PE侧=奇数, CE侧=偶数)。"""
     try:
         hosts = list(ipaddress.ip_network(cidr.strip(), strict=False).hosts())
         if len(hosts) >= 2:
