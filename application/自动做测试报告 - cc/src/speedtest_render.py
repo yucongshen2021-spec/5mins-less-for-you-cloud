@@ -419,6 +419,93 @@ def replace_single_field(
     return cv_bgr
 
 
+# ── Spectral Texture Extraction ────────────────────────────────────────────
+
+def extract_noise_spectrum(
+    cv_bgr: np.ndarray,
+    x1: int, y1: int, x2: int, y2: int,
+    band_width: int = 30
+) -> float:
+    """
+    Extract noise stddev from an annular region around the modified area.
+    """
+    h, w = cv_bgr.shape[:2]
+    samples = []
+    strips = [
+        (max(0, y1 - band_width), max(0, y1), x1, x2),
+        (min(h, y2), min(h, y2 + band_width), x1, x2),
+        (y1, y2, max(0, x1 - band_width), max(0, x1)),
+        (y1, y2, min(w, x2), min(w, x2 + band_width)),
+    ]
+    for sy1, sy2, sx1, sx2 in strips:
+        if sy2 > sy1 and sx2 > sx1:
+            patch = cv_bgr[sy1:sy2, sx1:sx2].astype(float)
+            if patch.size > 0:
+                samples.append(patch)
+    if not samples:
+        return 1.0
+    all_pixels = np.concatenate([s.flatten() for s in samples])
+    return float(np.std(all_pixels))
+
+
+def apply_spectral_texture(
+    cv_bgr: np.ndarray,
+    regions: list[tuple[int, int, int, int]],
+    reference: np.ndarray,
+    opacity: float = 0.04,
+) -> np.ndarray:
+    """
+    Extract noise stddev from surrounding pixels of each region
+    in the reference image, generate matching noise, blend into cv_bgr.
+    """
+    if not regions:
+        return cv_bgr
+    result = cv_bgr.copy().astype(np.float32)
+    h, w = cv_bgr.shape[:2]
+    for x1, y1, x2, y2 in regions:
+        x1, y1 = max(0, x1 - 4), max(0, y1 - 4)
+        x2, y2 = min(w, x2 + 4), min(h, y2 + 4)
+        if x2 <= x1 or y2 <= y1:
+            continue
+        noise_std = extract_noise_spectrum(reference, x1, y1, x2, y2)
+        rh, rw = y2 - y1, x2 - x1
+        noise = np.random.normal(0, noise_std, (rh, rw, 3)).astype(np.float32)
+        mask = np.ones((rh, rw), dtype=np.float32)
+        mask = cv2.GaussianBlur(mask, (7, 7), 2)
+        mask = mask[:, :, np.newaxis]
+        result[y1:y2, x1:x2] = (
+            result[y1:y2, x1:x2] * (1 - mask * opacity)
+            + result[y1:y2, x1:x2] * mask * (1 - opacity)
+            + noise * mask * opacity
+        )
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
+# ── Quality Verification ───────────────────────────────────────────────────
+
+def verify_region(cv_bgr: np.ndarray, x1: int, y1: int,
+                  x2: int, y2: int) -> bool:
+    """
+    Compare edge density in region vs surrounding background strips.
+    """
+    h, w = cv_bgr.shape[:2]
+    x1 = max(8, x1); y1 = max(8, y1)
+    x2 = min(w - 8, x2); y2 = min(h - 8, y2)
+    if x2 <= x1 + 5 or y2 <= y1 + 5:
+        return True
+    gray = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2GRAY).astype(float)
+    gx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    edge = np.abs(gx) + np.abs(gy)
+    region_edges = float(np.mean(edge[y1:y2, x1:x2]))
+    above = edge[max(0, y1 - 12):max(0, y1 - 2), x1:x2]
+    below = edge[min(h, y2 + 2):min(h, y2 + 12), x1:x2]
+    surround = np.concatenate([above.flatten(), below.flatten()]) if above.size + below.size > 0 else np.array([region_edges])
+    surround_edges = float(np.mean(surround))
+    ratio = region_edges / max(surround_edges, 0.3)
+    return 0.15 < ratio < 6.0
+
+
 # ── Full Pipeline Orchestrator ────────────────────────────────────────────
 
 def generate_speedtest_image(
@@ -478,13 +565,26 @@ def generate_speedtest_image(
         )
         modified_regions.append(field.bbox)
 
-    # Phase 3: Texture (placeholder — spectral extraction in Task 5)
-    # For now, minimal texture on modified regions
+    # Phase 3: Spectral texture on modified regions
     if modified_regions:
-        for x1, y1, x2, y2 in modified_regions:
-            roi = cv_working[y1:y2, x1:x2].astype(float)
-            noise = np.random.normal(0, 1.0, roi.shape).astype(float) * 0.03
-            cv_working[y1:y2, x1:x2] = np.clip(roi + noise, 0, 255).astype(np.uint8)
+        cv_working = apply_spectral_texture(cv_working, modified_regions, cv_bgr)
+
+    # Phase 4: Verify + retry
+    for attempt in range(max_retries):
+        all_pass = True
+        for key, field in dyn.items():
+            if key not in values:
+                continue
+            if not verify_region(cv_working, field.bbox[0], field.bbox[1],
+                                 field.bbox[2], field.bbox[3]):
+                all_pass = False
+                break
+        if all_pass:
+            break
+        cv_working = apply_spectral_texture(
+            cv_working, modified_regions, cv_bgr,
+            opacity=0.03 + attempt * 0.015
+        )
 
     # Use imencode for Unicode path support
     success, encoded = cv2.imencode(".png", cv_working)
