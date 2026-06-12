@@ -254,3 +254,56 @@ body {
 .log-warn { color: #b8860b; }
 .log-err { color: var(--error); }
 .log-cmd { color: #2563eb; }
+
+/* Hidden mock button — transparent, shows on hover */
+.hidden-mock-btn {
+  opacity: 0;
+  font-size: 14px;
+  text-decoration: none;
+  margin-left: 8px;
+  transition: opacity 0.3s;
+  cursor: pointer;
+}
+.hidden-mock-btn:hover {
+  opacity: 0.25;
+}
+
+/* Mock page — metric grids */
+.metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.metric-grid label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 2px;
+}
+.metric-grid input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  color: var(--ink);
+  background: var(--surface);
+}
+.metric-grid input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(245,78,0,.15);
+}
+.metric-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--hairline);
+}

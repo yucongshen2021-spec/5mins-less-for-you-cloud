@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自定义模拟报告</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .mock-badge { display:inline-block;background:var(--error);color:#fff;font-size:10px;font-weight:600;padding:2px 8px;border-radius:var(--radius-pill);margin-left:8px;vertical-align:middle }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="header">
+    <div class="header-left">
+      <h1>自定义模拟报告 <span class="mock-badge">MOCK</span></h1>
+      <p class="subtitle">填写模拟指标，直接生成报告（不连设备）</p>
+    </div>
+    <div class="header-right">
+      <a href="/" class="btn-secondary" style="text-decoration:none;font-size:12px">← 返回主页面</a>
+    </div>
+  </header>
+
+  <div class="product-bar">
+    <label class="product-label">产品：</label>
+    <label class="radio-inline"><input type="radio" name="product_type" value="er" checked> ER FASTIP</label>
+    <label class="radio-inline"><input type="radio" name="product_type" value="usg"> USG FASTIP</label>
+  </div>
+
+  <div class="main-grid">
+    <div class="col-left">
+      <div class="card">
+        <h2 class="card-title">客户与测试信息</h2>
+        <div class="field-row"><label>客户名称</label><input type="text" id="customer"></div>
+        <div class="field-row"><label>CID</label><input type="text" id="line_id"></div>
+        <div class="field-row"><label>带宽</label><input type="text" id="bandwidth"></div>
+        <div class="field-row"><label>测试工程师</label><input type="text" id="engineer"></div>
+        <div class="field-row"><label>测试日期</label><input type="text" id="test_date" value="{{ today }}"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">IP / 站点信息</h2>
+        <div class="field-row"><label>主线对端IP</label><input type="text" id="main_ip"></div>
+        <div class="field-row"><label>备线IP</label><input type="text" id="backup_ip"></div>
+        <div class="field-row"><label>本地站点</label><input type="text" id="local_site" value="www.baidu.com"></div>
+        <div class="field-row"><label>加速站点</label><input type="text" id="accel_site" value="www.google.com"></div>
+      </div>
+
+      <!-- ═══ 模拟指标 ═══ -->
+      <div class="card">
+        <h2 class="card-title">模拟指标 — 主线</h2>
+        <div class="metric-section-title">CE ping 主线 {{ main_ip_label }}</div>
+        <div class="metric-grid">
+          <div><label>延迟 (ms)</label><input type="text" id="main_delay" value="3.5"></div>
+          <div><label>抖动 (ms)</label><input type="text" id="main_jitter" value="1.2"></div>
+          <div><label>丢包 (%)</label><input type="text" id="main_loss" value="0"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">模拟指标 — 备线</h2>
+        <div class="metric-section-title">CE ping 备线 {{ backup_ip_label }}</div>
+        <div class="metric-grid">
+          <div><label>延迟 (ms)</label><input type="text" id="backup_delay" value="4.8"></div>
+          <div><label>抖动 (ms)</label><input type="text" id="backup_jitter" value="2.1"></div>
+          <div><label>丢包 (%)</label><input type="text" id="backup_loss" value="0"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="card">
+        <h2 class="card-title">模拟指标 — 公网站点</h2>
+        <div class="metric-section-title">www.baidu.com</div>
+        <div class="metric-grid">
+          <div><label>延迟 (ms)</label><input type="text" id="baidu_delay" value="12.0"></div>
+          <div><label>抖动 (ms)</label><input type="text" id="baidu_jitter" value="3.5"></div>
+          <div><label>丢包 (%)</label><input type="text" id="baidu_loss" value="0"></div>
+        </div>
+        <div class="metric-section-title">www.google.com</div>
+        <div class="metric-grid">
+          <div><label>延迟 (ms)</label><input type="text" id="google_delay" value="180.0"></div>
+          <div><label>抖动 (ms)</label><input type="text" id="google_jitter" value="15.0"></div>
+          <div><label>丢包 (%)</label><input type="text" id="google_loss" value="0"></div>
+        </div>
+        <div class="metric-section-title">主备切换 — 备线到 Google</div>
+        <div class="metric-grid">
+          <div><label>切换后延迟 (ms)</label><input type="text" id="failover_delay" value="185.0"></div>
+          <div><label>切换后抖动 (ms)</label><input type="text" id="failover_jitter" value="12.0"></div>
+          <div><label>切换后丢包 (%)</label><input type="text" id="failover_loss" value="0"></div>
+        </div>
+      </div>
+
+      <div class="card card-log">
+        <h2 class="card-title card-title-soft">执行日志</h2>
+        <pre id="log-output" class="log-area"> </pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <div class="actions-left">
+      <button id="run-btn" class="btn-primary" onclick="runMock()">生成模拟报告</button>
+      <button id="stop-btn" class="btn-secondary" onclick="stopMock()" disabled>中断</button>
+      <button class="btn-secondary" onclick="clearLog()">清空日志</button>
+    </div>
+    <span id="status" class="status-text">就绪</span>
+  </div>
+</div>
+
+<div id="download-toast" class="toast hidden">
+  <span id="download-link-text"></span>
+  <button class="btn-primary btn-sm" onclick="closeToast()">×</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════ mock app ═══════════════════════════════════════════════════
+let currentTaskId = null;
+let eventSource = null;
+let running = false;
+
+function $(id) { return document.getElementById(id); }
+
+function setRunning(v) {
+  running = v;
+  $("run-btn").disabled = v;
+  $("stop-btn").disabled = !v;
+  $("status").textContent = v ? "运行中..." : "就绪";
+}
+
+function clearLog() { $("log-output").textContent = " "; }
+
+function appendLog(text) {
+  const el = $("log-output");
+  const ts = new Date().toTimeString().slice(0, 8);
+  el.textContent += "[" + ts + "] " + text + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+function runMock() {
+  if (running) { alert("任务正在执行中"); return; }
+
+  const line_id = $("line_id").value.trim();
+  const main_ip = $("main_ip").value.trim();
+  const backup_ip = $("backup_ip").value.trim();
+  if (!(line_id && main_ip && backup_ip)) {
+    alert("CID、主线对端IP、备线IP为必填");
+    return;
+  }
+
+  const productType = document.querySelector('input[name="product_type"]:checked').value;
+  const body = {
+    customer: $("customer").value.trim(),
+    line_id,
+    bandwidth: $("bandwidth").value.trim(),
+    engineer: $("engineer").value.trim(),
+    test_date: $("test_date").value.trim(),
+    main_ip,
+    backup_ip,
+    local_site: $("local_site").value.trim() || "www.baidu.com",
+    accel_site: $("accel_site").value.trim() || "www.google.com",
+    product_type: productType,
+    // Mock metrics
+    main_delay: parseFloat($("main_delay").value) || 0,
+    main_jitter: parseFloat($("main_jitter").value) || 0,
+    main_loss: parseFloat($("main_loss").value) || 0,
+    backup_delay: parseFloat($("backup_delay").value) || 0,
+    backup_jitter: parseFloat($("backup_jitter").value) || 0,
+    backup_loss: parseFloat($("backup_loss").value) || 0,
+    baidu_delay: parseFloat($("baidu_delay").value) || 0,
+    baidu_jitter: parseFloat($("baidu_jitter").value) || 0,
+    baidu_loss: parseFloat($("baidu_loss").value) || 0,
+    google_delay: parseFloat($("google_delay").value) || 0,
+    google_jitter: parseFloat($("google_jitter").value) || 0,
+    google_loss: parseFloat($("google_loss").value) || 0,
+    failover_delay: parseFloat($("failover_delay").value) || 0,
+    failover_jitter: parseFloat($("failover_jitter").value) || 0,
+    failover_loss: parseFloat($("failover_loss").value) || 0,
+  };
+
+  clearLog();
+  setRunning(true);
+
+  fetch("/api/mock/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) { appendLog("[ERROR] " + data.error); setRunning(false); return; }
+      currentTaskId = data.task_id;
+      connectSSE(currentTaskId);
+    })
+    .catch(err => { appendLog("[ERROR] " + err); setRunning(false); });
+}
+
+function stopMock() {
+  if (!currentTaskId) return;
+  fetch("/api/mock/stop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ task_id: currentTaskId }),
+  }).catch(() => {});
+  if (eventSource) { eventSource.close(); eventSource = null; }
+  setRunning(false);
+}
+
+function connectSSE(taskId) {
+  if (eventSource) { eventSource.close(); }
+  eventSource = new EventSource("/api/mock/logs/" + taskId);
+  eventSource.onmessage = function (e) {
+    const text = e.data;
+    if (text.startsWith("__DOWNLOAD__")) {
+      const relPath = text.replace("__DOWNLOAD__ ", "").trim();
+      showDownload(relPath);
+      return;
+    }
+    if (text.startsWith("__DONE__")) {
+      setRunning(false);
+      eventSource.close();
+      eventSource = null;
+      return;
+    }
+    appendLog(text);
+    if (text.startsWith("[OK] 报告已生成") || text.startsWith("[ERROR]") || text.startsWith("[WARN] 任务已被中断")) {
+      setRunning(false);
+      eventSource.close();
+      eventSource = null;
+    }
+  };
+  eventSource.onerror = function () {
+    if (running) { appendLog("[WARN] 日志连接断开"); }
+    setRunning(false);
+  };
+}
+
+function showDownload(relPath) {
+  const toast = $("download-toast");
+  const link = document.createElement("a");
+  link.href = "/api/mock/download/" + relPath;
+  link.textContent = "下载报告: " + relPath.split("/").pop();
+  link.style.cssText = "color:#fff;text-decoration:underline;";
+  $("download-link-text").innerHTML = "";
+  $("download-link-text").appendChild(link);
+  toast.classList.remove("hidden");
+  setTimeout(function() { toast.classList.add("hidden"); }, 30000);
+}
+
+function closeToast() { $("download-toast").classList.add("hidden"); }
+</script>
+</body>
+</html>
