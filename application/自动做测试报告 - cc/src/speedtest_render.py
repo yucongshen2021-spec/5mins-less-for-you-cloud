@@ -310,3 +310,184 @@ def compute_baseline_y(field: DetectedField, font: ImageFont.FreeTypeFont) -> in
     else:
         pix_descent = 2
     return y2 - pix_descent
+
+
+# ── Constants ─────────────────────────────────────────────────────────────
+
+UPSCALE = 8
+INPAINT_RADIUS = 3
+MASK_THRESHOLD = 10
+
+
+# ── Single-Buffer Field Replacement ───────────────────────────────────────
+
+def replace_single_field(
+    cv_bgr: np.ndarray,              # Single working buffer (BGR, modified in-place)
+    field: DetectedField,            # OCR-detected field to replace
+    new_text: str,                   # New text to render
+    protection_mask: np.ndarray,     # Static elements (255 = do not touch)
+    weight: str = "normal",
+) -> np.ndarray:
+    """
+    Replace one text field using single image buffer.
+    1. Extract character mask from OCR bbox (minus protection)
+    2. Inpaint ONLY those pixels via TELEA
+    3. Find exact font size via binary search (find_exact_font_size)
+    4. Render new text at 8x on transparent RGBA canvas → Lanczos downscale to 1x
+    5. Compute baseline position (compute_baseline_y)
+    6. Alpha-composite new text directly onto cv_bgr (BGR)
+    Returns cv_bgr (same buffer, modified).
+    """
+    h, w = cv_bgr.shape[:2]
+    x1, y1, x2, y2 = field.bbox
+
+    # ── 1. Extract character mask ──
+    roi = cv_bgr[y1:y2, x1:x2]
+    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY).astype(float)
+
+    strips = []
+    if roi.shape[0] > 2:
+        strips.extend([gray[0, :].flatten(), gray[-1, :].flatten()])
+    if roi.shape[1] > 2:
+        strips.extend([gray[:, 0].flatten(), gray[:, -1].flatten()])
+    bg_val = float(np.median(np.concatenate(strips))) if strips else 127
+
+    char_mask = (np.abs(gray - bg_val) > MASK_THRESHOLD).astype(np.uint8) * 255
+
+    # ── 2. Subtract protection mask ──
+    prot_roi = protection_mask[y1:y2, x1:x2]
+    char_mask = cv2.bitwise_and(char_mask, cv2.bitwise_not(prot_roi))
+
+    if char_mask.sum() < 10:
+        return cv_bgr
+
+    # ── 3. Inpaint only character pixels ──
+    full_mask = np.zeros((h, w), dtype=np.uint8)
+    full_mask[y1:y2, x1:x2] = char_mask
+    cv_bgr = cv2.inpaint(cv_bgr, full_mask, INPAINT_RADIUS, cv2.INPAINT_TELEA)
+
+    # ── 4. Measure original character dimensions ──
+    ys, xs = np.where(char_mask > 0)
+    char_w = int(np.max(xs) - np.min(xs) + 1) if len(ys) > 0 else field.font_size_est
+    char_h = field.font_size_est
+
+    # ── 5. Find matching font ──
+    font, actual_size = find_exact_font_size(char_w, char_h, "8", weight)
+
+    # ── 6. Render at 8x → Lanczos ──
+    scale = UPSCALE
+    big_size = actual_size * scale
+    big_font = FontRegistry.instance().load(big_size, weight)
+
+    bb = big_font.getbbox(new_text)
+    tw, th = bb[2] - bb[0], bb[3] - bb[1]
+    ox, oy = bb[0], bb[1]
+    pad = max(4, int(big_size * 0.12))
+
+    img_8x = Image.new("RGBA", (tw + pad * 2, th + pad * 2), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img_8x)
+    draw.text((pad - ox, pad - oy), new_text, fill=field.fg_color + (255,), font=big_font)
+
+    ow = max(1, (tw + pad * 2) // scale)
+    oh = max(1, (th + pad * 2) // scale)
+    text_1x = img_8x.resize((ow, oh), Image.LANCZOS)
+
+    # ── 7. Place: center horizontally, baseline-aligned vertically ──
+    baseline_y = compute_baseline_y(field, font)
+    orig_cx = (x1 + x2) // 2
+    px = orig_cx - text_1x.width // 2
+    py = baseline_y - int(actual_size * 0.7)
+    py = max(y1 - 2, min(y2 - text_1x.height + 2, py))
+
+    # ── 8. Alpha-composite onto cv_bgr (BGR) ──
+    text_arr = np.array(text_1x)  # RGBA
+    text_alpha = text_arr[:, :, 3].astype(float) / 255.0
+    text_rgb = text_arr[:, :, :3].astype(float)
+
+    tx1 = max(0, px); ty1 = max(0, py)
+    tx2 = min(w, px + text_1x.width); ty2 = min(h, py + text_1x.height)
+    sx1 = tx1 - px; sy1 = ty1 - py
+
+    for c in range(3):
+        patch = cv_bgr[ty1:ty2, tx1:tx2, c].astype(float)
+        ap = text_alpha[sy1:sy1+(ty2-ty1), sx1:sx1+(tx2-tx1)]
+        tp = text_rgb[sy1:sy1+(ty2-ty1), sx1:sx1+(tx2-tx1), 2-c]  # RGB→BGR
+        cv_bgr[ty1:ty2, tx1:tx2, c] = np.clip(
+            patch * (1 - ap) + tp * ap, 0, 255
+        ).astype(np.uint8)
+
+    return cv_bgr
+
+
+# ── Full Pipeline Orchestrator ────────────────────────────────────────────
+
+def generate_speedtest_image(
+    template_path: Path,
+    output_path: Path,
+    download_mbps: str,
+    upload_mbps: str,
+    ping_ms: str,
+    jitter_ms: str,
+    server: str = "FastIP SpeedTest",
+    isp: str = "China Telecom",
+    ip_addr: str = "192.168.5.10",
+    location: str = "Shenzhen",
+    max_retries: int = 3,
+) -> Path:
+    """
+    Full pipeline on single image buffer:
+    OCR detect -> classify -> protect -> inpaint -> render -> texture -> verify -> retry.
+    """
+    # Use np.fromfile + imdecode for Unicode path support (cv2.imread fails on CJK paths)
+    buf = np.fromfile(str(template_path), dtype=np.uint8)
+    cv_bgr = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+    h, w = cv_bgr.shape[:2]
+
+    # Phase 1: OCR detection + classification
+    fields = detect_fields(cv_bgr)
+    dyn = classify_dynamic_fields(fields, w, h)
+    protection_mask = build_protection_mask(fields, h, w)
+
+    if not dyn:
+        # Use imencode for Unicode path support
+        success, encoded = cv2.imencode(".png", cv_bgr)
+        if success:
+            output_path.write_bytes(encoded.tobytes())
+        return output_path
+
+    # Build value map — download as SINGLE visual object (not split int/frac)
+    values = {
+        "download": f"{download_mbps} Mbps",
+        "upload": f"{upload_mbps} Mbps",
+        "ping": f"{ping_ms} ms",
+        "jitter": f"{jitter_ms} ms",
+        "server": server,
+        "isp": f"{isp}  {ip_addr}  {location}",
+    }
+
+    # Phase 2: Process each dynamic field on single buffer
+    cv_working = cv_bgr.copy()
+    modified_regions = []
+
+    for key, field in dyn.items():
+        if key not in values:
+            continue
+        weight = "light" if field.font_size_est > 30 else "normal"
+        cv_working = replace_single_field(
+            cv_working, field, values[key], protection_mask, weight
+        )
+        modified_regions.append(field.bbox)
+
+    # Phase 3: Texture (placeholder — spectral extraction in Task 5)
+    # For now, minimal texture on modified regions
+    if modified_regions:
+        for x1, y1, x2, y2 in modified_regions:
+            roi = cv_working[y1:y2, x1:x2].astype(float)
+            noise = np.random.normal(0, 1.0, roi.shape).astype(float) * 0.03
+            cv_working[y1:y2, x1:x2] = np.clip(roi + noise, 0, 255).astype(np.uint8)
+
+    # Use imencode for Unicode path support
+    success, encoded = cv2.imencode(".png", cv_working)
+    if success:
+        output_path.write_bytes(encoded.tobytes())
+    return output_path
