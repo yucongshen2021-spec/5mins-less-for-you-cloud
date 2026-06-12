@@ -237,3 +237,76 @@ def build_protection_mask(fields: list[DetectedField],
         y2 = min(img_h, y2 + 3)
         mask[y1:y2, x1:x2] = 255
     return mask
+
+
+# ── Font Sizing — Iterative Search ───────────────────────────────────────
+
+def find_exact_font_size(target_char_w: int, target_char_h: int,
+                         sample_char: str = "8",
+                         weight: str = "normal") -> tuple[ImageFont.FreeTypeFont, int]:
+    """
+    Binary search for the Pillow font size that produces a character
+    closest to target_char_w x target_char_h.
+    Returns (font, actual_size_px) with error <= +/-1px.
+    """
+    registry = FontRegistry.instance()
+
+    lo, hi = 4, 200
+    best_font = None
+    best_size = 0
+    best_diff = float("inf")
+
+    for _ in range(12):  # Binary search iterations
+        mid = (lo + hi) // 2
+        font = registry.load(mid, weight)
+        bb = font.getbbox(sample_char)
+        actual_w = bb[2] - bb[0]
+        actual_h = bb[3] - bb[1]
+        diff = abs(actual_w - target_char_w) + abs(actual_h - target_char_h)
+
+        if diff < best_diff:
+            best_diff = diff
+            best_font = font
+            best_size = mid
+
+        if abs(actual_h - target_char_h) <= 1 and abs(actual_w - target_char_w) <= 1:
+            break  # Good enough
+
+        if actual_h < target_char_h:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+
+    if best_font is None:
+        best_font = registry.load(target_char_h, weight)
+
+    return best_font, best_size
+
+
+# ── Baseline Computation ─────────────────────────────────────────────────
+
+def compute_baseline_y(field: DetectedField, font: ImageFont.FreeTypeFont) -> int:
+    """
+    Compute the true baseline y-coordinate using font metrics:
+    baseline = bbox_bottom - descent
+
+    Uses per-character font bbox to determine the actual descent
+    for the specific text (e.g., digits have zero descent, while 'g'
+    extends below the baseline).
+    """
+    ascent, _descent = font.getmetrics()
+    _, y1, _, y2 = field.bbox
+    char_h = y2 - y1
+
+    # Get the font's actual pixel bbox for this specific character
+    bb = font.getbbox(field.text)
+    char_h_px = bb[3] - bb[1]
+    # Per-character descent: how far the glyph extends below the baseline
+    char_descent = max(0, bb[3] - ascent)
+
+    if char_h > 0 and char_h_px > 0:
+        scale = char_h / char_h_px
+        pix_descent = int(char_descent * scale)
+    else:
+        pix_descent = 2
+    return y2 - pix_descent
