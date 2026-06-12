@@ -462,40 +462,8 @@ def _run_mock_worker(task_id: str, cfg: MockConfig, metrics: dict, run_dir: Path
             render_terminal_png(shots / f"{tag}.png", f"[CE]$ ping -c 500 -s {size} {target}", output, FONT_PATH, tail_lines=20)
             q.put(f"    完成 → {tag}.png\n")
 
-        # ── 05 speedtest — generate realistic screenshot ──
-        if _mock_stop_flags.get(task_id):
-            q.put("[WARN] 任务已被中断\n"); q.put("__DONE__\n"); return
-        q.put(f"\n>>> [05] 生成 Speedtest 截图 — 下载 {cfg.bandwidth or '100M'} Mbps\n")
-
-        from src.speedtest_render import generate_speedtest_image
-
-        # Parse bandwidth value
-        bw_str = (cfg.bandwidth or "100").replace("M", "").replace("m", "").strip()
-        try:
-            bw_val = int(float(bw_str)) if bw_str else 100
-        except ValueError:
-            bw_val = 100
-
-        import random as _rnd
-        dl_val = str(int(bw_val * 0.95) + _rnd.randint(-3, 5))
-        ul_val = str(int(bw_val * 0.92) + _rnd.randint(-2, 6))
-
-        speedtest_template = ROOT / "企业微信截图_17812561974493.png"
-        if speedtest_template.is_file():
-            generate_speedtest_image(
-                speedtest_template, shots / "05_speedtest.png",
-                download_mbps=dl_val,
-                upload_mbps=ul_val,
-                ping_ms=str(metrics["main"]["delay"]),
-                jitter_ms=str(metrics["main"]["jitter"]),
-                server="FastIP SpeedTest",
-                isp="China Telecom",
-                ip_addr=cfg.main_ip,
-                location="Shenzhen",
-            )
-            q.put("    完成 → 05_speedtest.png\n")
-        else:
-            q.put(f"    [WARN] 缺少 Speedtest 模板截图: {speedtest_template}\n")
+        # ── 05 bandwidth — skip ──
+        q.put("\n>>> [05_speedtest] 跳过（模拟模式不包含带宽测试）\n")
 
         # ── 06 local baidu ──
         if _mock_stop_flags.get(task_id):
