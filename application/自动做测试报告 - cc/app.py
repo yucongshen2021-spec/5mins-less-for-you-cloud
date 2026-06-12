@@ -411,6 +411,8 @@ def api_mock_logs(task_id):
         while True:
             try:
                 line = q.get(timeout=120)
+                # Strip leading/trailing newlines — embedded \n breaks SSE message framing
+                line = line.strip("\n")
                 yield f"data: {line}\n\n"
                 if any(line.startswith(p) for p in ("__DONE", "[OK] 报告已生成", "[ERROR]", "[WARN] 任务已被中断")):
                     break
@@ -478,10 +480,10 @@ def _run_mock_worker(task_id: str, cfg: MockConfig, metrics: dict, run_dir: Path
         dl_val = str(int(bw_val * 0.95) + _rnd.randint(-3, 5))
         ul_val = str(int(bw_val * 0.92) + _rnd.randint(-2, 6))
 
-        template = ROOT / "企业微信截图_17812561974493.png"
-        if template.is_file():
+        speedtest_template = ROOT / "企业微信截图_17812561974493.png"
+        if speedtest_template.is_file():
             generate_speedtest_image(
-                template, shots / "05_speedtest.png",
+                speedtest_template, shots / "05_speedtest.png",
                 download_mbps=dl_val,
                 upload_mbps=ul_val,
                 ping_ms=str(metrics["main"]["delay"]),
@@ -493,7 +495,7 @@ def _run_mock_worker(task_id: str, cfg: MockConfig, metrics: dict, run_dir: Path
             )
             q.put("    完成 → 05_speedtest.png\n")
         else:
-            q.put(f"    [WARN] 缺少 Speedtest 模板截图: {template}\n")
+            q.put(f"    [WARN] 缺少 Speedtest 模板截图: {speedtest_template}\n")
 
         # ── 06 local baidu ──
         if _mock_stop_flags.get(task_id):
