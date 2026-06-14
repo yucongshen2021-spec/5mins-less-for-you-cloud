@@ -56,8 +56,9 @@ curl http://127.0.0.1:8000/api/update/manifest
 
 - [ ] `py -m pytest application/test/ -v` 通过
 - [ ] `py application/test/portal/test_customer_full.py` 通过
+- [ ] `py application/test/portal/test_update_e2e.py` 通过（模拟客户在线更新）
 - [ ] `git branch` 在 `release`
-- [ ] `dist/` 有旧版 zip 供客户模拟测试
+- [ ] `dist/` 有新旧两版 zip 供模拟更新测试
 
 ## 客户更新地址
 
