@@ -51,7 +51,7 @@ set "any=0"
 for %%p in (7000 7001 7002 7003 7004) do (
     for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /c:":%%p " ^| findstr "LISTENING" 2^>nul') do set "any=1"
 )
-if !any!==1 if %waited% lss 20 goto :wait_loop
+if !any!==1 if %waited% lss 30 goto :wait_loop
 
 :: ---- [2/6] Kill leftover ports ----
 echo [2/6] Killing leftover processes...
@@ -85,6 +85,8 @@ if %errorlevel% neq 0 (
 )
 
 if not "%ERR%"=="1" (
+    :: Unlock any read-only files before copy
+    powershell -NoProfile -Command "Get-ChildItem '%TMPDIR%' -Recurse | ForEach-Object { try { $_.Attributes = 'Normal' } catch {} }" 2>nul
     for /d %%d in ("%TMPDIR%\*") do (
         echo   Copying files - this may take a moment
         robocopy "%%d" "%BUNDLE%" /E /R:3 /W:3 /NFL /NDL /NJH /NJS /NC /NS /NP >nul 2>&1
@@ -92,6 +94,11 @@ if not "%ERR%"=="1" (
             echo   WARNING: some files could not be copied - code %errorlevel%
             set "ERR=1"
         )
+    )
+    :: Verify RELEASE_INFO.json was copied
+    if not exist "%BUNDLE%\RELEASE_INFO.json" (
+        echo   ERROR: RELEASE_INFO.json missing after copy
+        set "ERR=1"
     )
 )
 

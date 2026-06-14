@@ -120,6 +120,18 @@ def api_update_upgrade():
     return jsonify(result), 500
 
 
+@app.route("/api/shutdown", methods=["POST"])
+def api_shutdown():
+    """Gracefully shutdown portal — called by frontend after upgrade launch."""
+    import signal as _sig
+    import os as _os
+    def _do():
+        import time as _t; _t.sleep(0.5)
+        _os.kill(_os.getpid(), _sig.SIGTERM)
+    import threading as _th; _th.Thread(target=_do, daemon=True).start()
+    return jsonify({"ok": True})
+
+
 @app.route("/download/latest.zip")
 def download_latest_zip():
     """下发最新可分发包；本地无包时 404。"""

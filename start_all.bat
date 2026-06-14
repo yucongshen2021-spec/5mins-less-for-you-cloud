@@ -17,7 +17,7 @@ echo.
 echo   Using bundled Python runtime
 echo.
 echo   [1/2] Cleaning old processes...
-for %%p in (5003 5002 5001 5004 5000) do call :kill_port %%p
+for %%p in (5003 5002 5001 5004 5000 7003 7002 7001 7004 7000) do call :kill_port %%p
 echo   [2/2] Starting all services...
 echo.
 if defined RELEASE_MODE (
