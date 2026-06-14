@@ -53,8 +53,9 @@ def main():
         cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     time.sleep(3)
     r = requests.get(f"http://127.0.0.1:{MIRROR_PORT}/api/update/manifest", timeout=5)
-    assert r.json()["ok"], f"Mirror: {r.json()}"
-    print(f"Mirror: v{r.json().get('version')}")
+    data = r.json()
+    assert r.status_code == 200 and "version" in data, f"Mirror: {data}"
+    print(f"Mirror: v{data.get('version')}")
 
     # 3. Start portal
     env = {**dict(os.environ), "RELEASE_MODE": "1"}
