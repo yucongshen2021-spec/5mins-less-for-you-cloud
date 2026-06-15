@@ -291,8 +291,17 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 </div><!-- end er-ds-layout -->
 
 <div id="er5-ds-layout" style="display:none">
-<div class="card"><div class="card-h">域名分流 · 5.0</div><div class="card-b">
-<p style="color:var(--mu);font-size:12px;padding:16px;text-align:center">5.0 域名分流 — 开发中，请切换回 4.0 版本</p>
+<div class="card" style="margin-bottom:14px"><div class="card-h">域名分流 · 5.0 VyOS 语法</div><div class="card-b" style="max-width:800px">
+<div class="fg"><label class="fl">域名列表（每行一个域名）</label><textarea class="ft ft-sm" id="epoch-fastip5-ds-domains" placeholder="google.com&#10;youtube.com"></textarea></div>
+<div class="fr2"><div class="fg"><label class="fl">Address Group 名称</label><input class="fi" id="epoch-fastip5-ds-addr-group" value="to-US"></div><div class="fg"><label class="fl">LAN-MAP Rule 序号</label><input class="fi" id="epoch-fastip5-ds-rule-num" value="100"></div></div>
+<div class="fr2"><div class="fg"><label class="fl">Static Table 号</label><input class="fi" id="epoch-fastip5-ds-table-num" value="139"></div><div class="fg"><label class="fl">源网段 CIDR（可空）</label><input class="fi" id="epoch-fastip5-ds-src-cidr" placeholder="192.168.5.0/24"></div></div>
+<div class="fr2"><div class="fg"><label class="fl">首选 DNS</label><input class="fi" id="epoch-fastip5-ds-dns1" value="209.244.0.3"></div><div class="fg"><label class="fl">备选 DNS（可空）</label><input class="fi" id="epoch-fastip5-ds-dns2" placeholder="可空"></div></div>
+<div class="fg"><label class="fl">应用接口（policy-route 绑定的 ethernet）</label><input class="fi" id="epoch-fastip5-ds-eth" value="eth0"></div>
+<div class="fr2"><div class="fg"><label class="fl">递归下一跳（IP）</label><input class="fi" id="epoch-fastip5-ds-nh" value="2.2.2.2"></div><div class="fg"><label class="fl">主下一跳 /32 静态路由</label><input class="fi" id="epoch-fastip5-ds-s32-nh" value="10.22.15.185"></div></div>
+<div class="fr2"><div class="fg"><label class="fl">Track 名称（可空）</label><input class="fi" id="epoch-fastip5-ds-track" value="tooutbound1"></div><div class="fg"><label class="fl">备下一跳 /32 静态路由（可空）</label><input class="fi" id="epoch-fastip5-ds-s32-bk" placeholder="可空"></div></div>
+<div class="fr2"><div class="fg"><label class="fl">100.100 探测 IP</label><input class="fi" id="epoch-fastip5-ds-probe" value="100.100.100.1"></div><div class="fg"><label class="fl">NAT Rule 号（可空）</label><input class="fi" id="epoch-fastip5-ds-nat-rule" placeholder="可空"></div></div>
+<div class="fr2"><div class="fg"><label class="fl">NAT 出口 Tunnel（可空）</label><input class="fi" id="epoch-fastip5-ds-exit-tun" placeholder="可空"></div><div class="fg"><label class="fl">主线出口 IP（可空）</label><input class="fi" id="epoch-fastip5-ds-exit-ip" placeholder="可空"></div></div>
+<div class="fr2"><div class="fg"><label class="fl">Failover Source IP（可空）</label><input class="fi" id="epoch-fastip5-ds-failover-src" placeholder="与主下一跳相同"></div><div class="fg"></div></div>
 </div></div>
 </div>
 
@@ -549,7 +558,7 @@ function showNetPanel(tp,v){
   if(tp==='epoch-fastip'){['er5-panel-hk-us','er5-panel-flink','er5-panel-new_exit'].forEach(id=>{let el=$(id);if(el){el.classList.remove('active');el.style.display='none'}})}
   // Show correct panel
   if(tp==='epoch-fastip'&&isV5){
-    let panels5={hk:'er5-panel-hk-us',us:'er5-panel-hk-us',flink:'er5-panel-flink',new_exit:'er5-panel-new_exit'};
+    let panels5={hk:'er5-panel-hk-us',us:'er5-panel-hk-us',flink:'er5-panel-flink',new_exit:'er5-panel-new_exit',domain_split:'er5-ds-layout'};
     let a5=panels5[v];if(a5){let el=$(a5);if(el){el.style.display='block';el.classList.add('active')}}
   }else{
     let active=(map[tp]||{})[v];if(active){let el=$(active);if(el){el.style.display='block';el.classList.add('active')}}
@@ -725,6 +734,8 @@ function gn5(tp){
        ER5_NE_NAT_SOURCE_CIDR_DEFAULT:g('ne-nat-src')?.value||'',
        ER5_NE_FNET_PROBE_DEFAULT:g('ne-fnet-probe')?.value||'',ER5_NE_FNET_EXIT_TUNNEL_DEFAULT:g('ne-fnet-tunnel')?.value||'',
        ER5_NE_FNET_NAT_RULE_DEFAULT:g('ne-fnet-nat-rule')?.value||''};
+  }else if(v==='domain_split'){
+    n={ER5_DS_DOMAINS_DEFAULT:g('ds-domains')?.value||'',ER5_DS_ADDR_GROUP_DEFAULT:g('ds-addr-group')?.value||'',ER5_DS_RULE_NUM_DEFAULT:g('ds-rule-num')?.value||'',ER5_DS_TABLE_NUM_DEFAULT:g('ds-table-num')?.value||'',ER5_DS_SOURCE_CIDR_DEFAULT:g('ds-src-cidr')?.value||'',ER5_DS_ETH_DEFAULT:g('ds-eth')?.value||'',ER5_DS_DNS1_DEFAULT:g('ds-dns1')?.value||'',ER5_DS_DNS2_DEFAULT:g('ds-dns2')?.value||'',ER5_DS_TABLE_NH_PRIMARY_DEFAULT:g('ds-nh')?.value||'',ER5_DS_STATIC32_PRIMARY_NH_DEFAULT:g('ds-s32-nh')?.value||'',ER5_DS_TRACK_NAME_DEFAULT:g('ds-track')?.value||'',ER5_DS_STATIC32_BACKUP_NH_DEFAULT:g('ds-s32-bk')?.value||'',ER5_DS_FNET_PROBE_DEFAULT:g('ds-probe')?.value||'',ER5_DS_FNET_NAT_RULE_DEFAULT:g('ds-nat-rule')?.value||'',ER5_DS_EXIT_TUNNEL_DEFAULT:g('ds-exit-tun')?.value||'',ER5_DS_EXIT_SNAT_IP_DEFAULT:g('ds-exit-ip')?.value||'',ER5_DS_FAILOVER_SRC_DEFAULT:g('ds-failover-src')?.value||''};
   }
   return n;
 }
@@ -742,7 +753,8 @@ async function ldInitForm(tp){
       'epoch-fastip5+hk':'Epoch FastIP 5.0 · HK 香港出口',
       'epoch-fastip5+us':'Epoch FastIP 5.0 · 非香港出口',
       'epoch-fastip5+flink':'Epoch FastIP 5.0 · ER 飞连',
-      'epoch-fastip5+new_exit':'Epoch FastIP 5.0 · ER 新增出口'};
+      'epoch-fastip5+new_exit':'Epoch FastIP 5.0 · ER 新增出口',
+      'epoch-fastip5+domain_split':'Epoch FastIP 5.0 · ER 域名分流'};
     let isV5=tp==='epoch-fastip'&&erVersion==='5';
     let lookupTp=isV5?'epoch-fastip5':tp;
     let v=gv(tp);let key=scenarioMap[lookupTp+'+'+v];if(!key)return;

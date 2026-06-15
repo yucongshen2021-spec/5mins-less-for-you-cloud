@@ -1029,7 +1029,21 @@ def generate_epoch_fastip5():
             build_fn = er5.get("build_epoch5_domain_split_format_dict")
             if not build_fn:
                 return jsonify({"ok": False, "error": "5.0 域名分流生成器未找到"}), 500
-            result = build_fn(network.get("header_text", ""))
+            # Inject ER5_DS_* from form into module globals for the builder
+            for k in ("ER5_DS_ADDR_GROUP_DEFAULT","ER5_DS_RULE_NUM_DEFAULT","ER5_DS_TABLE_NUM_DEFAULT",
+                      "ER5_DS_SOURCE_CIDR_DEFAULT","ER5_DS_ETH_DEFAULT",
+                      "ER5_DS_DNS1_DEFAULT","ER5_DS_DNS2_DEFAULT",
+                      "ER5_DS_TABLE_NH_PRIMARY_DEFAULT","ER5_DS_STATIC32_PRIMARY_NH_DEFAULT",
+                      "ER5_DS_TRACK_NAME_DEFAULT","ER5_DS_STATIC32_BACKUP_NH_DEFAULT",
+                      "ER5_DS_FNET_PROBE_DEFAULT","ER5_DS_FNET_NAT_RULE_DEFAULT",
+                      "ER5_DS_EXIT_TUNNEL_DEFAULT","ER5_DS_EXIT_SNAT_IP_DEFAULT",
+                      "ER5_DS_FAILOVER_SRC_DEFAULT"):
+                v = network.get(k)
+                if v is not None and str(v).strip():
+                    er5[k] = str(v)
+            # Domain list comes from form field ER5_DS_DOMAINS_DEFAULT
+            domains_text = network.get("ER5_DS_DOMAINS_DEFAULT", network.get("header_text", ""))
+            result = build_fn(domains_text)
             if isinstance(result, tuple):
                 output, err = result
                 if output is None:
