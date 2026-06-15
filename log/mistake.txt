@@ -737,3 +737,85 @@ fallback 到带时间戳的新目录名，绝不因 stale 目录而放弃整跑�
   2. 发版后手动确认 main 分支 `RELEASE_INFO.json` 已同步到新版本号
   3. `_local_version()` 是 demo 和 release 两个 portal 共享的版本来源，
      任何改版本号的操作必须两个分支都生效
+
+## 56. upgrade.py 下载备用 URL 拼接错误 — manifest URL 当 base URL 用了
+
+**现象**: 下载失败后重试 URL 变成：
+  `http://192.168.72.219:8000/api/update/manifest/api/update/download/xxx.zip`
+  路径重复，404。
+
+**根因**: `_load_mirror_base_urls()` 从 `update_config.json` 加载的 URL 是 manifest 路径
+  (`/api/update/manifest`)，但 `_build_alt_download_urls()` 直接在后面拼接 download 路径
+  (`/api/update/download/xxx.zip`)，没有先剥离 manifest 路径。
+
+**修复**: `_load_mirror_base_urls()` 提取 `urlsplit(url).netloc` 和 `scheme`，只用 base URL
+  (`http://host:port`)，不再包含 manifest 路径。
+
+**避免**:
+  1. URL 拼接前先明确"base URL"的定义 — base 只含 scheme + netloc，不含 path
+  2. 写 `_build_*_url` 类函数时，必须用测试验证拼接结果不含重复路径段
+  3. 举一反三：所有 URL 拼接都要做端到端验证，不要假设各部分格式一致
+
+## 57. 忘记 import queue / Response / stream_with_context — portal 启动直接 NameError
+
+**现象**: 客户 zip 解压后 portal 启动报 `NameError: name 'queue' is not defined`，完全无法启动。
+
+**根因**: 在 `app.py` 中新增了 SSE 升级进度功能，用到了 `queue.Queue`、`Response`、
+  `stream_with_context`，但只写了业务代码，忘记在文件顶部添加对应的 import 语句。
+
+**修复**: 在 `app.py` 头部添加 `import queue` 和
+  `from flask import ..., Response, stream_with_context`。
+
+**避免**:
+  1. 新增模块级依赖时，必须同步更新 import 区域——checklist 第三步就是"检查 import"
+  2. 任何代码修改后，在提交前至少在本机启动一次验证无 `NameError` / `ImportError`
+  3. 可以在 build 后加一个 smoke 检查：解压 zip，尝试 `python -c "import app"` 验证导入
+
+## 58. bat 模板 `timeout /t` 与 GNU coreutils `timeout` 冲突
+
+**现象**: 升级脚本运行时报 `timeout: invalid time interval '/t'`，脚本中断，
+  升级失败。
+
+**根因**: Windows 的 `timeout.exe` 语法是 `timeout /t N /nobreak`，但 Git Bash / Cygwin
+  的 GNU coreutils `timeout` 语法是 `timeout DURATION COMMAND`。如果在 PATH 中 GNU
+  timeout 排在前面，bat 调用时会错误地执行 GNU 版本。
+
+**修复**: 将所有 `timeout /t N /nobreak >nul` 替换为 `ping 127.0.0.1 -n N+1 >nul`。
+  `ping` 是 Windows 内置命令，不会被 GNU 工具替代。近似延迟：`ping -n 2` ≈ 1 秒，
+  `ping -n 3` ≈ 2 秒，`ping -n 4` ≈ 3 秒。
+
+**避免**:
+  1. bat 脚本中的等待逻辑优先用 `ping -n` 而非 `timeout` — `ping` 无歧义、无冲突
+  2. 举一反三：检查所有 `.bat` 文件中是否还有 `timeout` 调用
+  3. 任何依赖外部命令的 bat 逻辑都要考虑 PATH 污染的可能
+
+## 59. E2E 测试 pass 但实际更新失败 — 测试环境与用户环境不一致
+
+**现象**: 本地 Playwright E2E 测试（`test_update_e2e.py`）多次 pass，但用户实际测试时
+  更新失败（10060 超时、portal 不重启、timeout 冲突等）。测试没有暴露真实问题。
+
+**根因**:
+  1. E2E 测试的 mirror 和 client 在同一台机器上，`download_url` 的 IP 总是可达的
+  2. 测试用 `subprocess.Popen` 启动 portal，但生产环境用 `start_all.bat`
+  3. 测试环境的 PATH 没有 GNU coreutils 污染
+  4. 测试只验证了"portal 能否重启并显示新版本"，没有验证中间步骤的健壮性
+
+**避免**:
+  1. E2E 测试必须模拟真实环境差异：不同 IP、PATH 污染、网络延迟
+  2. 测试要覆盖"下载失败后重试"路径 — 不能只测 golden path
+  3. 每个 bat 版本的修改都必须在真实 Windows cmd 环境（非 Git Bash）中验证
+  4. 发版前 checklist 必须包括在真实客户环境（解压 zip → 双击 start_all.bat）中跑一遍更新
+
+## 60. 反复 rebuild zip 却不验证内容 — 浪费多轮测试
+
+**现象**: 同一天内反复 rebuild v1.2.4/v1.2.5 超过 6 次，每次都在 E2E 测试失败后才
+  发现缺少 import 或 timeout 修复没生效。如果每次 rebuild 后先验证 zip 内容，至少能
+  省掉一半的 rebuild 轮次。
+
+**根因**: 只依赖 E2E 测试作为唯一验证手段，没有在 rebuild 后立即做快速的 zip 内容检查。
+  E2E 测试跑一次 5-8 分钟，而 zip 内容检查只需要 5 秒。
+
+**避免**:
+  1. 每次 rebuild 后立即检查 zip 中关键文件的内容（用 `zipfile` 读特定文件搜关键字）
+  2. 建立 rebuild 后的快速 smoke checklist：import 完整性、timeout→ping 替换、URL 格式
+  3. 不要等 E2E 测试失败才回头看 zip — 先验证 zip，再跑 E2E
