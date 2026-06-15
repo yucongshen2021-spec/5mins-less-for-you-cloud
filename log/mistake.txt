@@ -658,3 +658,62 @@ body 是 `Download failed: HTTPError: HTTP Error 404: Not Found`。
      时间戳，取实测最大值 ×1.5 作为窗口。
   3. 升级失败时测试要**保留 temp 目录**（`if FAILED: 不删 TEMP`）便于事后查
      RELEASE_INFO / update.bat / robocopy 日志。
+
+## 57. release 分支的 verifier 不认 literal-700x 端口；大 bundle 升级超 300s；stale temp 锁住下一跑
+
+发版 1.2.1（88.8MB / 8228 文件）时连环暴露三个测试侧问题（产品代码没错）。
+
+### 57-A: _verify_zip.py 的 M#2 检查只认 main 分支的 `_BASE` 结构
+
+**现象**: `release.py 1.2.1` 后 verifier 报 `FAIL M#2 process_manager runtime port switch intact
+expected '_BASE = 7000 if _RELEASE else 5000'`，但 zip 里的 portal 实际跑得好好的。
+
+**根因**: 我从 main 分支把 `_verify_zip.py` 同步到 release 分支，main 的 M#2 检查写死了
+`_BASE = 7000 if _RELEASE else 5000`（main 分支 process_manager 用运行时切换 + `_BASE + N`）。
+但 **release 分支的 process_manager.py 结构不同**：它 APPS 字典里**字面量硬编码** 7001/7002/7003/7004
+（release 分支永远是 release 模式，不需要 demo fallback）。两个结构都合法，
+但 verifier 只认 main 的那一种。
+
+**修复**: M#2 改成接受**任一**合法结构——`_BASE` 运行时切换（main）或字面量 7001-7004（release）。
+同步把 `Source count < 200`（读 RELEASE_INFO 的 source_file_count，但 release.py 不写这个字段）
+改成**直接数 zip 里的 .py 文件**作 sanity 上限。
+
+**避免**: verifier 检查不能写死单一分支的代码结构。跨分支同步的检查脚本，每个检查点都要
+"两种合法形态都接受"，或按分支走不同的检查分支。
+
+### 57-B: 1.2.1 大 bundle 升级耗时 > 300s，e2e 窗口再次不够
+
+**现象**: e2e 跑 1.1.17 → 1.2.1，`portal restarted showing NEW version` 在 300s 窗口内
+**没**观察到（虽然手动跑 start_all.bat 证明 portal 能起来）。
+
+**根因**: 1.2.1 是 88.8MB / 8228 文件（比 1.1.19 的 72.9MB / ~4000 文件大一倍多）。
+robocopy 复制翻倍 → 解压+复制合计 ~5min，加 portal 启动 ~60s，总用时 > 300s 窗口。
+
+**修复**: 重启窗口从 300s 提到 **420s**；并增加**双重信号**——除了 poll 端口，还 poll
+磁盘上的 RELEASE_INFO.json 版本翻转（copy 完成的铁证）。RELEASE_INFO 翻到新版本即视为
+升级成功，即使端口 poll 因时序错过也算通过。
+
+**避免**: 升级测试不能用"端口起来"这单一信号——大 bundle 复制慢时端口晚起。
+加一个**与 portal 进程无关的磁盘信号**（RELEASE_INFO 版本）作主信号，端口作辅助确认。
+超时窗口按"最大 bundle 文件数 × 单文件复制耗时"估，留 50% 余量。
+
+### 57-C: 上次失败跑留下的 stale temp 目录锁住下一次
+
+**现象**: e2e 第二跑直接 `FileExistsError: real_upgrade_e2e`——上一次失败时保留了 TEMP，
+里面的 customer portal 进程没被杀干净，句柄锁住目录，`shutil.rmtree(ignore_errors=True)`
+**静默吞掉删除失败**，然后 `mkdir` 炸。
+
+**根因**: 两个叠加：
+  1. `shutil.rmtree(ignore_errors=True)` 静默失败——错误被吞，没机会重试或换目录。
+  2. 上次失败跑的 portal/robocopy/cmd 子进程残留（`start "" start_all.bat` 派生的独立窗口），
+     锁着 customer 目录里的文件。
+
+**修复**: harness 开头改成 `_force_rmtree`（onerror 清只读位 + 重试 4 次），并先扫一遍
+`wmic process` 把命令行里含 TEMP 路径的 python/cmd 全 taskkill 掉。万不得已时
+fallback 到带时间戳的新目录名，绝不因 stale 目录而放弃整跑。
+
+**避免**:
+  1. **`shutil.rmtree(ignore_errors=True)` 是反模式**——删除失败必须知道、必须重试或换路径，
+     不能静默吞。用 `onerror=` 回调清只读位 + 显式重试。
+  2. **任何会 `start` 派生独立窗口的流程，测试结束时要主动清理子进程**（按命令行含路径匹配
+     taskkill），不能只靠杀端口——派生窗口的 PID 不在端口监听列表里。
