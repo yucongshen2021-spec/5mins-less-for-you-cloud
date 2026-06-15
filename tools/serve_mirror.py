@@ -155,13 +155,50 @@ def main():
     else:
         print("[mirror] WARNING: dist/ 中没有发布包")
 
-    # Auto-detect local IP for download URLs
-    import socket as _socket
-    try:
-        local_ip = _socket.gethostbyname(_socket.gethostname())
-    except Exception:
-        local_ip = "127.0.0.1"
+    # Auto-detect local IP for download URLs.
+    # Priority: 192.168.72.219 (primary) → 192.168.5.10 (fallback) → auto-detect.
+    import socket as _socket, subprocess as _sp
+    PREFERRED_IPS = ["192.168.72.219", "192.168.5.10"]
+
+    def _local_ips() -> set[str]:
+        """Return all IPv4 addresses configured on local interfaces."""
+        ips: set[str] = set()
+        # Method 1: hostname resolution
+        try:
+            for info in _socket.getaddrinfo(_socket.gethostname(), None):
+                addr = info[4][0]
+                if addr and ":" not in addr:  # IPv4 only
+                    ips.add(addr)
+        except Exception:
+            pass
+        # Method 2: ipconfig (Windows — catches secondary NICs)
+        try:
+            import re
+            out = _sp.run(["ipconfig"], capture_output=True, text=True,
+                          encoding="gbk", errors="replace").stdout
+            for m in re.finditer(r"IPv4[^:]*:\s*([\d.]+)", out):
+                ips.add(m.group(1))
+        except Exception:
+            pass
+        return ips
+
+    local_ips = _local_ips()
+    print(f"[mirror] 本地 IP: {sorted(local_ips)}")
+
+    local_ip = None
+    for ip in PREFERRED_IPS:
+        if ip in local_ips:
+            local_ip = ip
+            break
+
+    if local_ip is None:
+        try:
+            local_ip = _socket.gethostbyname(_socket.gethostname())
+        except Exception:
+            local_ip = "127.0.0.1"
+
     MirrorHandler.base_url = f"http://{local_ip}:{args.port}"
+    print(f"[mirror] download_url 使用 IP: {local_ip}")
 
     server = HTTPServer((args.host, args.port), MirrorHandler)
     print(f"[mirror] 镜像服务启动: http://{args.host}:{args.port}")
