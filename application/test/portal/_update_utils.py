@@ -171,17 +171,31 @@ def unzip(zip_path: Path, dest_dir: Path) -> None:
     ], capture_output=True, timeout=120)
 
 
+def find_content_root(extract_dir: Path) -> Path:
+    """Find actual content root after unzip.
+
+    Many zip files have a single top-level directory (e.g. '帮你节省5分钟/').
+    If extract_dir contains exactly one subdirectory, return that subdirectory.
+    Otherwise return extract_dir itself.
+    """
+    entries = list(extract_dir.iterdir())
+    if len(entries) == 1 and entries[0].is_dir():
+        return entries[0]
+    return extract_dir
+
+
 def replace_config(extract_dir: Path, mirror_host: str = "127.0.0.1",
                    customer_port: int = CUSTOMER_PORT_BASE) -> None:
     """Inject mirror URL and port into an extracted release."""
-    config_path = extract_dir / "application" / "portal" / "update_config.json"
+    content_root = find_content_root(extract_dir)
+    config_path = content_root / "application" / "portal" / "update_config.json"
     if config_path.exists():
         cfg = json.loads(config_path.read_text("utf-8"))
         cfg["mirror_urls"] = [f"http://{mirror_host}:{MIRROR_PORT}/api/update/manifest"]
         config_path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), "utf-8")
 
     # Replace port 5000 → customer_port in app.py
-    app_py = extract_dir / "application" / "portal" / "app.py"
+    app_py = content_root / "application" / "portal" / "app.py"
     if app_py.exists():
         text = app_py.read_text("utf-8")
         text = re.sub(r"\b5000\b", str(customer_port), text)
@@ -225,8 +239,11 @@ def read_zip_version(zip_path: Path) -> str | None:
     """Read version from RELEASE_INFO.json inside a zip."""
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
-            with zf.open("RELEASE_INFO.json") as f:
-                info = json.loads(f.read().decode("utf-8"))
-                return info.get("version")
+            for name in zf.namelist():
+                if name.endswith("RELEASE_INFO.json"):
+                    with zf.open(name) as f:
+                        info = json.loads(f.read().decode("utf-8"))
+                        return info.get("version")
+            return None
     except Exception:
         return None

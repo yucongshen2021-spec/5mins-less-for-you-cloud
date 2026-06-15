@@ -21,7 +21,7 @@ from _update_utils import (
     port_open, kill_port, kill_ports,
     mirror_url, mirror_ok, fetch_manifest,
     http_get, html_contains_selectors,
-    unzip, replace_config, _force_rmtree,
+    unzip, replace_config, find_content_root, _force_rmtree,
     dist_zips, read_zip_version,
 )
 
@@ -93,6 +93,7 @@ def test_customer_check_update() -> None:
         # Extract
         extract_dir = tmp / "customer"
         unzip(old_zip, extract_dir)
+        content_root = find_content_root(extract_dir)
 
         # Inject mirror config + port
         replace_config(extract_dir, mirror_host="127.0.0.1", customer_port=CUSTOMER_PORT_BASE)
@@ -101,8 +102,8 @@ def test_customer_check_update() -> None:
         kill_port(CUSTOMER_PORT_BASE)
 
         # Start portal
-        python_exe = extract_dir / "runtime" / "python" / "python.exe"
-        app_py = extract_dir / "application" / "portal" / "app.py"
+        python_exe = content_root / "runtime" / "python" / "python.exe"
+        app_py = content_root / "application" / "portal" / "app.py"
         if not python_exe.exists():
             _fail(f"Python not found in zip: {python_exe}")
             return

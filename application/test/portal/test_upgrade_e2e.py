@@ -18,7 +18,7 @@ from _update_utils import (
     port_open, kill_port, kill_ports,
     mirror_url, mirror_ok, fetch_manifest,
     http_get,
-    unzip, replace_config, _force_rmtree,
+    unzip, replace_config, find_content_root, _force_rmtree,
     check_garbled_filenames,
     dist_zips, read_zip_version,
 )
@@ -59,8 +59,9 @@ def _ok(msg: str) -> None:
 
 def _start_portal(extract_dir: Path) -> subprocess.Popen | None:
     """Start customer portal from extract_dir. Returns Popen or None."""
-    python_exe = extract_dir / "runtime" / "python" / "python.exe"
-    app_py = extract_dir / "application" / "portal" / "app.py"
+    content_root = find_content_root(extract_dir)
+    python_exe = content_root / "runtime" / "python" / "python.exe"
+    app_py = content_root / "application" / "portal" / "app.py"
     if not python_exe.exists() or not app_py.exists():
         _fail(f"Portal entry point missing: python_exe={python_exe.exists()}, app_py={app_py.exists()}")
         return None
@@ -92,7 +93,8 @@ def _wait_for_portal(timeout: float = 60.0) -> bool:
 
 def _read_version_from_extracted(extract_dir: Path) -> str | None:
     """Read version from RELEASE_INFO.json in extracted dir."""
-    ri = extract_dir / "RELEASE_INFO.json"
+    content_root = find_content_root(extract_dir)
+    ri = content_root / "RELEASE_INFO.json"
     if ri.exists():
         return json.loads(ri.read_text("utf-8")).get("version")
     return None
