@@ -1023,10 +1023,67 @@ set firewall group network-group LAN-NET network {route1}
 set firewall group network-group LAN-NET network {route2}
 set firewall group network-group LAN-NET network {route3}"""
 
-TEMPLATE_EPOCH5_DOMAIN_SPLIT = (
-    "# [5.0 ER 域名分流 — 开发中]\n"
-    "# 模板待实现\n"
-)
+TEMPLATE_EPOCH5_DOMAIN_SPLIT = """# ER 5.0 域名分流 · VyOS set 语法
+# --- 写入域名列表（shell）---
+sudo tee /opt/{ER5_DS_DOMAINLIST_COMPUTED}.txt >/dev/null <<'EOF'
+{ER5_DS_DOMAINS_DEFAULT}
+EOF
+sudo chmod 777 /opt/{ER5_DS_DOMAINLIST_COMPUTED}.txt
+
+set firewall group address-group {ER5_DS_ADDR_GROUP_DEFAULT}
+
+set service dns forwarding domain-list {ER5_DS_DOMAINLIST_COMPUTED} address-group '{ER5_DS_ADDR_GROUP_DEFAULT}'
+set service dns forwarding domain-list {ER5_DS_DOMAINLIST_COMPUTED} file '/opt/{ER5_DS_DOMAINLIST_COMPUTED}.txt'
+set service dns forwarding domain-list {ER5_DS_DOMAINLIST_COMPUTED} name-server {ER5_DS_DNS1_DEFAULT}
+set service dns forwarding domain-list {ER5_DS_DOMAINLIST_COMPUTED} recursion-desired
+{ER5_DS_OPT_DNS2_LINE}
+{ER5_DS_OPT_POLICY_ROUTE_BLOCK}set protocols static route {ER5_DS_TABLE_NH_PRIMARY_DEFAULT}/32 next-hop {ER5_DS_STATIC32_PRIMARY_NH_DEFAULT}{ER5_DS_OPT_TRACK_SUFFIX}
+{ER5_DS_OPT_S32BAK_LINE}
+{ER5_DS_OPT_FNET_BLOCK}"""
+
+ER5_DS_DOMAINS_DEFAULT = "google.com"
+ER5_DS_ADDR_GROUP_DEFAULT = "to-US"
+ER5_DS_RULE_NUM_DEFAULT = "100"
+ER5_DS_TABLE_NUM_DEFAULT = "139"
+ER5_DS_SOURCE_CIDR_DEFAULT = "192.168.5.0/24"
+ER5_DS_DNS1_DEFAULT = "209.244.0.3"
+ER5_DS_DNS2_DEFAULT = ""
+ER5_DS_ETH_DEFAULT = "eth0"
+ER5_DS_TABLE_NH_PRIMARY_DEFAULT = "2.2.2.2"
+ER5_DS_TRACK_NAME_DEFAULT = "tooutbound1"
+ER5_DS_STATIC32_PRIMARY_NH_DEFAULT = "10.22.15.185"
+ER5_DS_STATIC32_BACKUP_NH_DEFAULT = "10.22.24.157"
+ER5_DS_EXIT_TUNNEL_DEFAULT = ""
+ER5_DS_EXIT_SNAT_IP_DEFAULT = ""
+ER5_DS_FNET_NAT_RULE_DEFAULT = ""
+ER5_DS_FNET_PROBE_DEFAULT = "100.100.100.1"
+ER5_DS_FAILOVER_SRC_DEFAULT = ""
+
+def _er_ds_normalize_addr_group(raw: str) -> str:
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    m = re.match(r"(?i)address-group\s*:\s*(.+)$", s)
+    if m:
+        return m.group(1).strip()
+    return s
+
+
+def _er_ds_domainlist_name(addr_group: str) -> str:
+    ag = _er_ds_normalize_addr_group(addr_group or "")
+    return ("A" + ag) if ag else ""
+
+
+def _er_ds_policy_route_name(addr_group: str) -> str:
+    ag = _er_ds_normalize_addr_group(addr_group or "")
+    return "LAN-MAP-" + ag
+
+
+def _er_ds_track_suffix(track_name: str) -> str:
+    t = (track_name or "").strip()
+    return f" track {t}" if t else ""
+
+
 
 
 # =====================================================================
@@ -2087,7 +2144,134 @@ def build_epoch5_flink_format_dict(hdr_text):
 
 
 def build_epoch5_domain_split_format_dict(hdr_text):
-    return None, ("tpl", "5.0 ER 域名分流模板尚未实现")
+    """5.0 ER 域名分流生成器。
+    返回 (output_string, None) 或 (None, error_string)。
+    """
+    dom_lines = []
+    for ln in (hdr_text or "").splitlines():
+        s = ln.strip()
+        if not s:
+            continue
+        if re.search(r"[\s#;|&$`<>]", s):
+            return None, f"域名含非法字符：{s!r}"
+        dom_lines.append(s)
+    if not dom_lines:
+        return None, "请至少填写一行域名"
+
+    g = globals()
+    ag_raw = str(g.get("ER5_DS_ADDR_GROUP_DEFAULT", "")).strip()
+    addr_group = _er_ds_normalize_addr_group(ag_raw)
+    if not addr_group:
+        return None, "请填写 address-group"
+
+    dl = _er_ds_domainlist_name(addr_group)
+    pr = _er_ds_policy_route_name(addr_group)
+    if not dl:
+        return None, "address-group 无效，无法推导 domain-list 名称"
+
+    dns1 = str(g.get("ER5_DS_DNS1_DEFAULT", "")).strip()
+    dns2 = str(g.get("ER5_DS_DNS2_DEFAULT", "")).strip()
+    if not dns1:
+        return None, "DNS 主不能为空"
+
+    sc_raw = str(g.get("ER5_DS_SOURCE_CIDR_DEFAULT", "")).strip()
+    src_cidr = ""
+    if sc_raw:
+        try:
+            src_cidr = str(ipaddress.ip_network(sc_raw, strict=False))
+        except ValueError:
+            return None, f"源网段非法：{sc_raw}"
+    rn = str(g.get("ER5_DS_RULE_NUM_DEFAULT", "")).strip()
+    tn = str(g.get("ER5_DS_TABLE_NUM_DEFAULT", "")).strip()
+    eth = str(g.get("ER5_DS_ETH_DEFAULT", "")).strip()
+    if not rn.isdigit() or not tn.isdigit():
+        return None, "rule/table 号须为数字"
+
+    nh_pri = str(g.get("ER5_DS_TABLE_NH_PRIMARY_DEFAULT", "")).strip()
+    s32_pri = str(g.get("ER5_DS_STATIC32_PRIMARY_NH_DEFAULT", "")).strip()
+    s32_bak = str(g.get("ER5_DS_STATIC32_BACKUP_NH_DEFAULT", "")).strip()
+    trn = str(g.get("ER5_DS_TRACK_NAME_DEFAULT", "")).strip()
+    for ip, lab in ((nh_pri, "递归下一跳"), (s32_pri, "主下一跳")):
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            return None, f"{lab}「{ip}」不是合法 IPv4"
+    if s32_bak:
+        try:
+            ipaddress.ip_address(s32_bak)
+        except ValueError:
+            return None, f"备下一跳「{s32_bak}」不是合法 IPv4"
+
+    lines = []
+    lines.append(f"# 等价于 touch + vi 写入 /opt/{dl}.txt")
+    lines.append(f"sudo tee /opt/{dl}.txt >/dev/null <<'EOF'")
+    lines.extend(dom_lines)
+    lines.append("EOF")
+    lines.append(f"sudo chmod 777 /opt/{dl}.txt")
+    lines.append("")
+    lines.append(f"set firewall group address-group {addr_group}")
+    lines.append("")
+    lines.append(f"set service dns forwarding domain-list {dl} address-group '{addr_group}'")
+    lines.append(f"set service dns forwarding domain-list {dl} file '/opt/{dl}.txt'")
+    lines.append(f"set service dns forwarding domain-list {dl} name-server {dns1}")
+    lines.append(f"set service dns forwarding domain-list {dl} recursion-desired")
+    if dns2:
+        lines.append(f"set service dns forwarding domain-list {dl} name-server {dns2}")
+    lines.append("")
+
+    lines.append(f"set policy route {pr} interface '{eth}'")
+    lines.append(f"set policy route {pr} rule {rn} destination group address-group '{addr_group}'")
+    if src_cidr:
+        lines.append(f"set policy route {pr} rule {rn} source address {src_cidr}")
+    lines.append(f"set policy route {pr} rule {rn} set table '{tn}'")
+    lines.append(f"set protocols static table {tn} route 0.0.0.0/0 next-hop  {nh_pri}")
+    lines.append("")
+
+    track_suffix = f" track {trn}" if trn else ""
+    lines.append(f"set protocols static route {nh_pri}/32 next-hop {s32_pri}{track_suffix}")
+    if s32_bak:
+        lines.append(f"set protocols static route {nh_pri}/32 next-hop {s32_bak} distance '20'")
+
+    nr_raw = str(g.get("ER5_DS_FNET_NAT_RULE_DEFAULT", "")).strip()
+    tun_raw = str(g.get("ER5_DS_EXIT_TUNNEL_DEFAULT", "")).strip()
+    sn_raw = str(g.get("ER5_DS_EXIT_SNAT_IP_DEFAULT", "")).strip()
+    fnet_probe_raw = str(g.get("ER5_DS_FNET_PROBE_DEFAULT", "100.100.100.1")).strip()
+    fnet_src = str(g.get("ER5_DS_FAILOVER_SRC_DEFAULT", "")).strip()
+
+    f_filled = (bool(nr_raw), bool(tun_raw), bool(sn_raw))
+    if all(f_filled):
+        nr_ok = nr_raw.isdigit() and 1 <= int(nr_raw) <= 999999
+        tun_ok = bool(re.match(r"^[A-Za-z0-9._-]+$", tun_raw))
+        sn_ok = True
+        try:
+            ipaddress.ip_address(sn_raw)
+        except ValueError:
+            sn_ok = False
+        try:
+            fnet_probe = str(ipaddress.ip_address(fnet_probe_raw))
+        except ValueError:
+            fnet_probe = ""
+            sn_ok = False
+        if nr_ok and tun_ok and sn_ok and fnet_probe:
+            FNET_GRP = "GROUP-FNET-Whitelist"
+            FNET_NET = "100.100.100.0/24"
+            lines.append("")
+            lines.append(f"set firewall group network-group {FNET_GRP} network {FNET_NET}")
+            lines.append("")
+            lines.append(f"set nat source rule {nr_raw} destination address {fnet_probe}/32")
+            lines.append(f"set nat source rule {nr_raw} outbound-interface '{tun_raw}'")
+            lines.append(f"set nat source rule {nr_raw} translation address '{sn_raw}'")
+            lines.append("")
+            lines.append(f"set protocols static route {fnet_probe}/32 next-hop {s32_pri}")
+            lines.append("")
+            if trn:
+                failover_src = fnet_src if fnet_src else s32_pri
+                lines.append(f"set protocols failover2 route {fnet_probe}/32 next-hop {s32_pri} track '{trn}'")
+                lines.append(f"set protocols failover2 track {trn} source-address '{failover_src}'")
+                lines.append(f"set protocols failover2 track {trn} target '{fnet_probe}'")
+                lines.append(f"set protocols failover2 track {trn} type 'icmp'")
+
+    return "\n".join(lines).rstrip() + "\n", None
 
 
 # =====================================================================

@@ -1026,7 +1026,18 @@ def generate_epoch_fastip5():
             output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)
             return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
         elif variant == "domain_split":
-            return jsonify({"ok": False, "error": "5.0 域名分流模板尚未实现，请切换回 4.0"}), 400
+            build_fn = er5.get("build_epoch5_domain_split_format_dict")
+            if not build_fn:
+                return jsonify({"ok": False, "error": "5.0 域名分流生成器未找到"}), 500
+            result = build_fn(network.get("header_text", ""))
+            if isinstance(result, tuple):
+                output, err = result
+                if output is None:
+                    return jsonify({"ok": False, "error": _humanize_error(err, variant)}), 400
+            else:
+                output = result
+            output = str(output)
+            return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
         else:
             return jsonify({"ok": False, "error": f"Unknown variant: {variant}"}), 400
     except Exception as e:
@@ -1509,7 +1520,7 @@ _NOTES = {
         ),
         "flink": "5.0 ER 飞连\n\n• 使用 failover2 语法进行路由切换\n• 填写 PE/FPE/预留IP 格式数据头\n• failover source IP 从主回程下一跳所在 /30 的偶数位自动计算\n• 配置仅供参考，使用仍需谨慎。",
         "new_exit": "5.0 ER 新增出口\n\n• 使用 5.0 VyOS set 语法\n• 数据头格式与 4.0 相同（LineID/PE/WANIP/TUNNEL/Docking/海外出口ip）\n• GRE Tunnel + dummy LoopBack + NAT 规则\n• MTU & ip adjust-mss 可按需调整\n• 配置仅供参考，使用仍需谨慎。",
-        "domain_split": "5.0 ER 域名分流 — 模板开发中，请切换回 4.0。",
+        "domain_split": "5.0 ER 域名分流\n\n• 使用 VyOS domain-list（带连字符）+ name-server 语法\n• 策略路由 interface 独立行\n• FNET/100.100 探测使用 failover2 语法\n• 初始化参数与 4.0 域名分流完全一致\n• 配置仅供参考，使用仍需谨慎。",
         "default": "• 5.0 版本使用 VyOS set 语法。\n• 配置仅供参考，使用仍需谨慎。",
     },
     "usg_fastip": {
@@ -2270,12 +2281,12 @@ def api_template_preview():
                 if d:
                     rendered = tpl.format(**d)
         elif slot == "TEMPLATE_EPOCH5_DOMAIN_SPLIT":
-            fn = ns.get("build_epoch5_us_format_dict")
+            fn = ns.get("build_epoch5_domain_split_format_dict")
             if fn:
                 result = fn(hdr_text)
-                d = result[0] if isinstance(result, tuple) else result
-                if d:
-                    rendered = tpl.format(**d)
+                output_str, err = result if isinstance(result, tuple) else (result, None)
+                if output_str:
+                    rendered = output_str
         elif slot in ("TEMPLATE_MPLS_DOMESTIC", "TEMPLATE_MPLS_OVERSEAS"):
             build_fn = ns.get("build_mpls_domestic_format_dict" if "DOMESTIC" in slot else "build_mpls_overseas_format_dict")
             gen_fn = ns.get("generate_mpls_config")
@@ -2634,8 +2645,7 @@ def _get_init_keys(slot):
     if slot in ("TEMPLATE_EPOCH_HK", "TEMPLATE_EPOCH_US",
                  "TEMPLATE_EPOCH_HK_IPSEC", "TEMPLATE_EPOCH_US_IPSEC",
                  "TEMPLATE_EPOCH5_HK", "TEMPLATE_EPOCH5_US",
-                 "TEMPLATE_EPOCH5_US_IPSEC",
-                 "TEMPLATE_EPOCH5_DOMAIN_SPLIT"):
+                 "TEMPLATE_EPOCH5_US_IPSEC"):
         return ["DEFAULT_WAN_ETH","DEFAULT_WAN_CIDR","DEFAULT_WAN_GW","DEFAULT_WAN_DHCP",
                 "DEFAULT_LAN_ETH","DEFAULT_LAN_CIDR","DEFAULT_LAN_GW","DEFAULT_LAN_DHCP",
                 "DEFAULT_INNER_NETS","DEFAULT_GEN_RETURN_ROUTE"]
@@ -2666,6 +2676,16 @@ def _get_init_keys(slot):
                 "ER_DS_TRACK_NAME_DEFAULT","ER_DS_STATIC32_BACKUP_NH_DEFAULT",
                 "ER_DS_FNET_PROBE_DEFAULT","ER_DS_FNET_NAT_RULE_DEFAULT",
                 "ER_DS_EXIT_TUNNEL_DEFAULT","ER_DS_EXIT_SNAT_IP_DEFAULT"]
+    if slot == "TEMPLATE_EPOCH5_DOMAIN_SPLIT":
+        return ["ER5_DS_DOMAINS_DEFAULT","ER5_DS_ADDR_GROUP_DEFAULT",
+                "ER5_DS_RULE_NUM_DEFAULT","ER5_DS_TABLE_NUM_DEFAULT",
+                "ER5_DS_SOURCE_CIDR_DEFAULT","ER5_DS_ETH_DEFAULT",
+                "ER5_DS_DNS1_DEFAULT","ER5_DS_DNS2_DEFAULT",
+                "ER5_DS_TABLE_NH_PRIMARY_DEFAULT","ER5_DS_STATIC32_PRIMARY_NH_DEFAULT",
+                "ER5_DS_TRACK_NAME_DEFAULT","ER5_DS_STATIC32_BACKUP_NH_DEFAULT",
+                "ER5_DS_FNET_PROBE_DEFAULT","ER5_DS_FNET_NAT_RULE_DEFAULT",
+                "ER5_DS_EXIT_TUNNEL_DEFAULT","ER5_DS_EXIT_SNAT_IP_DEFAULT",
+                "ER5_DS_FAILOVER_SRC_DEFAULT"]
     if slot == "TEMPLATE_USG_HK":
         return ["HK_DEFAULT_DNS1","HK_DEFAULT_DNS2","DEFAULT_WAN_ETH","DEFAULT_WAN_IP",
                 "DEFAULT_WAN_GW","DEFAULT_WAN_DHCP","DEFAULT_LAN_ETH","DEFAULT_LAN_IP",

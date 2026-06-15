@@ -1,0 +1,25 @@
+ER5_DS_DOMAINLIST_COMPUTED  预览推导：A+address-group 组名（勿写入 user_init）
+ER5_DS_POLICY_ROUTE_COMPUTED  预览推导：LAN-MAP+组名（勿写入 user_init）
+ER5_DS_OPT_DNS2_LINE  预览推导：备 DNS 行（有备 DNS 时一行 set，否则空）
+ER5_DS_OPT_S32BAK_LINE  预览推导：备下一跳 /32 路由行（有备下一跳时一行 set，否则空）
+ER5_DS_OPT_TRACK_SUFFIX  预览推导：主 /32 静态路由的 track 后缀（Track 为空则空）
+ER5_DS_OPT_POLICY_ROUTE_BLOCK  预览推导：源网段非空时生成 policy-route+table+eth（空则不生成）
+ER5_DS_OPT_FNET_BLOCK  预览推导：100.100 / NAT 段（三项齐全且合法时生成；Track 为空则不下发 set failover2 track name；勿写入 user_init）
+
+ER5_DS_DOMAINS_DEFAULT  域名分流：默认域名列表（每行一个）
+ER5_DS_ADDR_GROUP_DEFAULT  address-group（可写「address-group : 名称」；domain-list 与 /opt/<名称>.txt 用 A+组名；policy-route=LAN-MAP+组名）
+ER5_DS_RULE_NUM_DEFAULT  LAN-MAP rule（策略路由规则序号）
+ER5_DS_TABLE_NUM_DEFAULT  static table 号
+ER5_DS_SOURCE_CIDR_DEFAULT  源网段 CIDR（可空；不填则不生成策略路由相关配置）
+ER5_DS_DNS1_DEFAULT  DNS 主
+ER5_DS_DNS2_DEFAULT  DNS 备（可空；为空则脚本仅下发主 DNS）
+ER5_DS_ETH_DEFAULT  应用接口（policy-route 绑定的 ethernet，如 eth0）
+ER5_DS_TABLE_NH_PRIMARY_DEFAULT  递归下一跳（table 默认路由）
+ER5_DS_TRACK_NAME_DEFAULT  Track 名称（可空；为空时主/32不带 track，且不下发 set failover2 track name）
+ER5_DS_STATIC32_PRIMARY_NH_DEFAULT  主下一跳（/32 静态的 next-hop）
+ER5_DS_STATIC32_BACKUP_NH_DEFAULT  备下一跳（可空；非空时 distance 固定 20）
+ER5_DS_FNET_PROBE_DEFAULT  track 100.100 探测 IP
+ER5_DS_FNET_NAT_RULE_DEFAULT  NAT rule 号（默认空；与 tunnel、主线出口须同填或同空）
+ER5_DS_EXIT_TUNNEL_DEFAULT  NAT 出口 tunnel（可空；openvpn，FNET outbound-interface）
+ER5_DS_EXIT_SNAT_IP_DEFAULT  主线出口 IP（可空；set nat translation address）
+ER5_DS_FAILOVER_SRC_DEFAULT  failover2 track source-address（可空；Track 名称非空时必填）
