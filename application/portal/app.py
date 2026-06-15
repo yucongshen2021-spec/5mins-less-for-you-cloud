@@ -114,9 +114,21 @@ def api_update_upgrade():
     download_url = (data.get("download_url") or "").strip()
     if not download_url:
         return jsonify({"ok": False, "error": "缺少 download_url"}), 400
-    result = upgrade.perform_upgrade(download_url)
+    try:
+        result = upgrade.perform_upgrade(download_url)
+    except Exception as exc:
+        import traceback
+        detail = traceback.format_exc()
+        print(f"[UPGRADE ERROR] {detail}", flush=True)
+        return jsonify({
+            "ok": False,
+            "error": f"Upgrade failed: {type(exc).__name__}: {exc}",
+            "stage": "exception"
+        }), 500
     if result.get("ok"):
         return jsonify(result)
+    # Log the specific error from perform_upgrade
+    print(f"[UPGRADE FAILED] stage={result.get('stage')} error={result.get('error')}", flush=True)
     return jsonify(result), 500
 
 
