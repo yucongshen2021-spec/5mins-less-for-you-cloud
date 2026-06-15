@@ -221,6 +221,62 @@ def _verify_zip(zip_path: Path) -> dict | None:
     return None
 
 
+def _load_mirror_base_urls() -> list[str]:
+    """Load mirror base URLs from update_config.json for download fallback."""
+    urls: list[str] = []
+    try:
+        cfg_path = _PROJECT_ROOT / "application" / "portal" / "update_config.json"
+        if cfg_path.is_file():
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8-sig"))
+            for key in ("mirror_url", "mirror_urls"):
+                v = cfg.get(key)
+                if isinstance(v, str) and v.strip():
+                    urls.append(v.strip().rstrip("/"))
+                elif isinstance(v, list):
+                    for u in v:
+                        if isinstance(u, str) and u.strip():
+                            urls.append(u.strip().rstrip("/"))
+    except Exception:
+        pass
+    return list(dict.fromkeys(urls))  # dedup, preserve order
+
+
+def _try_download(download_url: str, zip_dest: Path) -> tuple[int, str]:
+    """Try downloading from one URL. Returns (downloaded_bytes, error_msg)."""
+    last = 0
+    err = ""
+    try:
+        for d, _t in _download_with_progress(download_url, zip_dest):
+            last = d
+    except (urllib.error.URLError, urllib.error.HTTPError,
+            TimeoutError, OSError, ValueError) as e:
+        err = f"{type(e).__name__}: {e}"
+    return last, err
+
+
+def _build_alt_download_urls(original_url: str, base_urls: list[str]) -> list[str]:
+    """Build alternative download URLs by swapping the base URL.
+    Example: http://10.0.0.1:8000/api/update/download/xxx.zip
+             -> http://10.0.0.2:8000/api/update/download/xxx.zip
+    """
+    import urllib.parse as _up
+    alt_urls: list[str] = []
+    try:
+        parts = _up.urlsplit(original_url)
+        path_segments = parts.path.strip("/").split("/")
+        # Find the filename (last segment) and the prefix path
+        if len(path_segments) >= 2:
+            filename = path_segments[-1]
+            prefix = "/".join(path_segments[:-1])  # e.g. "api/update/download"
+            for base in base_urls:
+                alt = f"{base}/{prefix}/{filename}"
+                if alt != original_url:
+                    alt_urls.append(alt)
+    except Exception:
+        pass
+    return alt_urls
+
+
 def perform_upgrade(download_url: str) -> dict:
     parent = _PROJECT_ROOT / "temp" / "upgrade"
     parent.mkdir(parents=True, exist_ok=True)
@@ -233,16 +289,23 @@ def perform_upgrade(download_url: str) -> dict:
         except PermissionError:
             pass
 
-    last_downloaded = 0
-    try:
-        for downloaded, _total in _download_with_progress(download_url, zip_dest):
-            last_downloaded = downloaded
-    except (urllib.error.URLError, urllib.error.HTTPError,
-            TimeoutError, OSError, ValueError) as e:
-        # ValueError covers UnicodeEncodeError (raw non-ASCII URL that somehow
-        # bypassed _encode_url_idempotent). Never let it bubble as an uncaught 500.
+    # Try primary download URL first
+    last_downloaded, err = _try_download(download_url, zip_dest)
+
+    # If download failed, try alternative mirror base URLs
+    if err and last_downloaded < 100_000:
+        mirror_urls = _load_mirror_base_urls()
+        alt_urls = _build_alt_download_urls(download_url, mirror_urls)
+        for alt_url in alt_urls:
+            if last_downloaded >= 100_000:
+                break
+            zip_dest.unlink(missing_ok=True)
+            print(f"[UPGRADE] Retrying download with: {alt_url}", flush=True)
+            last_downloaded, err = _try_download(alt_url, zip_dest)
+
+    if err and last_downloaded < 100_000:
         zip_dest.unlink(missing_ok=True)
-        return {"ok": False, "error": f"Download failed: {type(e).__name__}: {e}", "stage": "download"}
+        return {"ok": False, "error": f"Download failed: {err}", "stage": "download"}
 
     if last_downloaded < 100_000:
         zip_dest.unlink(missing_ok=True)
