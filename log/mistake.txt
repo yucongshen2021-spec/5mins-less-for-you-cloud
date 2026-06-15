@@ -717,3 +717,23 @@ fallback 到带时间戳的新目录名，绝不因 stale 目录而放弃整跑�
      不能静默吞。用 `onerror=` 回调清只读位 + 显式重试。
   2. **任何会 `start` 派生独立窗口的流程，测试结束时要主动清理子进程**（按命令行含路径匹配
      taskkill），不能只靠杀端口——派生窗口的 PID 不在端口监听列表里。
+
+## 58. 发版后 demo portal 仍显示旧版本号 — RELEASE_INFO.json 只在 release 分支 commit
+
+**现象**: 发版 v1.2.1 后，main 分支 `RELEASE_INFO.json` 仍是 `1.1.16`，
+  demo portal 顶部显示 `v1.1.16` 而不是 `v1.2.1`。
+
+**根因**: `release.py` 第 3 步 `git add RELEASE_INFO.json && git commit` 只在
+  release 分支执行。main 分支的同一文件未被更新，而 demo portal 通过
+  `_local_version()` 读取 `../../RELEASE_INFO.json` 作为版本显示源。
+  两个分支各自拥有一份 RELEASE_INFO.json，release.py 只更新了一边。
+
+**修复**: 在 `release.py` 增加第 5 步 "Leftover version sweep" — 构建并 push 后、
+  返回成功前，检查当前工作树中 RELEASE_INFO.json 的 version 字段是否匹配目标版本。
+  不匹配则拒绝完成，提示先同步。
+
+**避免**:
+  1. release.py 的 leftover-version sweep 是最后一道防线——每次发版都会触发检查
+  2. 发版后手动确认 main 分支 `RELEASE_INFO.json` 已同步到新版本号
+  3. `_local_version()` 是 demo 和 release 两个 portal 共享的版本来源，
+     任何改版本号的操作必须两个分支都生效

@@ -113,6 +113,32 @@ def main():
         print("  FAILED")
         sys.exit(1)
 
+    # 5. Pre-release leftover-version sweep (M#58)
+    # RELEASE_INFO.json is the single source of truth for the version header
+    # (app.py::_local_version reads it on BOTH branches; demo portal on main
+    # shows it at templates/index.html:344). release.py only commits it on the
+    # release branch, so the other branch silently keeps the OLD version and the
+    # demo portal shows a stale number. This check refuses to finish release
+    # until the checked-out tree has no other RELEASE_INFO.json version drift.
+    print()
+    print("[5/5] Leftover version sweep (M#58)")
+    stale = []
+    ri_path = ROOT / "RELEASE_INFO.json"
+    if ri_path.exists():
+        try:
+            cur = json.loads(ri_path.read_text(encoding="utf-8")).get("version")
+            if cur != ver:
+                stale.append(f"RELEASE_INFO.json version={cur} (expected {ver})")
+        except (json.JSONDecodeError, OSError) as e:
+            stale.append(f"RELEASE_INFO.json unreadable: {e}")
+    if stale:
+        print("  STALE VERSION FOUND:")
+        for s in stale:
+            print(f"    - {s}")
+        print("  Fix before completing the release (M#58).")
+        sys.exit(1)
+    print(f"  RELEASE_INFO.json version matches {ver}")
+
     print()
     print(f"DONE: dist/{zip_name}")
 
