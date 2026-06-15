@@ -2146,6 +2146,16 @@ def build_epoch5_flink_format_dict(hdr_text):
 def build_epoch5_domain_split_format_dict(hdr_text):
     """5.0 ER 域名分流生成器。
     返回 (output_string, None) 或 (None, error_string)。
+
+    输出顺序：
+      1. shell heredoc + chmod
+      2. firewall group address-group
+      3. FNET whitelist（紧跟 address-group 之后）
+      4. service dns forwarding domain-list
+      5. policy route interface + rule + static table
+      6. failover2 track（仅 target + type）
+      7. failover2 route（/32 主备）
+      8. NAT source rule + probe static route（末尾）
     """
     dom_lines = []
     for ln in (hdr_text or "").splitlines():
@@ -2202,43 +2212,15 @@ def build_epoch5_domain_split_format_dict(hdr_text):
         except ValueError:
             return None, f"备下一跳「{s32_bak}」不是合法 IPv4"
 
-    lines = []
-    lines.append(f"# 等价于 touch + vi 写入 /opt/{dl}.txt")
-    lines.append(f"sudo tee /opt/{dl}.txt >/dev/null <<'EOF'")
-    lines.extend(dom_lines)
-    lines.append("EOF")
-    lines.append(f"sudo chmod 777 /opt/{dl}.txt")
-    lines.append("")
-    lines.append(f"set firewall group address-group {addr_group}")
-    lines.append("")
-    lines.append(f"set service dns forwarding domain-list {dl} address-group '{addr_group}'")
-    lines.append(f"set service dns forwarding domain-list {dl} file '/opt/{dl}.txt'")
-    lines.append(f"set service dns forwarding domain-list {dl} name-server {dns1}")
-    lines.append(f"set service dns forwarding domain-list {dl} recursion-desired")
-    if dns2:
-        lines.append(f"set service dns forwarding domain-list {dl} name-server {dns2}")
-    lines.append("")
-
-    lines.append(f"set policy route {pr} interface '{eth}'")
-    lines.append(f"set policy route {pr} rule {rn} destination group address-group '{addr_group}'")
-    if src_cidr:
-        lines.append(f"set policy route {pr} rule {rn} source address {src_cidr}")
-    lines.append(f"set policy route {pr} rule {rn} set table '{tn}'")
-    lines.append(f"set protocols static table {tn} route 0.0.0.0/0 next-hop  {nh_pri}")
-    lines.append("")
-
-    track_suffix = f" track {trn}" if trn else ""
-    lines.append(f"set protocols static route {nh_pri}/32 next-hop {s32_pri}{track_suffix}")
-    if s32_bak:
-        lines.append(f"set protocols static route {nh_pri}/32 next-hop {s32_bak} distance '20'")
-
+    # ── FNET 预检 ──
     nr_raw = str(g.get("ER5_DS_FNET_NAT_RULE_DEFAULT", "")).strip()
     tun_raw = str(g.get("ER5_DS_EXIT_TUNNEL_DEFAULT", "")).strip()
     sn_raw = str(g.get("ER5_DS_EXIT_SNAT_IP_DEFAULT", "")).strip()
     fnet_probe_raw = str(g.get("ER5_DS_FNET_PROBE_DEFAULT", "100.100.100.1")).strip()
-    fnet_src = str(g.get("ER5_DS_FAILOVER_SRC_DEFAULT", "")).strip()
 
     f_filled = (bool(nr_raw), bool(tun_raw), bool(sn_raw))
+    emit_fnet = False
+    fnet_probe = ""
     if all(f_filled):
         nr_ok = nr_raw.isdigit() and 1 <= int(nr_raw) <= 999999
         tun_ok = bool(re.match(r"^[A-Za-z0-9._-]+$", tun_raw))
@@ -2250,185 +2232,79 @@ def build_epoch5_domain_split_format_dict(hdr_text):
         try:
             fnet_probe = str(ipaddress.ip_address(fnet_probe_raw))
         except ValueError:
-            fnet_probe = ""
             sn_ok = False
         if nr_ok and tun_ok and sn_ok and fnet_probe:
-            FNET_GRP = "GROUP-FNET-Whitelist"
-            FNET_NET = "100.100.100.0/24"
-            lines.append("")
-            lines.append(f"set firewall group network-group {FNET_GRP} network {FNET_NET}")
-            lines.append("")
-            lines.append(f"set nat source rule {nr_raw} destination address {fnet_probe}/32")
-            lines.append(f"set nat source rule {nr_raw} outbound-interface '{tun_raw}'")
-            lines.append(f"set nat source rule {nr_raw} translation address '{sn_raw}'")
-            lines.append("")
-            lines.append(f"set protocols static route {fnet_probe}/32 next-hop {s32_pri}")
-            lines.append("")
-            if trn:
-                failover_src = fnet_src if fnet_src else s32_pri
-                lines.append(f"set protocols failover2 route {fnet_probe}/32 next-hop {s32_pri} track '{trn}'")
-                lines.append(f"set protocols failover2 track {trn} source-address '{failover_src}'")
-                lines.append(f"set protocols failover2 track {trn} target '{fnet_probe}'")
-                lines.append(f"set protocols failover2 track {trn} type 'icmp'")
+            emit_fnet = True
+
+    FNET_GRP = "GROUP-FNET-Whitelist"
+    FNET_NET = "100.100.100.0/24"
+
+    lines = []
+
+    # ── 1. Shell heredoc ──
+    lines.append(f"# 等价于 touch + vi 写入 /opt/{dl}.txt")
+    lines.append(f"sudo tee /opt/{dl}.txt >/dev/null <<'EOF'")
+    lines.extend(dom_lines)
+    lines.append("EOF")
+    lines.append(f"sudo chmod 777 /opt/{dl}.txt")
+    lines.append("")
+
+    # ── 2. Address group ──
+    lines.append(f"set firewall group address-group {addr_group}")
+
+    # ── 3. FNET whitelist（紧跟 address-group）──
+    if emit_fnet:
+        lines.append(f"set firewall group network-group {FNET_GRP} network {FNET_NET}")
+
+    lines.append("")
+
+    # ── 4. DNS forwarding ──
+    lines.append(f"set service dns forwarding domain-list {dl} address-group '{addr_group}'")
+    lines.append(f"set service dns forwarding domain-list {dl} file '/opt/{dl}.txt'")
+    lines.append(f"set service dns forwarding domain-list {dl} name-server {dns1}")
+    lines.append(f"set service dns forwarding domain-list {dl} recursion-desired")
+    if dns2:
+        lines.append(f"set service dns forwarding domain-list {dl} name-server {dns2}")
+    lines.append("")
+
+    # ── 5. Policy route + static table ──
+    lines.append(f"set policy route {pr} interface '{eth}'")
+    lines.append("")
+    lines.append(f"set policy route {pr} rule {rn} destination group address-group '{addr_group}'")
+    if src_cidr:
+        lines.append(f"set policy route {pr} rule {rn} source address {src_cidr}")
+    lines.append(f"set policy route {pr} rule {rn} set table '{tn}'")
+    lines.append("")
+    lines.append(f"set protocols static table {tn} route 0.0.0.0/0 next-hop  {nh_pri}")
+    lines.append("")
+
+    # ── 6. Failover2 track（仅 target + type）──
+    if trn and emit_fnet:
+        lines.append(f"set protocols failover2 track {trn} target '{fnet_probe}'")
+        lines.append(f"set protocols failover2 track {trn} type 'icmp'")
+        lines.append("")
+
+    # ── 7. Failover2 routes（/32 主备）──
+    if trn:
+        lines.append(f"set protocols failover2 route {nh_pri}/32 next-hop {s32_pri} track {trn}")
+        if s32_bak:
+            lines.append(f"set protocols failover2 route {nh_pri}/32 next-hop {s32_bak} distance '20'")
+    else:
+        lines.append(f"set protocols static route {nh_pri}/32 next-hop {s32_pri}")
+        if s32_bak:
+            lines.append(f"set protocols static route {nh_pri}/32 next-hop {s32_bak} distance '20'")
+
+    # ── 8. NAT + probe static route（末尾）──
+    if emit_fnet:
+        lines.append("")
+        lines.append(f"set nat source rule {nr_raw} destination address {fnet_probe}/32")
+        lines.append(f"set nat source rule {nr_raw} outbound-interface '{tun_raw}'")
+        lines.append(f"set nat source rule {nr_raw} translation address '{sn_raw}'")
+        lines.append("")
+        lines.append(f"set protocols static route {fnet_probe}/32 next-hop {s32_pri}")
 
     return "\n".join(lines).rstrip() + "\n", None
 
-
-# =====================================================================
-# 示例数据
-# =====================================================================
-US5_EXAMPLE = (
-    "LineID:603642Ar1\n"
-    "PE:szd-upe5\n"
-    "Tunnel:Tunnel0/0/1165\n"
-    "wanip:10.55.14.64/30\n"
-    "PE 对接:192.168.247.17\n"
-    "CE 对接:10.23.0.122\n"
-    "PE:szd-acvpnpe2\n"
-    "Tunnel:vtun17953\n"
-    "wanip:10.23.0.120/30\n"
-    "PE 对接:183.63.68.171\n"
-    "\n"
-    "LineID:603642Ar2\n"
-    "PE:szc-upe2\n"
-    "Tunnel:Tunnel0/0/1998\n"
-    "wanip:10.40.209.220/30\n"
-    "PE 对接:192.168.251.100\n"
-    "CE 对接:10.30.167.202\n"
-    "PE:szc-acvpnpe2\n"
-    "Tunnel:vtun50057\n"
-    "wanip:10.30.167.200/30\n"
-    "PE 对接:121.12.128.254\n"
-    "\n"
-    "LineID:603642Ar3\n"
-    "PE：szd-natflr2\n"
-    "WANIP:10.40.25.188/30\n"
-    "TUNNEL:tun100\n"
-    "PE Docking：121.12.81.3\n"
-    "CE Docking：10.20.186.2\n"
-    "BGPSERVER IP：10.10.99.168,10.10.99.169\n"
-    "海外出口ip：103.48.141.157\n"
-    "\n"
-    "LineID:603642Ar4\n"
-    "PE：szc-natbk10\n"
-    "WANIP:10.41.25.188/30\n"
-    "TUNNEL:tun200\n"
-    "PE Docking：120.133.129.72\n"
-    "CE Docking：10.25.186.3\n"
-    "BGPSERVER IP：10.10.99.198,10.10.99.199\n"
-    "海外出口ip：103.48.141.158\n"
-)
-
-US5_IPSEC_EXAMPLE = (
-    "LineID:609430B1\n"
-    "PE:szd-upe3\n"
-    "Tunnel:Tunnel0/0/2013\n"
-    "wanip:10.40.129.148/30\n"
-    "PE 对接:10.200.200.37\n"
-    "CE 对接:10.50.86.74\n"
-    "PE AS号:65510\n"
-    "客户内网路由:10.22.242.223\n"
-    "\n"
-    "拨号PE:szd-upe3\n"
-    "对接IP:10.200.200.37\n"
-    "LoopIP:10.50.86.74\n"
-    "拨号ip:183.56.161.86\n"
-    "秘钥:both-win\n"
-    "\n"
-    "--- IKE (ike-peer IPSEC) ---\n"
-    "key-exchange: ikev1/ikev2\n"
-    "proposal 1:\n"
-    "  dh-group: 2\n"
-    "  encryption: aes128 3des\n"
-    "  hash: sha1\n"
-    "  prf: hmac-sha2-256\n"
-    "dead-peer-detection: no\n"
-    "\n"
-    "--- IPsec proposal (IPSEC) ---\n"
-    "proposal 1:\n"
-    "  encryption: aes128 3des\n"
-    "  hash: sha1\n"
-    "\n"
-    "\n"
-    "\n"
-    "LineID:609430B2\n"
-    "PE:szc-upe1\n"
-    "Tunnel:Tunnel0/0/1163\n"
-    "wanip:10.30.37.168/30\n"
-    "PE 对接:10.200.200.27\n"
-    "CE 对接:10.50.118.76\n"
-    "PE AS号:65107\n"
-    "客户内网路由:10.22.242.223\n"
-    "\n"
-    "拨号PE:szc-upe1\n"
-    "对接IP:10.200.200.27\n"
-    "LoopIP:10.50.118.76\n"
-    "拨号ip:120.133.134.72\n"
-    "秘钥:both-win\n"
-    "\n"
-    "--- IKE (ike-peer IPSEC) ---\n"
-    "key-exchange: ikev1/ikev2\n"
-    "proposal 1:\n"
-    "  dh-group: 2\n"
-    "  encryption: aes128 3des\n"
-    "  hash: sha1\n"
-    "  prf: hmac-sha2-256\n"
-    "dead-peer-detection: yes\n"
-    "  type: ondemand\n"
-    "  idle-time: 10\n"
-    "\n"
-    "--- IPsec proposal (IPSEC) ---\n"
-    "proposal 1:\n"
-    "  encryption: aes128 3des\n"
-    "  hash: sha1\n"
-    "\n"
-    "\n"
-    "LineID:609430B5\n"
-    "PE： lax1-natpe7\n"
-    "WANIP: 10.22.113.36/30\n"
-    "TUNNEL: tun2209\n"
-    "PE Docking：192.168.215.12\n"
-    "CE Docking：: 10.22.242.223\n"
-    "BGPSERVER IP：103.252.19.25,43.229.117.226\n"
-    "海外出口ip：\n"
-    "10.60.52.46-8.3.6.111\n"
-    "\n"
-    "LineID:609430B6\n"
-    "PE： sjc1-natpe3\n"
-    "WANIP: 10.22.115.28/30\n"
-    "TUNNEL: tun1080\n"
-    "PE Docking：10.33.54.118\n"
-    "CE Docking：: 10.22.242.223\n"
-    "BGPSERVER IP：103.252.19.99,43.229.119.251\n"
-    "海外出口ip：\n"
-    "10.60.79.99-172.16.212.58\n"
-)
-
-HK5_EXAMPLE = (
-    "MAIN\n"
-    "lineid: 603642Ar3\n"
-    "主PE： szd-natflr2\n"
-    "WANIP: 10.40.25.188/30\n"
-    "TUNNEL: vtun40826\n"
-    "Docking：121.12.81.3\n"
-    "CE LOIP: 10.20.186.235\n"
-    "HKIP：10.60.241.250 --> 103.48.141.157\n"
-    "BGPSERVER IP： 10.10.99.168,10.10.99.169\n"
-    "\n"
-    "BACKUP\n"
-    "PE：szc-natbk10\n"
-    "WANIP: 10.41.25.188/30\n"
-    "TUNNEL: vtun50826\n"
-    "Docking： 120.133.129.72\n"
-    "CE LOIP: 10.20.186.235\n"
-    "HKIP：10.60.241.250 --> 103.48.141.157\n"
-    "BGPSERVER IP：10.10.99.198,10.10.99.199\n"
-)
-
-
-# =====================================================================
-# 可视化合并函数（供 all_in_one_v2 调用）
-# =====================================================================
 def _visual_merge_er5_init(variant: str, updates: dict) -> None:
     """all_in_one：将可视化编辑器的持久化值写入本模块 globals()。
     variant: "hk" | "us" | "flink" | "new_exit" | "domain_split"

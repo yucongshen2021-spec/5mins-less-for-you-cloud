@@ -1036,8 +1036,7 @@ def generate_epoch_fastip5():
                       "ER5_DS_TABLE_NH_PRIMARY_DEFAULT","ER5_DS_STATIC32_PRIMARY_NH_DEFAULT",
                       "ER5_DS_TRACK_NAME_DEFAULT","ER5_DS_STATIC32_BACKUP_NH_DEFAULT",
                       "ER5_DS_FNET_PROBE_DEFAULT","ER5_DS_FNET_NAT_RULE_DEFAULT",
-                      "ER5_DS_EXIT_TUNNEL_DEFAULT","ER5_DS_EXIT_SNAT_IP_DEFAULT",
-                      "ER5_DS_FAILOVER_SRC_DEFAULT"):
+                      "ER5_DS_EXIT_TUNNEL_DEFAULT","ER5_DS_EXIT_SNAT_IP_DEFAULT"):
                 if k in network:
                     er5[k] = str(network.get(k, ""))
             # Domain list comes from form field ER5_DS_DOMAINS_DEFAULT
@@ -2697,8 +2696,7 @@ def _get_init_keys(slot):
                 "ER5_DS_TABLE_NH_PRIMARY_DEFAULT","ER5_DS_STATIC32_PRIMARY_NH_DEFAULT",
                 "ER5_DS_TRACK_NAME_DEFAULT","ER5_DS_STATIC32_BACKUP_NH_DEFAULT",
                 "ER5_DS_FNET_PROBE_DEFAULT","ER5_DS_FNET_NAT_RULE_DEFAULT",
-                "ER5_DS_EXIT_TUNNEL_DEFAULT","ER5_DS_EXIT_SNAT_IP_DEFAULT",
-                "ER5_DS_FAILOVER_SRC_DEFAULT"]
+                "ER5_DS_EXIT_TUNNEL_DEFAULT","ER5_DS_EXIT_SNAT_IP_DEFAULT"]
     if slot == "TEMPLATE_USG_HK":
         return ["HK_DEFAULT_DNS1","HK_DEFAULT_DNS2","DEFAULT_WAN_ETH","DEFAULT_WAN_IP",
                 "DEFAULT_WAN_GW","DEFAULT_WAN_DHCP","DEFAULT_LAN_ETH","DEFAULT_LAN_IP",

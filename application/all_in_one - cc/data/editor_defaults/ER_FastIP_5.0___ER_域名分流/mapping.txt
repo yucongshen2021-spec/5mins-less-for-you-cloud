@@ -22,4 +22,3 @@ ER5_DS_FNET_PROBE_DEFAULT  track 100.100 探测 IP
 ER5_DS_FNET_NAT_RULE_DEFAULT  NAT rule 号（默认空；与 tunnel、主线出口须同填或同空）
 ER5_DS_EXIT_TUNNEL_DEFAULT  NAT 出口 tunnel（可空；openvpn，FNET outbound-interface）
 ER5_DS_EXIT_SNAT_IP_DEFAULT  主线出口 IP（可空；set nat translation address）
-ER5_DS_FAILOVER_SRC_DEFAULT  failover2 track source-address（可空；Track 名称非空时必填）

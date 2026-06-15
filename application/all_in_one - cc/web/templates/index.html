@@ -301,7 +301,6 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <div class="fr2"><div class="fg"><label class="fl">Track 名称（可空）</label><input class="fi" id="epoch-fastip5-ds-track" value="tooutbound1"></div><div class="fg"><label class="fl">备下一跳 /32 静态路由（可空）</label><input class="fi" id="epoch-fastip5-ds-s32-bk" placeholder="可空"></div></div>
 <div class="fr2"><div class="fg"><label class="fl">100.100 探测 IP</label><input class="fi" id="epoch-fastip5-ds-probe" value="100.100.100.1"></div><div class="fg"><label class="fl">NAT Rule 号（可空）</label><input class="fi" id="epoch-fastip5-ds-nat-rule" placeholder="可空"></div></div>
 <div class="fr2"><div class="fg"><label class="fl">NAT 出口 Tunnel（可空）</label><input class="fi" id="epoch-fastip5-ds-exit-tun" placeholder="可空"></div><div class="fg"><label class="fl">主线出口 IP（可空）</label><input class="fi" id="epoch-fastip5-ds-exit-ip" placeholder="可空"></div></div>
-<div class="fr2"><div class="fg"><label class="fl">Failover Source IP（可空）</label><input class="fi" id="epoch-fastip5-ds-failover-src" placeholder="与主下一跳相同"></div><div class="fg"></div></div>
 </div></div>
 </div>
 
@@ -735,7 +734,7 @@ function gn5(tp){
        ER5_NE_FNET_PROBE_DEFAULT:g('ne-fnet-probe')?.value||'',ER5_NE_FNET_EXIT_TUNNEL_DEFAULT:g('ne-fnet-tunnel')?.value||'',
        ER5_NE_FNET_NAT_RULE_DEFAULT:g('ne-fnet-nat-rule')?.value||''};
   }else if(v==='domain_split'){
-    n={ER5_DS_DOMAINS_DEFAULT:g('ds-domains')?.value||'',ER5_DS_ADDR_GROUP_DEFAULT:g('ds-addr-group')?.value||'',ER5_DS_RULE_NUM_DEFAULT:g('ds-rule-num')?.value||'',ER5_DS_TABLE_NUM_DEFAULT:g('ds-table-num')?.value||'',ER5_DS_SOURCE_CIDR_DEFAULT:g('ds-src-cidr')?.value||'',ER5_DS_ETH_DEFAULT:g('ds-eth')?.value||'',ER5_DS_DNS1_DEFAULT:g('ds-dns1')?.value||'',ER5_DS_DNS2_DEFAULT:g('ds-dns2')?.value||'',ER5_DS_TABLE_NH_PRIMARY_DEFAULT:g('ds-nh')?.value||'',ER5_DS_STATIC32_PRIMARY_NH_DEFAULT:g('ds-s32-nh')?.value||'',ER5_DS_TRACK_NAME_DEFAULT:g('ds-track')?.value||'',ER5_DS_STATIC32_BACKUP_NH_DEFAULT:g('ds-s32-bk')?.value||'',ER5_DS_FNET_PROBE_DEFAULT:g('ds-probe')?.value||'',ER5_DS_FNET_NAT_RULE_DEFAULT:g('ds-nat-rule')?.value||'',ER5_DS_EXIT_TUNNEL_DEFAULT:g('ds-exit-tun')?.value||'',ER5_DS_EXIT_SNAT_IP_DEFAULT:g('ds-exit-ip')?.value||'',ER5_DS_FAILOVER_SRC_DEFAULT:g('ds-failover-src')?.value||''};
+    n={ER5_DS_DOMAINS_DEFAULT:g('ds-domains')?.value||'',ER5_DS_ADDR_GROUP_DEFAULT:g('ds-addr-group')?.value||'',ER5_DS_RULE_NUM_DEFAULT:g('ds-rule-num')?.value||'',ER5_DS_TABLE_NUM_DEFAULT:g('ds-table-num')?.value||'',ER5_DS_SOURCE_CIDR_DEFAULT:g('ds-src-cidr')?.value||'',ER5_DS_ETH_DEFAULT:g('ds-eth')?.value||'',ER5_DS_DNS1_DEFAULT:g('ds-dns1')?.value||'',ER5_DS_DNS2_DEFAULT:g('ds-dns2')?.value||'',ER5_DS_TABLE_NH_PRIMARY_DEFAULT:g('ds-nh')?.value||'',ER5_DS_STATIC32_PRIMARY_NH_DEFAULT:g('ds-s32-nh')?.value||'',ER5_DS_TRACK_NAME_DEFAULT:g('ds-track')?.value||'',ER5_DS_STATIC32_BACKUP_NH_DEFAULT:g('ds-s32-bk')?.value||'',ER5_DS_FNET_PROBE_DEFAULT:g('ds-probe')?.value||'',ER5_DS_FNET_NAT_RULE_DEFAULT:g('ds-nat-rule')?.value||'',ER5_DS_EXIT_TUNNEL_DEFAULT:g('ds-exit-tun')?.value||'',ER5_DS_EXIT_SNAT_IP_DEFAULT:g('ds-exit-ip')?.value||''};
   }
   return n;
 }
