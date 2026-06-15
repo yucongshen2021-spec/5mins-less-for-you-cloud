@@ -45,7 +45,7 @@ set "ERR=0"
 echo [1/6] Waiting for portal to exit...
 set /a waited=0
 :wait_loop
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 set /a waited+=1
 set "any=0"
 for %%p in (7000 7001 7002 7003 7004) do (
@@ -60,7 +60,7 @@ for %%p in (7000 7001 7002 7003 7004) do (
         taskkill /F /PID %%a >nul 2>&1
     )
 )
-timeout /t 3 /nobreak >nul
+ping 127.0.0.1 -n 4 >nul
 
 :: ---- [3/6] Backup user workspace ----
 echo [3/6] Protecting user data...
@@ -79,7 +79,7 @@ if exist "%TMPDIR%" rmdir /s /q "%TMPDIR%" 2>nul
 powershell -NoProfile -Command "try { Expand-Archive -Path '%~dp0__update__.zip' -DestinationPath '%TMPDIR%' -Force -ErrorAction Stop } catch { exit 1 }" 2>&1
 if %errorlevel% neq 0 (
     echo   Retrying extraction...
-    timeout /t 2 /nobreak >nul
+    ping 127.0.0.1 -n 3 >nul
     powershell -NoProfile -Command "try { Expand-Archive -Path '%~dp0__update__.zip' -DestinationPath '%TMPDIR%' -Force -ErrorAction Stop } catch { exit 1 }" 2>&1
     if %errorlevel% neq 0 set "ERR=1"
 )
