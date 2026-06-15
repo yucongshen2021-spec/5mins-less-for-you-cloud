@@ -252,17 +252,20 @@ def _load_mirror_base_urls() -> list[str]:
     return bases
 
 
-def _try_download(download_url: str, zip_dest: Path) -> tuple[int, str]:
-    """Try downloading from one URL. Returns (downloaded_bytes, error_msg)."""
+def _try_download(download_url: str, zip_dest: Path) -> tuple[int, str, int, int]:
+    """Try downloading from one URL. Returns (downloaded_bytes, error_msg, last_progress_pct, total_size)."""
     last = 0
+    total = 0
     err = ""
     try:
-        for d, _t in _download_with_progress(download_url, zip_dest):
+        for d, t in _download_with_progress(download_url, zip_dest):
             last = d
+            total = t
     except (urllib.error.URLError, urllib.error.HTTPError,
             TimeoutError, OSError, ValueError) as e:
         err = f"{type(e).__name__}: {e}"
-    return last, err
+    pct = int(last * 100 / total) if total > 0 else 0
+    return last, err, pct, total
 
 
 def _build_alt_download_urls(original_url: str, base_urls: list[str]) -> list[str]:
@@ -288,7 +291,127 @@ def _build_alt_download_urls(original_url: str, base_urls: list[str]) -> list[st
     return alt_urls
 
 
+def perform_upgrade_progress(download_url: str):
+    """Generator version — yields progress dicts for SSE streaming."""
+    parent = _PROJECT_ROOT / "temp" / "upgrade"
+    parent.mkdir(parents=True, exist_ok=True)
+    zip_dest = parent / "__update__.zip"
+    bat_dest = parent / "update.bat"
+
+    for p in (zip_dest, bat_dest):
+        try:
+            p.unlink(missing_ok=True)
+        except PermissionError:
+            pass
+
+    # ── Download (with real-time progress) ──
+    def _do_download(url, dest):
+        """Download with real-time progress yields. Returns (bytes, error)."""
+        last = 0; total = 0; err = ""
+        try:
+            url2 = _encode_url_idempotent(url)
+            req = urllib.request.Request(url2, headers={"User-Agent": "5mins-portal-upgrade"})
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                total = int(resp.headers.get("Content-Length", "0"))
+                downloaded = 0
+                chunk_size = 256 * 1024
+                last_pct = -1
+                with open(dest, "wb") as f:
+                    while True:
+                        chunk = resp.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total > 0:
+                            pct = int(downloaded * 100 / total)
+                            if pct > last_pct:
+                                last_pct = pct
+                                yield {"stage": "download", "pct": pct,
+                                       "message": f"{downloaded//1024//1024}/{total//1024//1024} MB"}
+                last = downloaded
+        except (urllib.error.URLError, urllib.error.HTTPError,
+                TimeoutError, OSError, ValueError) as e:
+            err = f"{type(e).__name__}: {e}"
+        return last, err
+
+    # Primary download
+    yield {"stage": "download", "message": "正在连接...", "pct": 0}
+    gen = _do_download(download_url, zip_dest)
+    last_downloaded = 0; err = ""
+    for update in gen:
+        if isinstance(update, dict):
+            yield update
+        else:
+            last_downloaded, err = update
+
+    # Retry with alternative mirrors
+    if err and last_downloaded < 100_000:
+        mirror_urls = _load_mirror_base_urls()
+        alt_urls = _build_alt_download_urls(download_url, mirror_urls)
+        for alt_url in alt_urls:
+            if last_downloaded >= 100_000:
+                break
+            zip_dest.unlink(missing_ok=True)
+            print(f"[UPGRADE] Retrying download with: {alt_url}", flush=True)
+            yield {"stage": "download", "message": "切换备用线路...", "pct": 0}
+            gen2 = _do_download(alt_url, zip_dest)
+            for update in gen2:
+                if isinstance(update, dict):
+                    yield update
+                else:
+                    last_downloaded, err = update
+
+    if err and last_downloaded < 100_000:
+        zip_dest.unlink(missing_ok=True)
+        yield {"ok": False, "error": f"Download failed: {err}", "stage": "download"}
+        return
+
+    if last_downloaded < 100_000:
+        zip_dest.unlink(missing_ok=True)
+        yield {"ok": False, "error": f"Downloaded file too small ({last_downloaded} bytes)", "stage": "download"}
+        return
+
+    # ── Verify ──
+    yield {"stage": "verify", "message": "正在验证更新包...", "pct": 100}
+    release_info = _verify_zip(zip_dest)
+    if release_info is None:
+        zip_dest.unlink(missing_ok=True)
+        yield {"ok": False, "error": "Not a valid release package (missing RELEASE_INFO.json)", "stage": "verify"}
+        return
+
+    conflicts = _scan_zip_for_conflicts(zip_dest)
+    new_version = release_info.get("version", "unknown")
+
+    # ── Install ──
+    yield {"stage": "install", "message": "正在准备安装...", "pct": 100}
+    bat_dest.write_text(UPDATE_BAT_TEMPLATE, encoding="ascii")
+
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", "start", "5mins-tools Online Upgrade", str(bat_dest)],
+            cwd=str(parent),
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
+    except OSError as e:
+        yield {"ok": False, "error": f"Cannot start upgrade script: {e}", "stage": "launch"}
+        return
+
+    result = {"ok": True, "stage": "launched", "new_version": new_version, "message": "即将重启..."}
+    if conflicts:
+        result["workspace_warning"] = (
+            f"New zip contains protected user data files. "
+            f"Upgrade script will backup and restore: {', '.join(conflicts)}"
+        )
+    yield result
+
+
 def perform_upgrade(download_url: str) -> dict:
+    """Synchronous wrapper — collects generator output into a single result dict."""
+    result = {}
+    for update in perform_upgrade_progress(download_url):
+        result = update
+    return result
     parent = _PROJECT_ROOT / "temp" / "upgrade"
     parent.mkdir(parents=True, exist_ok=True)
     zip_dest = parent / "__update__.zip"

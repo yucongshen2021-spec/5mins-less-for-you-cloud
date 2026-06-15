@@ -107,29 +107,61 @@ def api_update_check():
     return jsonify(update_check.check(force=force))
 
 
+# Upgrade progress streams (like mock report SSE)
+_upgrade_streams: dict[str, queue.Queue] = {}
+
+
 @app.route("/api/update/upgrade", methods=["POST"])
 def api_update_upgrade():
-    """执行在线升级：下载最新 zip → 解压覆盖 → 提示重启。"""
+    """执行在线升级：下载 → 验证 → 安装 → 重启。SSE 流式推送进度。"""
     data = request.get_json(silent=True) or {}
     download_url = (data.get("download_url") or "").strip()
     if not download_url:
         return jsonify({"ok": False, "error": "缺少 download_url"}), 400
-    try:
-        result = upgrade.perform_upgrade(download_url)
-    except Exception as exc:
-        import traceback
-        detail = traceback.format_exc()
-        print(f"[UPGRADE ERROR] {detail}", flush=True)
-        return jsonify({
-            "ok": False,
-            "error": f"Upgrade failed: {type(exc).__name__}: {exc}",
-            "stage": "exception"
-        }), 500
-    if result.get("ok"):
-        return jsonify(result)
-    # Log the specific error from perform_upgrade
-    print(f"[UPGRADE FAILED] stage={result.get('stage')} error={result.get('error')}", flush=True)
-    return jsonify(result), 500
+
+    task_id = f"upgrade_{int(__import__('time').time())}"
+    q: queue.Queue[str] = queue.Queue()
+    _upgrade_streams[task_id] = q
+
+    def _run():
+        try:
+            for update in upgrade.perform_upgrade_progress(download_url):
+                q.put(json.dumps(update, ensure_ascii=False))
+        except Exception as exc:
+            import traceback
+            detail = traceback.format_exc()
+            print(f"[UPGRADE ERROR] {detail}", flush=True)
+            q.put(json.dumps({
+                "ok": False,
+                "error": f"Upgrade failed: {type(exc).__name__}: {exc}",
+                "stage": "exception"
+            }, ensure_ascii=False))
+        finally:
+            q.put("__DONE__")
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return jsonify({"ok": True, "task_id": task_id})
+
+
+@app.route("/api/update/progress/<task_id>")
+def api_update_progress(task_id):
+    q = _upgrade_streams.get(task_id)
+    def generate():
+        if q is None:
+            yield "data: {\"error\": \"任务不存在\"}\n\n"
+            return
+        while True:
+            try:
+                line = q.get(timeout=300)
+                yield f"data: {line}\n\n"
+                if line == "__DONE__":
+                    break
+            except queue.Empty:
+                yield "data: {\"stage\": \"timeout\"}\n\n"
+                break
+    return Response(stream_with_context(generate()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.route("/api/shutdown", methods=["POST"])
