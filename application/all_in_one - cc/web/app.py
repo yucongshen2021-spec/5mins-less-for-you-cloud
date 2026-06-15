@@ -1038,9 +1038,8 @@ def generate_epoch_fastip5():
                       "ER5_DS_FNET_PROBE_DEFAULT","ER5_DS_FNET_NAT_RULE_DEFAULT",
                       "ER5_DS_EXIT_TUNNEL_DEFAULT","ER5_DS_EXIT_SNAT_IP_DEFAULT",
                       "ER5_DS_FAILOVER_SRC_DEFAULT"):
-                v = network.get(k)
-                if v is not None and str(v).strip():
-                    er5[k] = str(v)
+                if k in network:
+                    er5[k] = str(network.get(k, ""))
             # Domain list comes from form field ER5_DS_DOMAINS_DEFAULT
             domains_text = network.get("ER5_DS_DOMAINS_DEFAULT", network.get("header_text", ""))
             result = build_fn(domains_text)
