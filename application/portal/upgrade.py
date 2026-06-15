@@ -222,7 +222,13 @@ def _verify_zip(zip_path: Path) -> dict | None:
 
 
 def _load_mirror_base_urls() -> list[str]:
-    """Load mirror base URLs from update_config.json for download fallback."""
+    """Load mirror base URLs from update_config.json for download fallback.
+
+    The config stores manifest URLs like:
+      http://192.168.72.219:8000/api/update/manifest
+    We strip the path to get the base: http://192.168.72.219:8000
+    """
+    import urllib.parse as _up
     urls: list[str] = []
     try:
         cfg_path = _PROJECT_ROOT / "application" / "portal" / "update_config.json"
@@ -238,7 +244,12 @@ def _load_mirror_base_urls() -> list[str]:
                             urls.append(u.strip().rstrip("/"))
     except Exception:
         pass
-    return list(dict.fromkeys(urls))  # dedup, preserve order
+    # Strip manifest path to get base URL (scheme + netloc only)
+    bases: list[str] = []
+    for url in list(dict.fromkeys(urls)):
+        parts = _up.urlsplit(url)
+        bases.append(f"{parts.scheme}://{parts.netloc}")
+    return bases
 
 
 def _try_download(download_url: str, zip_dest: Path) -> tuple[int, str]:
