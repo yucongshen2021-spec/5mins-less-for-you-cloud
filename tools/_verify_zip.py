@@ -43,22 +43,30 @@ with zipfile.ZipFile(zip_path, "r") as z:
             chk("M#46 zero chcp anywhere", "chcp" not in b)
             break
 
-    # M#35: port 7000
+    # M#35: port 7000. app.py switches at runtime via RELEASE_MODE; both branches
+    # must be intact (7000 for release, 5000 for demo fallback — see build_release.py).
     for n in names:
         if n.endswith("portal/app.py") and ".py" in n:
             a = z.read(n).decode("utf-8")
-            chk("M#35 port is 7000", "port=7000" in a or "is_release=True" in a)
+            chk("M#35 app.py runtime port switch intact",
+                "7000 if _RELEASE else 5000" in a,
+                "expected '7000 if _RELEASE else 5000' (runtime switch)")
             chk("M#14 pycache clean at startup", "__pycache__" in a)
             chk("M#47 import upgrade", "import upgrade" in a)
             break
 
-    # M#2: sub-app port args
+    # M#2: process_manager must keep BOTH runtime branches intact (7000/5000),
+    # and sub-apps get their port via argv (built per RELEASE_MODE at runtime).
     for n in names:
         if n.endswith("portal/process_manager.py"):
             pm = z.read(n).decode("utf-8")
-            for name, port in [("all_in_one","7003"),("test_report","7002"),
-                               ("domain_capture","7001"),("config_analyzer","7004")]:
-                chk(f"M#2 {name} port {port} in cmd", f'"{port}"' in pm or f"'{port}'" in pm)
+            chk("M#2 process_manager runtime port switch intact",
+                "_BASE = 7000 if _RELEASE else 5000" in pm,
+                "expected '_BASE = 7000 if _RELEASE else 5000'")
+            # Sub-app cmds use _BASE+offset, so the literal release ports appear
+            # as `_BASE + 1..4`, NOT as '7001'..'7004' literals.
+            chk("M#2 sub-app cmds use _BASE offset",
+                "_BASE + 1" in pm and "_BASE + 3" in pm)
             break
 
     # M#34 #38: DOM — release template must have upgradeBtn, banner before script

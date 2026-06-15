@@ -553,3 +553,108 @@ make_report.py 崩溃：`EOFError: EOF when reading a line`。
      而不是泛化名（`t_local, t_remote`），强迫自己思考谁是 PE 谁是 CE。
   2. 举一反三: ER FastIP (`pe_ip, ce_ip`)、MPLS (`pe_ip, ce_ip`)、AR SD-WAN (`wan_peer_ip, wan_ce_ip`)
      都正确使用了语义变量名——只有 AR 传统组网用了泛化变量名，这是 bug 的前兆信号。
+
+## 54. upgrade.py 的 URL 重编码不幂等 — 已编码 URL 被双重编码成 %25 → 升级 404
+
+**现象**: 客户点"一键升级"后 `/api/update/upgrade` 返回 500，
+body 是 `Download failed: HTTPError: HTTP Error 404: Not Found`。
+直接 `urllib.request.urlopen(manifest 的 download_url)` 又报
+`UnicodeEncodeError: 'ascii' codec can't encode characters`。
+
+**根因**: 升级链路的 URL 编码契约不一致，两个 bug 互相抵消、又各自炸：
+  - serve_mirror.py 第 72 行给的 download_url 是**原始中文字面量**
+    (`.../download/帮你节省5分钟-1.1.18.zip`)。urllib 不能把非 ASCII 放到
+    HTTP 请求行 → UnicodeEncodeError。
+  - 为"修"上面这个，upgrade._download_with_progress 加了一段
+    `urllib.parse.quote(part, safe="")` 对每个 path 段重新 quote。
+    但 quote 会把已有的 `%` 再编码成 `%25`：`%E5` → `%25E5`。
+    对 serve_mirror 的原始中文 URL 恰好"救"了它（中文字面量被 quote 一次 = 正确编码）；
+    但对**已经合法 percent-encoded** 的 URL（GitHub asset、任何 RFC 合规 mirror、
+    含 `%20` 空格的 URL）一律双重编码 → 服务器收到 `%25E5...` 找不到文件 → 404。
+  - 这是"两个 bug 互相抵消"的脆弱平衡：只要 mirror 改成合规预编码、或客户切到
+    GitHub 源，升级立刻 404。
+
+**修复**（两边契约对齐到 RFC）:
+  1. `serve_mirror.build_manifest` 直接发**预编码**的 download_url
+     (`urllib.parse.quote(filename, safe="")`)。
+  2. `upgrade._encode_url_idempotent` 改成**幂等**: `quote(unquote(part))`，
+     对原始中文和已编码 URL 都得到同一个正确结果，绝不产生 `%25`。
+  3. `perform_upgrade` 的 except 增加 `ValueError`（UnicodeEncodeError 的父类），
+     防止任何漏网的非 ASCII URL 冒泡成未捕获 500。
+
+**避免**:
+  1. **URL 编码必须幂等**: 任何"对 URL 重新编码"的代码必须先 unquote 再 quote，
+     或者用 `urllib.parse.urlsplit/urlunsplit` 只动 path。盲目 quote 已编码字符串必双编码。
+  2. **客户端和服务端的编码契约必须显式对齐**: 不能一边发原始中文、另一边猜着补编码。
+     选 RFC 合规（预编码）作为唯一契约，两边都按它来。
+  3. 这条已锁进 `application/test/portal/test_upgrade_url_encode.py`
+     (7 个 encode 用例 + manifest 编码 + ValueError 捕获)，禁止回退。
+  4. 举一反三: 全仓库搜 `urllib.parse.quote` 和 `urlopen`，凡是对"可能已编码"
+     的输入调 quote 的，都要改成幂等写法。
+
+## 55. build_release.py 端口替换误伤 app.py 的 `_RELEASE else 5000` 分支 + 测试读 cmd 输出用错编码
+
+**现象 A**: 构建出的客户 zip 里 `app.py` 是 `_PORT = 7000 if _RELEASE else 7000`
+（两个分支都是 7000），demo 版解压后也跑 7000，与 release 冲突，违反 CLAUDE.md
+双版本架构。`_verify_zip.py` 的 M#35 检查也过不了。
+
+**根因 A**: `build_release._RELEASE_PORT_FILES` 把 `app.py` 和 `process_manager.py`
+列进端口替换名单，用 `re.sub(r"\b5000\b", "7000", text)`。但这两个文件**已经在运行时
+按 RELEASE_MODE 切端口**（`7000 if _RELEASE else 5000`），替换把 `else 5000` 里的
+5000 也变成 7000，把 demo fallback 分支废了。只有"硬编码端口、无运行时分支"的文件
+才该进替换名单。
+
+**修复 A**: 从 `_RELEASE_PORT_FILES` 删掉 `app.py` 和 `process_manager.py`
+（它们自带运行时切换）。同步更新 `_verify_zip.py` 的 M#35/M#2 检查成
+"runtime switch intact"（`7000 if _RELEASE else 5000` 字面存在）。
+
+**现象 B**: `test_upgrade_bat.py::test_full_bat_syntax_valid_on_windows` 假失败
+（30s 超时或 `bat 未执行步骤 [1/6]`）。bat 实际能跑完 6 步。
+
+**根因 B**: 两个独立问题叠加：
+  1. 测试用 `subprocess.run(..., encoding="utf-8")` 读 cmd 输出，但本机控制台是
+     代码页 936 (GBK)，cmd 的本地化错误信息（"系统找不到文件"）按 GBK 编码 →
+     reader 线程 `UnicodeDecodeError` → `stdout=''` → 断言失败。
+  2. 测试没中和 `start ""` 命令：bat 里 `start "" "%BUNDLE%\start_all.bat"` 在
+     subprocess capture 下会派生新控制台，子进程继承 stdout 管道并一直开着 →
+     `communicate()` 永久阻塞到超时。
+
+**修复 B**:
+  1. 测试改成 `capture_output=True`（拿 bytes）+ `.decode("mbcs", errors="replace")`。
+  2. 中和列表加 `'start ""'` → `'echo start ""'`。
+
+**避免**:
+  1. **端口替换只动"无运行时分支的硬编码端口"文件**；自带 `if _RELEASE` 切换的文件
+     （app.py、process_manager.py）绝不能进替换名单。改完用 `_verify_zip.py` 验证
+     `7000 if _RELEASE else 5000` 字面还在。
+  2. **Windows subprocess 读 cmd 输出必须用 mbcs 解码**（或 `chcp 65001` 后用 utf-8），
+     绝不能假设控制台是 utf-8。中文 Windows 默认 936。
+  3. **测试 bat 语法时必须中和 `start`**: `start` 会派生独立窗口，在 capture 模式下
+     管道永不关闭 → 超时。所有会派生子进程的命令（start、explorer 等）都要 echo 掉。
+  4. 这条已锁进 `_verify_zip.py` (M#35/M#2 改为 runtime switch 检查) 和
+     `test_upgrade_bat.py` (mbcs 解码 + start 中和)。
+
+## 56. 在线升级全链路用时 ~190s，测试窗口写 180s 必假失败
+
+**现象**: e2e 升级测试（`test_upgrade_real_e2e.py`）第一次跑 23 passed / 1 failed，
+失败项是 "portal restarted showing NEW version — did not come back in 180s"。
+但 portal **确实**重启了，只是慢。
+
+**根因**: 真实升级链路用时拆解（在 SSD + 本机 mirror 实测）：
+  - 等 portal 退出（/api/shutdown → SIGTERM → 端口释放）: ~35s
+  - Expand-Archive 解压 77MB zip: ~6s
+  - **robocopy 复制 ~4000 个 runtime 文件到 bundle: ~100-110s** ← 大头
+  - 恢复 workspace + 清理: ~5s
+  - 新 portal 启动 + 子应用就绪: ~30s
+  合计 **~189s**。测试窗口写 180s，刚好擦边失败。
+
+**修复**: 测试重启等待窗口从 180s 提到 **300s**（留 60% 余量）。
+诊断脚本实测确认升级在 189s 完成、RELEASE_INFO 变 1.1.19、port 7000 回来。
+
+**避免**:
+  1. **真实升级测试的超时窗口必须按实测链路用时 + 充足余量**，不能拍脑袋写。
+     robocopy 几千个小文件是已知慢操作，机械硬盘上更慢。
+  2. 写 e2e 超时前，先用诊断脚本（`temp/_bat_diag.py`）跑一次，打印每个阶段的
+     时间戳，取实测最大值 ×1.5 作为窗口。
+  3. 升级失败时测试要**保留 temp 目录**（`if FAILED: 不删 TEMP`）便于事后查
+     RELEASE_INFO / update.bat / robocopy 日志。

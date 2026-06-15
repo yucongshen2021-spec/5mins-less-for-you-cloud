@@ -164,15 +164,35 @@ def _scan_zip_for_conflicts(zip_path: Path) -> list[str]:
     return list(dict.fromkeys(conflicts))
 
 
-def _download_with_progress(url: str, dest: Path, timeout: int = 120):
+def _encode_url_idempotent(url: str) -> str:
+    """Percent-encode a URL's path so it is safe for urllib, WITHOUT double-encoding.
+
+    Why this exists (see log/mistake.txt #47 + #54):
+      - urllib.request cannot put raw non-ASCII (e.g. the 中文 bundle filename) on
+        the HTTP request-target → UnicodeEncodeError.
+      - The original fix blindly re-quoted every path segment, which turned an
+        already-percent-encoded URL (GitHub asset, RFC-compliant mirror) into a
+        double-encoded one (%E5 → %25E5 → 404). That was a latent bug: it only
+        "worked" because serve_mirror happened to emit raw filenames, so two bugs
+        cancelled out.
+
+    This helper is idempotent: it unquotes first, then quotes once, so calling it
+    on a raw URL or an already-encoded URL yields the same correct result.
+    """
     import urllib.parse
-    scheme, rest = url.split("://", 1)
-    if "/" in rest:
-        host, path = rest.split("/", 1)
-        encoded_path = "/".join(
-            urllib.parse.quote(part, safe="") for part in path.split("/")
-        )
-        url = f"{scheme}://{host}/{encoded_path}"
+    split = urllib.parse.urlsplit(url)
+    # Normalize each path segment: unquote (idempotent) then quote once.
+    encoded_path = "/".join(
+        urllib.parse.quote(urllib.parse.unquote(part), safe="")
+        for part in split.path.split("/")
+    )
+    return urllib.parse.urlunsplit(
+        (split.scheme, split.netloc, encoded_path, split.query, split.fragment)
+    )
+
+
+def _download_with_progress(url: str, dest: Path, timeout: int = 120):
+    url = _encode_url_idempotent(url)
 
     req = urllib.request.Request(url, headers={"User-Agent": "5mins-portal-upgrade"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -217,7 +237,10 @@ def perform_upgrade(download_url: str) -> dict:
     try:
         for downloaded, _total in _download_with_progress(download_url, zip_dest):
             last_downloaded = downloaded
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as e:
+    except (urllib.error.URLError, urllib.error.HTTPError,
+            TimeoutError, OSError, ValueError) as e:
+        # ValueError covers UnicodeEncodeError (raw non-ASCII URL that somehow
+        # bypassed _encode_url_idempotent). Never let it bubble as an uncaught 500.
         zip_dest.unlink(missing_ok=True)
         return {"ok": False, "error": f"Download failed: {type(e).__name__}: {e}", "stage": "download"}
 

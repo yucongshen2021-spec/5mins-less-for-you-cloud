@@ -64,12 +64,16 @@ def build_manifest(zip_path: Path, base_url: str) -> dict:
     if not version:
         version = filename.removeprefix(f"{BUNDLE_NAME}-").removesuffix(".zip")
 
+    # download_url 必须 percent-encode 文件名（见 log/mistake.txt #47 / #54）。
+    # 原始中文字面量会让 urllib 的请求行直接 UnicodeEncodeError；客户端再做一次
+    # 幂等编码（upgrade._encode_url_idempotent）拿到同样的结果，两边契约一致。
+    encoded_filename = urllib.parse.quote(filename, safe="")
     return {
         "name": BUNDLE_NAME,
         "version": version,
         "size": stat.st_size,
         "sha256": sha256,
-        "download_url": f"{base_url}/api/update/download/{filename}",
+        "download_url": f"{base_url}/api/update/download/{encoded_filename}",
         "release_url": f"{base_url}/api/update/manifest",
     }
 

@@ -111,18 +111,57 @@ def test_upgrade_endpoint_not_in_main(release_portal):
         assert e.code == 400, f"应 400, 实际 {e.code}"
 
 
-def test_shutdown_not_in_main(release_portal):
-    """main 分支不应有 /api/shutdown。"""
-    body = json.dumps({}).encode("utf-8")
-    req = urllib.request.Request(
-        release_portal + "/api/shutdown",
-        data=body, headers={"Content-Type": "application/json"}, method="POST",
+def test_shutdown_route_present_in_release(release_portal):
+    """release 运行时(RELEASE_MODE=1)必须有 /api/shutdown（升级后重启用）。
+
+    历史背景：旧测试 test_shutdown_not_in_main 既想测 demo 不暴露此端点、
+    又用了 release_portal fixture，自相矛盾。正确的不变量分两半：
+      - release 运行时：路由存在 → 200 ok  （本测试，通过子进程验证，
+        不真打 HTTP，避免 os.kill 杀掉 fixture 服务进程）
+      - demo 运行时：路由 404  （由 test_demo_runtime_has_no_shutdown 验证）
+    """
+    import subprocess
+    # 用独立子进程设 RELEASE_MODE=1 后跑 test_client，避免污染当前进程
+    code = (
+        "import os, sys; sys.path.insert(0, r'" + str(PORTAL_DIR) + "'); "
+        "os.environ['RELEASE_MODE']='1'; "
+        "import app as m; "
+        "r = m.app.test_client().post('/api/shutdown'); "
+        "print('STATUS', r.status_code); "
+        "assert r.status_code==200, r.status_code; "
+        "assert r.get_json()=={'ok': True}"
     )
-    try:
-        urllib.request.urlopen(req, timeout=10.0)
-        pytest.fail("main 分支不应有 /api/shutdown")
-    except urllib.error.HTTPError as e:
-        assert e.code == 404, f"应 404, 实际 {e.code}"
+    out = subprocess.run(
+        [PYTHON, "-c", code], capture_output=True, text=True, encoding="utf-8",
+        timeout=30,
+    )
+    assert out.returncode == 0, f"release shutdown 测试失败:\n{out.stdout}\n{out.stderr}"
+    assert "STATUS 200" in out.stdout
+
+
+def test_demo_runtime_has_no_shutdown():
+    """demo 运行时(RELEASE_MODE 未设置) /api/shutdown 必须返回 404。
+
+    防止 demo 客户被诱导自我关闭（demo 没有升级流程，见 app.py 注释）。
+    """
+    import subprocess
+    code = (
+        "import os, sys; "
+        "os.environ.pop('RELEASE_MODE', None); "
+        "sys.path.insert(0, r'" + str(PORTAL_DIR) + "'); "
+        "import app as m; "
+        "r = m.app.test_client().post('/api/shutdown'); "
+        "print('STATUS', r.status_code); "
+        "assert r.status_code==404, r.status_code"
+    )
+    out = subprocess.run(
+        [PYTHON, "-c", code], capture_output=True, text=True, encoding="utf-8",
+        timeout=30,
+        # 显式清掉 RELEASE_MODE，防止当前 pytest 进程环境泄漏到子进程
+        env={k: v for k, v in __import__("os").environ.items() if k != "RELEASE_MODE"},
+    )
+    assert out.returncode == 0, f"demo shutdown 测试失败:\n{out.stdout}\n{out.stderr}"
+    assert "STATUS 404" in out.stdout
 
 
 # ── 代理 ──

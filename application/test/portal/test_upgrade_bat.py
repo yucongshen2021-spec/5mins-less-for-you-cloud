@@ -473,7 +473,13 @@ class TestFullUpgradeBat:
         test_bat = _TEMP_ROOT / "customer_old" / "__syntax_test.bat"
         # Take the bat but change dangerous commands to echo
         content = e2e_env["bat_path"].read_text(encoding="utf-8")
-        # Neutralize destructive commands for syntax check
+        # Neutralize destructive/spawning commands for syntax check.
+        # `start` MUST be neutralized: even when the target start_all.bat does not
+        # exist, `start "" ...` opens a NEW console window whose lifetime is
+        # independent of the parent bat. Under subprocess capture, that child
+        # inherits the stdout pipe and keeps it open → communicate() hangs until
+        # timeout. Echoing it validates syntax without spawning anything.
+        # (see log/mistake.txt #54)
         safe = content.replace("taskkill /F /PID", "echo taskkill /F /PID")
         safe = safe.replace("rmdir /s /q", "echo rmdir /s /q")
         safe = safe.replace("robocopy", "echo robocopy")
@@ -483,22 +489,28 @@ class TestFullUpgradeBat:
         safe = safe.replace("powershell", "echo powershell")
         safe = safe.replace("mkdir ", "echo mkdir ")
         safe = safe.replace("netstat ", "echo netstat ")
+        safe = safe.replace('start ""', 'echo start ""')
         test_bat.write_text(safe, encoding="utf-8")
 
+        # Capture as BYTES, then decode with the OS ANSI codepage (cp936/GBK on
+        # zh-CN Windows). The bat is pure ASCII (mistake.txt #36), but cmd.exe's
+        # own error messages ("系统找不到文件" etc.) are emitted in the console's
+        # active codepage, not UTF-8. Forcing encoding="utf-8" here crashed the
+        # reader thread and produced a spurious test failure (mistake.txt #54).
         result = subprocess.run(
             ["cmd", "/c", str(test_bat)],
             cwd=str(test_bat.parent),
-            capture_output=True, text=True, encoding="utf-8", shell=True,
-            timeout=30,
+            capture_output=True, shell=True,
+            timeout=60,
         )
+        stdout = result.stdout.decode("mbcs", errors="replace") if result.stdout else ""
+        stderr = result.stderr.decode("mbcs", errors="replace") if result.stderr else ""
         # Check stderr for batch syntax errors
-        stderr = result.stderr or ""
         assert "was unexpected at this time" not in stderr.lower(), \
             f"bat syntax error: {stderr.strip()}"
         assert "unexpected" not in stderr.lower(), \
             f"bat syntax error: {stderr.strip()}"
         # stdout should contain step markers
-        stdout = result.stdout or ""
         for step in range(1, 7):
             assert f"[{step}/6]" in stdout, f"bat 未执行步骤 [{step}/6]"
 

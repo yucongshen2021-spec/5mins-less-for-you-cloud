@@ -231,15 +231,23 @@ def build(version: str, output_dir: Path, include_runtime: bool, mirror_url: str
     _RELEASE_PORT_MAP = {
         "5000": "7000", "5001": "7001", "5002": "7002", "5003": "7003", "5004": "7004",
     }
+    # Files that get build-time port substitution 500x → 700x.
+    #
+    # IMPORTANT: app.py and process_manager.py are NOT here. They already switch
+    # ports at RUNTIME via RELEASE_MODE (`_PORT = 7000 if _RELEASE else 5000`).
+    # Rewriting their `5000` would corrupt the demo fallback branch into `7000`,
+    # breaking the dual-version architecture (CLAUDE.md 双版本架构). Only files
+    # whose port is a hard-coded literal with no runtime branch should be here.
+    # Sub-app app.py files read the port from argv[1] (passed by process_manager),
+    # so their `else 500x` default is only a standalone-launch fallback — we still
+    # rewrite it so a customer double-clicking the sub-app's own start_*.bat lands
+    # on the release port.
     _RELEASE_PORT_FILES = {
-        "application/portal/app.py",
-        "application/portal/process_manager.py",
-        "application/portal/start_all.bat",
         "application/all_in_one - cc/web/app.py",
         "application/自动做测试报告 - cc/app.py",
         "application/自动抓域名发2/app.py",
         "application/自动梳理配置 - cc/app.py",
-    "application/自动梳理配置 - cc/start_配置梳理.bat",
+        "application/自动梳理配置 - cc/start_配置梳理.bat",
         "start_all.bat",
     }
 

@@ -122,7 +122,13 @@ def api_update_upgrade():
 
 @app.route("/api/shutdown", methods=["POST"])
 def api_shutdown():
-    """Gracefully shutdown portal — called by frontend after upgrade launch."""
+    """Gracefully shutdown portal — called by frontend after upgrade launch.
+
+    Release-only: the demo runtime (RELEASE_MODE unset) has no upgrade flow
+    (see CLAUDE.md 双版本架构), so it must not expose a self-shutdown endpoint.
+    """
+    if not _RELEASE:
+        abort(404)
     import signal as _sig
     import os as _os
     def _do():
