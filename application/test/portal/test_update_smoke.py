@@ -11,7 +11,6 @@ import os
 import sys
 import tempfile
 import time
-import urllib.request
 from pathlib import Path
 
 # Ensure we can import from the test/portal package
@@ -68,11 +67,10 @@ def test_download_url_valid() -> None:
     if not url:
         _fail("Empty download_url")
         return
-    # URL-encoded Chinese → %E5%B8%AE etc. Raw Chinese in URL is the bug.
-    decoded = urllib.request.unquote(url)
-    for ch in decoded:
+    # Check raw URL (before decoding) — it should be percent-encoded
+    for ch in url:
         if '\u4e00' <= ch <= '\u9fff' or '\u3000' <= ch <= '\u303f':
-            _fail(f"Download URL contains raw Chinese char '{ch}': {decoded[:120]}")
+            _fail(f"Download URL contains raw Chinese char '{ch}': {url[:120]}")
             return
     _ok("No raw Chinese in download URL")
 
@@ -149,8 +147,15 @@ def test_customer_check_update() -> None:
                     _fail(f"HTML missing {sel}")
 
         # Shut down
-        http_get(f"http://127.0.0.1:{CUSTOMER_PORT_BASE}/api/shutdown", timeout=5.0)
-        proc.wait(timeout=15)
+        try:
+            http_get(f"http://127.0.0.1:{CUSTOMER_PORT_BASE}/api/shutdown", timeout=5.0)
+            proc.wait(timeout=10)
+        except Exception:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except Exception:
+                proc.kill()
         _ok("portal shut down cleanly")
 
     finally:

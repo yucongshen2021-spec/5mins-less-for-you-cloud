@@ -25,9 +25,10 @@ def port_open(port: int, timeout: float = 30.0) -> bool:
     while time.time() < deadline:
         r = subprocess.run(
             ["netstat", "-ano"],
-            capture_output=True, text=True,
+            capture_output=True,
         )
-        if f":{port}" in r.stdout and "LISTENING" in r.stdout:
+        stdout = r.stdout.decode("gbk", errors="replace") if r.stdout else ""
+        if f":{port}" in stdout and "LISTENING" in stdout:
             return True
         time.sleep(1)
     return False
