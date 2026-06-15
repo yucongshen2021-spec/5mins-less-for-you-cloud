@@ -1,0 +1,56 @@
+ce_docking  CE Loopback/对接IP（全局）
+main_acvpn_gre_pe  主线国内GRE PE（upe设备）
+main_acvpn_gre_tun  主线国内GRE Tunnel
+main_acvpn_gre_wanip  主线国内GRE WANIP
+main_acvpn_gre_pe_ip  主线国内GRE PE侧IP
+main_acvpn_gre_ce_ip  主线国内GRE CE侧IP
+main_acvpn_gre_remote  主线国内GRE remote目标IP
+main_acvpn_vtun_pe  主线ACVPN vtun PE
+main_acvpn_vtun_id  主线ACVPN vtun ID
+main_acvpn_vtun_port  主线ACVPN vtun端口
+main_acvpn_vtun_local  主线ACVPN vtun本地IP
+main_acvpn_vtun_remote  主线ACVPN vtun远端IP
+main_acvpn_vtun_docking  主线ACVPN vtun对接IP
+main_us_pe  主线美国GRE PE（natpe设备）
+main_us_tun  主线美国GRE Tunnel
+main_us_wanip  主线美国GRE WANIP
+main_us_pe_ip  主线美国GRE PE侧IP
+main_us_gre_ce_ip  主线美国GRE CE侧IP
+main_us_pe_docking  主线美国PE对接IP
+main_us_nat_ip  主线美国出口NAT IP
+main_us_bgp1  主线美国BGP Server IP 1
+main_us_bgp2  主线美国BGP Server IP 2
+bk_acvpn_gre_pe  备线国内GRE PE
+bk_acvpn_gre_tun  备线国内GRE Tunnel
+bk_acvpn_gre_wanip  备线国内GRE WANIP
+bk_acvpn_gre_pe_ip  备线国内GRE PE侧IP
+bk_acvpn_gre_ce_ip  备线国内GRE CE侧IP
+bk_acvpn_gre_remote  备线国内GRE remote目标IP
+bk_acvpn_vtun_pe  备线ACVPN vtun PE
+bk_acvpn_vtun_id  备线ACVPN vtun ID
+bk_acvpn_vtun_port  备线ACVPN vtun端口
+bk_acvpn_vtun_local  备线ACVPN vtun本地IP
+bk_acvpn_vtun_remote  备线ACVPN vtun远端IP
+bk_acvpn_vtun_docking  备线ACVPN vtun对接IP
+bk_us_pe  备线美国GRE PE
+bk_us_tun  备线美国GRE Tunnel
+bk_us_wanip  备线美国GRE WANIP
+bk_us_pe_ip  备线美国GRE PE侧IP
+bk_us_gre_ce_ip  备线美国GRE CE侧IP
+bk_us_pe_docking  备线美国PE对接IP
+bk_us_nat_ip  备线美国出口NAT IP
+bk_us_bgp1  备线美国BGP Server IP 1
+bk_us_bgp2  备线美国BGP Server IP 2
+
+DEFAULT_WAN_ETH  初始化默认：WAN口
+DEFAULT_WAN_CIDR  初始化默认：WAN IP
+DEFAULT_WAN_IP_PLAIN  初始化默认：WAN 主机地址（无掩码，由 DEFAULT_WAN_CIDR 推导）
+DEFAULT_WAN_GW  初始化默认：WAN网关
+DEFAULT_WAN_DHCP  初始化默认：DHCP
+DEFAULT_LAN_ETH  初始化默认：LAN口
+DEFAULT_LAN_CIDR  初始化默认：LAN IP
+DEFAULT_LAN_IP_PLAIN  初始化默认：LAN 主机地址（无掩码，由 DEFAULT_LAN_CIDR 推导）
+DEFAULT_LAN_GW  初始化默认：LAN网关
+DEFAULT_LAN_DHCP  初始化默认：DHCP
+DEFAULT_INNER_NETS  初始化默认：内网段
+DEFAULT_GEN_RETURN_ROUTE  初始化默认：回程路由
