@@ -117,7 +117,21 @@ def test_customer_check_update() -> None:
             _fail("Portal did not start within 30s")
             proc.terminate()
             return
-        _ok("portal started")
+        # Wait for HTTP server to actually respond
+        _ok("portal started, waiting for HTTP...")
+        deadline = time.time() + 30
+        portal_ready = False
+        while time.time() < deadline:
+            s, _ = http_get(f"http://127.0.0.1:{CUSTOMER_PORT_BASE}/", timeout=5.0)
+            if s == 200:
+                portal_ready = True
+                break
+            time.sleep(1)
+        if not portal_ready:
+            _fail("Portal HTTP not responding within 30s")
+            proc.terminate()
+            return
+        _ok("portal HTTP ready")
 
         # Call check API
         status, body = http_get(
