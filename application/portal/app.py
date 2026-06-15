@@ -1,6 +1,7 @@
 """Portal Flask app — unified shell + reverse proxy for all sub-apps."""
 import json
 import os
+import queue
 import subprocess
 import sys
 import threading
@@ -10,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from flask import Flask, abort, jsonify, render_template, request, send_file
+from flask import Flask, abort, jsonify, render_template, request, send_file, Response, stream_with_context
 import process_manager
 import proxy
 import upgrade
