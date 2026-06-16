@@ -16,9 +16,17 @@ echo ============================================
 echo.
 echo   Using bundled Python runtime
 echo.
-echo   [1/2] Cleaning old processes...
-for %%p in (5003 5002 5001 5004 5000 7003 7002 7001 7004 7000) do call :kill_port %%p
-echo   [2/2] Starting all services...
+echo   [1/3] Cleaning old processes...
+for %%p in (5003 5002 5001 5004 5000 7003 7002 7001 7004 7000 8000) do call :kill_port %%p
+echo   [2/3] Starting update mirror on port 8000...
+set "BUNDLE_DIR=%~dp0"
+if exist "%BUNDLE_DIR%dist" (
+    start "5mins Update Mirror" /min "%PYTHON%" "%BUNDLE_DIR%tools\serve_mirror.py" --port 8000 --dist "%BUNDLE_DIR%dist"
+    echo     Mirror started — providing update service on port 8000
+) else (
+    echo     WARNING: dist/ directory not found, mirror not started
+)
+echo   [3/3] Starting all services...
 echo.
 if defined RELEASE_MODE (
     echo   Portal:      http://localhost:7000
