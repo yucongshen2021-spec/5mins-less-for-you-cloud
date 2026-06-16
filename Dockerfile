@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     fonts-wqy-zenhei \
     fonts-wqy-microhei \
+    fonts-dejavu-core \
+    fonts-liberation \
+    fontconfig \
     libnss3 \
     libnspr4 \
     libatk1.0-0 \

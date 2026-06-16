@@ -21,6 +21,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Callable, Literal
 
+_IS_WIN = sys.platform == "win32"
 _INTERACTIVE = True  # False when --no-manual-pause or --smoke; prevents blocking prompts
 
 import paramiko
@@ -48,12 +49,33 @@ SCREENSHOT_BLOCK_FIRST_ROW: dict[str, tuple[int, str]] = {
 }
 
 IPV4_CORE = r"\d{1,3}(?:\.\d{1,3}){3}"
-# 本机：仅允许 ping -n 100 -l 1200 <host> 与 tracert -d <host>；host 为 IPv4 或域名标签
+# 本机：仅允许 ping 与 traceroute；host 为 IPv4 或域名标签
 HOST_TOKEN = r"(?:\d{1,3}(?:\.\d{1,3}){3}|[A-Za-z0-9][A-Za-z0-9.-]*)"
-LOCAL_PING_PATTERN = re.compile(rf"^ping -n 100 -l 1200 {HOST_TOKEN}$")
-LOCAL_TRACERT_PATTERN = re.compile(rf"^tracert -w 1 -d {HOST_TOKEN}$")
+# Windows: ping -n 100 -l 1200; Linux: ping -c 100 -s 1200
+LOCAL_PING_PATTERN = re.compile(
+    rf"^ping (?:-n 100 -l 1200|-c 100 -s 1200) {HOST_TOKEN}$"
+)
+# Windows: tracert -w 1 -d; Linux: traceroute -w 1 -n
+LOCAL_TRACERT_PATTERN = re.compile(
+    rf"^(?:tracert -w 1 -d|traceroute -w 1 -n) {HOST_TOKEN}$"
+)
 
-FONT_PATH = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "consola.ttf"
+# Font fallback: Windows consola → Linux DejaVuSansMono
+if _IS_WIN:
+    FONT_PATH = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "consola.ttf"
+else:
+    _linux_font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansMono-Regular.ttf",
+    ]
+    FONT_PATH = None
+    for _f in _linux_font_candidates:
+        if Path(_f).is_file():
+            FONT_PATH = Path(_f)
+            break
+    if FONT_PATH is None:
+        FONT_PATH = Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf")
 
 @dataclass
 class Config:
@@ -304,12 +326,16 @@ def ssh_exec_ce(client: paramiko.SSHClient, cmd: str, sudo_password: str, cfg: C
 
 def local_exec(cmd: str) -> tuple[str, int]:
     assert_local_cmd_allowed(cmd)
-    wrapped_cmd = f'cmd /c "chcp 65001>nul & {cmd}"'
+    if _IS_WIN:
+        wrapped_cmd = f'cmd /c "chcp 65001>nul & {cmd}"'
+    else:
+        wrapped_cmd = cmd
     proc = subprocess.Popen(
         wrapped_cmd,
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
     )
     lines: list[str] = []
     assert proc.stdout is not None
@@ -339,8 +365,17 @@ def render_terminal_png(
     tail_lines: int | None = None,
 ) -> None:
     if not font_path.is_file():
-        print(f"错误：找不到字体文件 {font_path}", file=sys.stderr)
-        sys.exit(1)
+        print(f"[warn] 找不到字体文件 {font_path}，尝试系统默认", file=sys.stderr)
+        # fallback to PIL default bitmap font
+        try:
+            font = ImageFont.load_default()
+            font_title = ImageFont.load_default()
+        except Exception:
+            print(f"错误：无法加载任何字体", file=sys.stderr)
+            sys.exit(1)
+    else:
+        font = ImageFont.truetype(str(font_path), 15)
+        font_title = ImageFont.truetype(str(font_path), 15)
 
     bg = "#0c0c0c"
     fg = "#cccccc"
@@ -348,8 +383,6 @@ def render_terminal_png(
     width_px = 1200
     pad = 12
     line_h = 24
-    font = ImageFont.truetype(str(font_path), 15)
-    font_title = ImageFont.truetype(str(font_path), 15)
 
     body_lines = body.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     if tail_lines is not None and tail_lines > 0:
@@ -839,12 +872,20 @@ def main() -> None:
             client.close()
             client = None
 
-        local_cmds = [
-            ("06_ping", f"ping -n 100 -l 1200 {cfg.local_site}"),
-            ("06_tracert", f"tracert -w 1 -d {cfg.local_site}"),
-            ("07_ping", f"ping -n 100 -l 1200 {cfg.accel_site}"),
-            ("07_tracert", f"tracert -w 1 -d {cfg.accel_site}"),
-        ]
+        if _IS_WIN:
+            local_cmds = [
+                ("06_ping", f"ping -n 100 -l 1200 {cfg.local_site}"),
+                ("06_tracert", f"tracert -w 1 -d {cfg.local_site}"),
+                ("07_ping", f"ping -n 100 -l 1200 {cfg.accel_site}"),
+                ("07_tracert", f"tracert -w 1 -d {cfg.accel_site}"),
+            ]
+        else:
+            local_cmds = [
+                ("06_ping", f"ping -c 100 -s 1200 {cfg.local_site}"),
+                ("06_tracert", f"traceroute -w 1 -n {cfg.local_site}"),
+                ("07_ping", f"ping -c 100 -s 1200 {cfg.accel_site}"),
+                ("07_tracert", f"traceroute -w 1 -n {cfg.accel_site}"),
+            ]
         for tag, cmd in local_cmds:
             if args.mock_network:
                 runner = mock_runner_for_tag(tag, cfg)

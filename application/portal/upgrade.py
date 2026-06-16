@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import urllib.request
 import zipfile
 from pathlib import Path
+
+_IS_WIN = sys.platform == "win32"
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _PROJECT_DIR = str(_PROJECT_ROOT.resolve())
@@ -333,7 +336,7 @@ def perform_upgrade_progress(download_url: str):
         except (urllib.error.URLError, urllib.error.HTTPError,
                 TimeoutError, OSError, ValueError) as e:
             err = f"{type(e).__name__}: {e}"
-        return last, err
+        yield ("__RESULT__", last, err)
 
     # Primary download
     yield {"stage": "download", "message": "正在连接...", "pct": 0}
@@ -342,8 +345,8 @@ def perform_upgrade_progress(download_url: str):
     for update in gen:
         if isinstance(update, dict):
             yield update
-        else:
-            last_downloaded, err = update
+        elif isinstance(update, tuple) and len(update) == 3 and update[0] == "__RESULT__":
+            last_downloaded, err = update[1], update[2]
 
     # Retry with alternative mirrors
     if err and last_downloaded < 100_000:
@@ -359,8 +362,8 @@ def perform_upgrade_progress(download_url: str):
             for update in gen2:
                 if isinstance(update, dict):
                     yield update
-                else:
-                    last_downloaded, err = update
+                elif isinstance(update, tuple) and len(update) == 3 and update[0] == "__RESULT__":
+                    last_downloaded, err = update[1], update[2]
 
     if err and last_downloaded < 100_000:
         zip_dest.unlink(missing_ok=True)
@@ -388,11 +391,15 @@ def perform_upgrade_progress(download_url: str):
     bat_dest.write_text(UPDATE_BAT_TEMPLATE, encoding="ascii")
 
     try:
-        subprocess.Popen(
-            ["cmd", "/c", "start", "5mins-tools Online Upgrade", str(bat_dest)],
-            cwd=str(parent),
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-        )
+        if _IS_WIN:
+            subprocess.Popen(
+                ["cmd", "/c", "start", "5mins-tools Online Upgrade", str(bat_dest)],
+                cwd=str(parent),
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            )
+        else:
+            yield {"ok": False, "error": "Linux 环境不支持在线升级，请更新镜像", "stage": "launch"}
+            return
     except OSError as e:
         yield {"ok": False, "error": f"Cannot start upgrade script: {e}", "stage": "launch"}
         return
@@ -411,63 +418,4 @@ def perform_upgrade(download_url: str) -> dict:
     result = {}
     for update in perform_upgrade_progress(download_url):
         result = update
-    return result
-    parent = _PROJECT_ROOT / "temp" / "upgrade"
-    parent.mkdir(parents=True, exist_ok=True)
-    zip_dest = parent / "__update__.zip"
-    bat_dest = parent / "update.bat"
-
-    for p in (zip_dest, bat_dest):
-        try:
-            p.unlink(missing_ok=True)
-        except PermissionError:
-            pass
-
-    # Try primary download URL first
-    last_downloaded, err = _try_download(download_url, zip_dest)
-
-    # If download failed, try alternative mirror base URLs
-    if err and last_downloaded < 100_000:
-        mirror_urls = _load_mirror_base_urls()
-        alt_urls = _build_alt_download_urls(download_url, mirror_urls)
-        for alt_url in alt_urls:
-            if last_downloaded >= 100_000:
-                break
-            zip_dest.unlink(missing_ok=True)
-            print(f"[UPGRADE] Retrying download with: {alt_url}", flush=True)
-            last_downloaded, err = _try_download(alt_url, zip_dest)
-
-    if err and last_downloaded < 100_000:
-        zip_dest.unlink(missing_ok=True)
-        return {"ok": False, "error": f"Download failed: {err}", "stage": "download"}
-
-    if last_downloaded < 100_000:
-        zip_dest.unlink(missing_ok=True)
-        return {"ok": False, "error": f"Downloaded file too small ({last_downloaded} bytes)", "stage": "download"}
-
-    release_info = _verify_zip(zip_dest)
-    if release_info is None:
-        zip_dest.unlink(missing_ok=True)
-        return {"ok": False, "error": "Not a valid release package (missing RELEASE_INFO.json)", "stage": "verify"}
-
-    conflicts = _scan_zip_for_conflicts(zip_dest)
-    new_version = release_info.get("version", "unknown")
-
-    bat_dest.write_text(UPDATE_BAT_TEMPLATE, encoding="ascii")
-
-    try:
-        subprocess.Popen(
-            ["cmd", "/c", "start", "5mins-tools Online Upgrade", str(bat_dest)],
-            cwd=str(parent),
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-        )
-    except OSError as e:
-        return {"ok": False, "error": f"Cannot start upgrade script: {e}", "stage": "launch"}
-
-    result: dict = {"ok": True, "new_version": new_version, "stage": "launched"}
-    if conflicts:
-        result["workspace_warning"] = (
-            f"New zip contains protected user data files. "
-            f"Upgrade script will backup and restore: {', '.join(conflicts)}"
-        )
     return result
