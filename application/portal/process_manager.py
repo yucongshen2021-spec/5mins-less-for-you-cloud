@@ -13,7 +13,13 @@ PYTHON = sys.executable
 LOG_DIR = os.path.join(_HERE, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
-_NOOP_BROWSER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "noop.cmd")
+_IS_WIN = sys.platform == "win32"
+_SUPERVISOR_MODE = os.environ.get("SUPERVISOR_MODE", "").strip() == "1"
+
+_NOOP_BROWSER = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "noop.cmd" if _IS_WIN else "noop.sh",
+)
 _SUB_ENV = os.environ.copy()
 _SUB_ENV["BROWSER"] = _NOOP_BROWSER
 
@@ -94,39 +100,64 @@ def _monitor_loop():
 
 
 def _kill_port(port: int) -> None:
-    """Kill any process listening on the given port (Windows only)."""
-    if sys.platform != "win32":
-        return
+    """Kill any process listening on the given port."""
     try:
-        import subprocess as sp
-        result = sp.run(
-            ["netstat", "-ano"], capture_output=True, text=True, timeout=5,
-        )
-        for line in result.stdout.splitlines():
-            if f":{port}" in line and "LISTENING" in line:
-                parts = line.strip().split()
-                pid = int(parts[-1])
-                sp.run(["taskkill", "/F", "/PID", str(pid)],
+        if _IS_WIN:
+            import subprocess as sp
+            result = sp.run(
+                ["netstat", "-ano"], capture_output=True, text=True, timeout=5,
+            )
+            for line in result.stdout.splitlines():
+                if f":{port}" in line and "LISTENING" in line:
+                    parts = line.strip().split()
+                    pid = int(parts[-1])
+                    sp.run(["taskkill", "/F", "/PID", str(pid)],
+                           capture_output=True, timeout=5)
+                    print(f"[portal] Killed stale PID {pid} on port {port}")
+        else:
+            # Linux: try fuser first, fallback to lsof + kill
+            sp = subprocess
+            r = sp.run(["fuser", "-k", f"{port}/tcp"],
                        capture_output=True, timeout=5)
-                print(f"[portal] Killed stale PID {pid} on port {port}")
+            if r.returncode == 0:
+                print(f"[portal] Killed stale process on port {port}")
+            else:
+                # fallback: lsof -ti :port | xargs kill -9
+                lr = sp.run(["lsof", "-ti", f":{port}"],
+                            capture_output=True, text=True, timeout=5)
+                if lr.returncode == 0 and lr.stdout.strip():
+                    for pid_str in lr.stdout.strip().split():
+                        sp.run(["kill", "-9", pid_str],
+                               capture_output=True, timeout=3)
+                    print(f"[portal] Killed stale PIDs on port {port}")
     except Exception:
         pass
 
 
 def _start_one(app: dict) -> None:
     """Start a single sub-app process."""
+    if _SUPERVISOR_MODE:
+        # supervisord manages sub-apps; portal only waits for port.
+        if _wait_for_port(app["port"], timeout=15.0):
+            print(f"[portal] {app['name']} ready at {app['url']}")
+        else:
+            print(f"[portal] WARNING: {app['name']} port {app['port']} not reachable after 15s")
+        return
+
     _kill_port(app["port"])
     log_path = os.path.join(LOG_DIR, f"{app['id']}.log")
     try:
         log_fh = open(log_path, "a", encoding="utf-8")
-        proc = subprocess.Popen(
-            app["cmd"],
-            cwd=app["cwd"],
-            stdout=log_fh,
-            stderr=log_fh,
-            env=_SUB_ENV,
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-        )
+        kwargs = {
+            "cwd": app["cwd"],
+            "stdout": log_fh,
+            "stderr": log_fh,
+            "env": _SUB_ENV,
+            "stdin": subprocess.DEVNULL,
+        }
+        if _IS_WIN:
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        proc = subprocess.Popen(app["cmd"], **kwargs)
         _processes[app["id"]] = proc
         print(f"[portal] Starting {app['name']} (pid={proc.pid}, port={app['port']})...")
         if _wait_for_port(app["port"], timeout=15.0):
@@ -166,17 +197,29 @@ def get_apps_status() -> list[dict]:
     """Return list of apps with their current status for the frontend."""
     result = []
     for app in APPS:
-        proc = _processes.get(app["id"])
-        alive = proc is not None and proc.poll() is None
-        reachable = _port_open(app["port"]) if alive else False
-        result.append({
-            "id": app["id"],
-            "name": app["name"],
-            "url": app["url"],
-            "port": app["port"],
-            "alive": alive,
-            "reachable": reachable,
-        })
+        if _SUPERVISOR_MODE:
+            # supervisord manages lifecycle; portal only checks port.
+            reachable = _port_open(app["port"])
+            result.append({
+                "id": app["id"],
+                "name": app["name"],
+                "url": app["url"],
+                "port": app["port"],
+                "alive": reachable,
+                "reachable": reachable,
+            })
+        else:
+            proc = _processes.get(app["id"])
+            alive = proc is not None and proc.poll() is None
+            reachable = _port_open(app["port"]) if alive else False
+            result.append({
+                "id": app["id"],
+                "name": app["name"],
+                "url": app["url"],
+                "port": app["port"],
+                "alive": alive,
+                "reachable": reachable,
+            })
     return result
 
 

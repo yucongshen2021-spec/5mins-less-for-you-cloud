@@ -22,7 +22,8 @@ def static_file(filename):
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5004
-    threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
+    if os.environ.get("BROWSER") not in ("echo", "", "none"):
+        threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 

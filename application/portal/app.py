@@ -19,6 +19,7 @@ import upgrade
 # ── Release mode ──
 _RELEASE = os.environ.get("RELEASE_MODE", "").strip() == "1"
 _PORT = 7000 if _RELEASE else 5000
+_SUPERVISOR_MODE = os.environ.get("SUPERVISOR_MODE", "").strip() == "1"
 
 app = Flask(__name__)
 
@@ -115,6 +116,8 @@ _upgrade_streams: dict[str, queue.Queue] = {}
 @app.route("/api/update/upgrade", methods=["POST"])
 def api_update_upgrade():
     """执行在线升级：下载 → 验证 → 安装 → 重启。SSE 流式推送进度。"""
+    if _SUPERVISOR_MODE:
+        return jsonify({"ok": False, "error": "Docker 环境不支持在线升级，请更新镜像"}), 400
     data = request.get_json(silent=True) or {}
     download_url = (data.get("download_url") or "").strip()
     if not download_url:
@@ -149,20 +152,29 @@ def api_update_upgrade():
 def api_update_progress(task_id):
     q = _upgrade_streams.get(task_id)
     def generate():
-        if q is None:
-            yield "data: {\"error\": \"任务不存在\"}\n\n"
-            return
-        while True:
-            try:
-                line = q.get(timeout=300)
-                yield f"data: {line}\n\n"
-                if line == "__DONE__":
+        try:
+            if q is None:
+                yield "data: {\"error\": \"任务不存在\"}\n\n"
+                return
+            while True:
+                try:
+                    line = q.get(timeout=300)
+                    yield f"data: {line}\n\n"
+                    if line == "__DONE__":
+                        break
+                except queue.Empty:
+                    yield "data: {\"stage\": \"timeout\"}\n\n"
                     break
-            except queue.Empty:
-                yield "data: {\"stage\": \"timeout\"}\n\n"
-                break
+        finally:
+            _upgrade_streams.pop(task_id, None)
     return Response(stream_with_context(generate()), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/api/health")
+def api_health():
+    """Docker / load-balancer health check."""
+    return jsonify({"ok": True, "mode": "supervisor" if _SUPERVISOR_MODE else "direct"})
 
 
 @app.route("/api/shutdown", methods=["POST"])
@@ -242,7 +254,8 @@ def main():
     if not _RELEASE:
         mirror_proc = _start_mirror()
     port = 7000 if _RELEASE else 5000
-    threading.Timer(2.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
+    if os.environ.get("BROWSER") not in ("echo", "", "none"):
+        threading.Timer(2.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
     try:
         app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
     except KeyboardInterrupt:

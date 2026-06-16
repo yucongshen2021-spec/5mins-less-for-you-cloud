@@ -157,18 +157,16 @@ def _run_worker(task_id: str, cmd: list[str], run_dir: Path, cfg: dict) -> None:
     if q is None:
         return
     try:
-        creationflags = 0
+        kwargs = {
+            "cwd": str(ROOT),
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.STDOUT,
+        }
         if sys.platform.startswith("win"):
-            creationflags = subprocess.CREATE_NO_WINDOW
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(ROOT),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            creationflags=creationflags,
-        )
+        proc = subprocess.Popen(cmd, **kwargs)
         proc_registry[task_id] = proc
         assert proc.stdout is not None
         for line_b in iter(proc.stdout.readline, b""):

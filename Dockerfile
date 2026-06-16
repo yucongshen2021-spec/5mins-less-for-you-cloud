@@ -1,0 +1,71 @@
+# 帮你节省5分钟 — Docker 镜像
+# 基于 Debian Bookworm Slim + Python 3.11
+
+FROM python:3.11-slim-bookworm
+
+# 避免交互式提示
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 系统依赖：tk + xvfb + supervisor + curl + Chromium 系统库 + 中文字体
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tk \
+    xvfb \
+    supervisor \
+    curl \
+    wget \
+    ca-certificates \
+    fonts-wqy-zenhei \
+    fonts-wqy-microhei \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    libatspi2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Playwright Chromium（浏览器 + 系统依赖）
+RUN pip install --no-cache-dir playwright \
+    && playwright install chromium \
+    && playwright install-deps chromium
+
+# 工作目录
+WORKDIR /app
+
+# 先复制依赖文件，利用 Docker 层缓存
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制全部源码（.dockerignore 会过滤掉不需要的文件）
+COPY . .
+
+# 环境变量
+ENV DISPLAY=:99
+ENV BROWSER=echo
+ENV RELEASE_MODE=1
+ENV SUPERVISOR_MODE=1
+ENV PYTHONUNBUFFERED=1
+
+# 创建日志目录
+RUN mkdir -p /app/application/portal/logs \
+    /app/application/自动做测试报告 - cc/log \
+    /app/application/all_in_one\ -\ cc/data
+
+# 暴露端口
+EXPOSE 7000 7001 7002 7003 7004
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD curl -f http://localhost:7000/api/health || exit 1
+
+# supervisord 作为入口
+CMD ["supervisord", "-c", "/app/docker/supervisord.conf"]

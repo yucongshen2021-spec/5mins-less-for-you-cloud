@@ -57,99 +57,112 @@ COLORS = {
 # ═══════════════════════════════════════════════════════════════════
 
 # Each entry: (display_name, path_or_paths)
-_BROWSER_CANDIDATES: list[tuple[str, list[str]]] = [
-    ("Chrome", [
-        r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe",
-        r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe",
-        r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe",
-    ]),
-    ("Chrome Beta", [
-        r"%LOCALAPPDATA%\Google\Chrome Beta\Application\chrome.exe",
-        r"%PROGRAMFILES%\Google\Chrome Beta\Application\chrome.exe",
-    ]),
-    ("Chrome Dev", [
-        r"%LOCALAPPDATA%\Google\Chrome Dev\Application\chrome.exe",
-        r"%PROGRAMFILES%\Google\Chrome Dev\Application\chrome.exe",
-    ]),
-    ("Chrome Canary", [
-        r"%LOCALAPPDATA%\Google\Chrome SxS\Application\chrome.exe",
-    ]),
-    ("Edge", [
-        r"%PROGRAMFILES(X86)%\Microsoft\Edge\Application\msedge.exe",
-        r"%PROGRAMFILES%\Microsoft\Edge\Application\msedge.exe",
-    ]),
-    ("Edge Beta", [
-        r"%PROGRAMFILES(X86)%\Microsoft\Edge Beta\Application\msedge.exe",
-        r"%PROGRAMFILES%\Microsoft\Edge Beta\Application\msedge.exe",
-    ]),
-    ("Edge Dev", [
-        r"%PROGRAMFILES(X86)%\Microsoft\Edge Dev\Application\msedge.exe",
-        r"%PROGRAMFILES%\Microsoft\Edge Dev\Application\msedge.exe",
-    ]),
-    ("360极速浏览器", [
-        r"%LOCALAPPDATA%\360Chrome\Chrome\Application\360chrome.exe",
-        r"%PROGRAMFILES(X86)%\360Chrome\Chrome\Application\360chrome.exe",
-        r"%PROGRAMFILES%\360Chrome\Chrome\Application\360chrome.exe",
-    ]),
-    ("360安全浏览器", [
-        r"%APPDATA%\360se6\Application\360se.exe",
-        r"%PROGRAMFILES(X86)%\360\360se6\Application\360se.exe",
-        r"%PROGRAMFILES%\360\360se6\Application\360se.exe",
-        r"%APPDATA%\360se\Application\360se.exe",
-        r"%PROGRAMFILES(X86)%\360\360se\Application\360se.exe",
-    ]),
-    ("Brave", [
-        r"%LOCALAPPDATA%\BraveSoftware\Brave-Browser\Application\brave.exe",
-        r"%PROGRAMFILES%\BraveSoftware\Brave-Browser\Application\brave.exe",
-        r"%PROGRAMFILES(X86)%\BraveSoftware\Brave-Browser\Application\brave.exe",
-    ]),
-    ("Opera", [
-        r"%LOCALAPPDATA%\Programs\Opera\launcher.exe",
-        r"%PROGRAMFILES%\Opera\launcher.exe",
-        r"%PROGRAMFILES(X86)%\Opera\launcher.exe",
-    ]),
-    ("Opera GX", [
-        r"%LOCALAPPDATA%\Programs\Opera GX\launcher.exe",
-        r"%PROGRAMFILES%\Opera GX\launcher.exe",
-    ]),
-    ("QQ浏览器", [
-        r"%PROGRAMFILES(X86)%\Tencent\QQBrowser\QQBrowser.exe",
-        r"%PROGRAMFILES%\Tencent\QQBrowser\QQBrowser.exe",
-        r"%LOCALAPPDATA%\Tencent\QQBrowser\QQBrowser.exe",
-    ]),
-    ("搜狗浏览器", [
-        r"%PROGRAMFILES(X86)%\SogouExplorer\SogouExplorer.exe",
-        r"%PROGRAMFILES%\SogouExplorer\SogouExplorer.exe",
-    ]),
-    ("Vivaldi", [
-        r"%LOCALAPPDATA%\Vivaldi\Application\vivaldi.exe",
-        r"%PROGRAMFILES%\Vivaldi\Application\vivaldi.exe",
-    ]),
-    ("Chromium", [
-        r"%LOCALAPPDATA%\Chromium\Application\chrome.exe",
-        r"%PROGRAMFILES%\Chromium\Application\chrome.exe",
-    ]),
-    ("SRWare Iron", [
-        r"%PROGRAMFILES%\SRWare Iron\iron.exe",
-        r"%PROGRAMFILES(X86)%\SRWare Iron\iron.exe",
-    ]),
-    ("Yandex", [
-        r"%LOCALAPPDATA%\Yandex\YandexBrowser\Application\browser.exe",
-        r"%PROGRAMFILES%\Yandex\YandexBrowser\Application\browser.exe",
-    ]),
-    ("Cent Browser", [
-        r"%LOCALAPPDATA%\CentBrowser\Application\chrome.exe",
-        r"%PROGRAMFILES%\CentBrowser\Application\chrome.exe",
-    ]),
-    ("Cốc Cốc", [
-        r"%LOCALAPPDATA%\CocCoc\Browser\Application\browser.exe",
-        r"%PROGRAMFILES%\CocCoc\Browser\Application\browser.exe",
-    ]),
-    ("UC浏览器", [
-        r"%PROGRAMFILES(X86)%\UCBrowser\Application\UCBrowser.exe",
-        r"%PROGRAMFILES%\UCBrowser\Application\UCBrowser.exe",
-    ]),
-]
+_BROWSER_CANDIDATES: list[tuple[str, list[str]]] = []
+
+if sys.platform == "win32":
+    _BROWSER_CANDIDATES = [
+        ("Chrome", [
+            r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe",
+            r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe",
+            r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe",
+        ]),
+        ("Chrome Beta", [
+            r"%LOCALAPPDATA%\Google\Chrome Beta\Application\chrome.exe",
+            r"%PROGRAMFILES%\Google\Chrome Beta\Application\chrome.exe",
+        ]),
+        ("Chrome Dev", [
+            r"%LOCALAPPDATA%\Google\Chrome Dev\Application\chrome.exe",
+            r"%PROGRAMFILES%\Google\Chrome Dev\Application\chrome.exe",
+        ]),
+        ("Chrome Canary", [
+            r"%LOCALAPPDATA%\Google\Chrome SxS\Application\chrome.exe",
+        ]),
+        ("Edge", [
+            r"%PROGRAMFILES(X86)%\Microsoft\Edge\Application\msedge.exe",
+            r"%PROGRAMFILES%\Microsoft\Edge\Application\msedge.exe",
+        ]),
+        ("Edge Beta", [
+            r"%PROGRAMFILES(X86)%\Microsoft\Edge Beta\Application\msedge.exe",
+            r"%PROGRAMFILES%\Microsoft\Edge Beta\Application\msedge.exe",
+        ]),
+        ("Edge Dev", [
+            r"%PROGRAMFILES(X86)%\Microsoft\Edge Dev\Application\msedge.exe",
+            r"%PROGRAMFILES%\Microsoft\Edge Dev\Application\msedge.exe",
+        ]),
+        ("360极速浏览器", [
+            r"%LOCALAPPDATA%\360Chrome\Chrome\Application\360chrome.exe",
+            r"%PROGRAMFILES(X86)%\360Chrome\Chrome\Application\360chrome.exe",
+            r"%PROGRAMFILES%\360Chrome\Chrome\Application\360chrome.exe",
+        ]),
+        ("360安全浏览器", [
+            r"%APPDATA%\360se6\Application\360se.exe",
+            r"%PROGRAMFILES(X86)%\360\360se6\Application\360se.exe",
+            r"%PROGRAMFILES%\360\360se6\Application\360se.exe",
+            r"%APPDATA%\360se\Application\360se.exe",
+            r"%PROGRAMFILES(X86)%\360\360se\Application\360se.exe",
+        ]),
+        ("Brave", [
+            r"%LOCALAPPDATA%\BraveSoftware\Brave-Browser\Application\brave.exe",
+            r"%PROGRAMFILES%\BraveSoftware\Brave-Browser\Application\brave.exe",
+            r"%PROGRAMFILES(X86)%\BraveSoftware\Brave-Browser\Application\brave.exe",
+        ]),
+        ("Opera", [
+            r"%LOCALAPPDATA%\Programs\Opera\launcher.exe",
+            r"%PROGRAMFILES%\Opera\launcher.exe",
+            r"%PROGRAMFILES(X86)%\Opera\launcher.exe",
+        ]),
+        ("Opera GX", [
+            r"%LOCALAPPDATA%\Programs\Opera GX\launcher.exe",
+            r"%PROGRAMFILES%\Opera GX\launcher.exe",
+        ]),
+        ("QQ浏览器", [
+            r"%PROGRAMFILES(X86)%\Tencent\QQBrowser\QQBrowser.exe",
+            r"%PROGRAMFILES%\Tencent\QQBrowser\QQBrowser.exe",
+            r"%LOCALAPPDATA%\Tencent\QQBrowser\QQBrowser.exe",
+        ]),
+        ("搜狗浏览器", [
+            r"%PROGRAMFILES(X86)%\SogouExplorer\SogouExplorer.exe",
+            r"%PROGRAMFILES%\SogouExplorer\SogouExplorer.exe",
+        ]),
+        ("Vivaldi", [
+            r"%LOCALAPPDATA%\Vivaldi\Application\vivaldi.exe",
+            r"%PROGRAMFILES%\Vivaldi\Application\vivaldi.exe",
+        ]),
+        ("Chromium", [
+            r"%LOCALAPPDATA%\Chromium\Application\chrome.exe",
+            r"%PROGRAMFILES%\Chromium\Application\chrome.exe",
+        ]),
+        ("SRWare Iron", [
+            r"%PROGRAMFILES%\SRWare Iron\iron.exe",
+            r"%PROGRAMFILES(X86)%\SRWare Iron\iron.exe",
+        ]),
+        ("Yandex", [
+            r"%LOCALAPPDATA%\Yandex\YandexBrowser\Application\browser.exe",
+            r"%PROGRAMFILES%\Yandex\YandexBrowser\Application\browser.exe",
+        ]),
+        ("Cent Browser", [
+            r"%LOCALAPPDATA%\CentBrowser\Application\chrome.exe",
+            r"%PROGRAMFILES%\CentBrowser\Application\chrome.exe",
+        ]),
+        ("Cốc Cốc", [
+            r"%LOCALAPPDATA%\CocCoc\Browser\Application\browser.exe",
+            r"%PROGRAMFILES%\CocCoc\Browser\Application\browser.exe",
+        ]),
+        ("UC浏览器", [
+            r"%PROGRAMFILES(X86)%\UCBrowser\Application\UCBrowser.exe",
+            r"%PROGRAMFILES%\UCBrowser\Application\UCBrowser.exe",
+        ]),
+    ]
+else:
+    # Linux: rely on Playwright-installed Chromium or system browsers
+    _BROWSER_CANDIDATES = [
+        ("Chromium", [
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+        ]),
+    ]
 
 _browser_cache: tuple[str, str] | None = None  # (name, path)
 
@@ -887,7 +900,8 @@ def api_capture():
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5001
-    threading.Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
+    if os.environ.get("BROWSER") not in ("echo", "", "none"):
+        threading.Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
     app.run(host="0.0.0.0", port=port, debug=False)
 
 

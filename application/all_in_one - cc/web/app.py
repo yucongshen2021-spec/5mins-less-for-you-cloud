@@ -17,7 +17,9 @@ from flask import Flask, jsonify, render_template, request
 if getattr(sys, "frozen", False):
     _BUNDLE_DIR = Path(sys._MEIPASS)
     _DATA_RO_DIR = _BUNDLE_DIR / "data"
-    _DATA_RW_DIR = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")) / "all_in_one" / "data"
+    # Linux fallback: APPDATA absent → ~/.config
+    _data_parent = Path.home() / ".config" if sys.platform != "win32" else (Path.home() / "AppData" / "Roaming")
+    _DATA_RW_DIR = Path(os.environ.get("APPDATA", _data_parent)) / "all_in_one" / "data"
     _DATA_RW_DIR.mkdir(parents=True, exist_ok=True)
     # Copy factory defaults on first run
     _src_defaults = _DATA_RO_DIR / "editor_defaults"
@@ -66,8 +68,17 @@ def _load_module(filename: str) -> dict:
     raw = path.read_text(encoding="utf-8-sig")
 
     # Create hidden Tk root before loading module (only one Tk instance allowed)
-    _web_root = tk.Tk()
-    _web_root.withdraw()
+    # In headless Linux/Xvfb this should work; add fallback stub for safety.
+    try:
+        _web_root = tk.Tk()
+        _web_root.withdraw()
+    except Exception as _e:
+        class _StubTk:
+            def withdraw(self): pass
+            def destroy(self): pass
+            def mainloop(self): pass
+        _web_root = _StubTk()
+        print(f"[warn] tk.Tk() failed ({_e}), using stub. UI generation may be limited.", flush=True)
     _web_frame = tk.Frame(_web_root)
 
     # Preprocess: same as all_in_one_v2._preprocess()
@@ -2765,8 +2776,12 @@ if __name__ == "__main__":
     # 加载已保存的工作区模板到运行时
     _load_workspace_templates()
 
-    # 1.2 秒后自动打开浏览器（仅本机）；TEST_MODE / NO_BROWSER 下跳过以便 CI/E2E 跑测。
-    if os.environ.get("TEST_MODE") != "1" and os.environ.get("NO_BROWSER") != "1":
+    # 1.2 秒后自动打开浏览器（仅本机）；TEST_MODE / NO_BROWSER / BROWSER=echo 下跳过。
+    if (
+        os.environ.get("TEST_MODE") != "1"
+        and os.environ.get("NO_BROWSER") != "1"
+        and os.environ.get("BROWSER") not in ("echo", "", "none")
+    ):
         threading.Timer(
             1.2, lambda: webbrowser.open(f"http://127.0.0.1:{port}")
         ).start()

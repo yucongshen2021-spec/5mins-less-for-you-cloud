@@ -1,0 +1,31 @@
+services:
+  portal:
+    build: .
+    container_name: fivemins-portal
+    ports:
+      - "7000:7000"
+      - "7001:7001"
+      - "7002:7002"
+      - "7003:7003"
+      - "7004:7004"
+    volumes:
+      - portal-data:/app/application/all_in_one - cc/data
+      - portal-logs:/app/application/portal/logs
+      - report-logs:/app/application/自动做测试报告 - cc/log
+    environment:
+      - RELEASE_MODE=1
+      - SUPERVISOR_MODE=1
+      - DISPLAY=:99
+      - BROWSER=echo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
+
+volumes:
+  portal-data:
+  portal-logs:
+  report-logs:

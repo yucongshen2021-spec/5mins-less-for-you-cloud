@@ -1,0 +1,36 @@
+# Windows files
+*.bat
+*.cmd
+*.exe
+*.dll
+runtime/
+
+# Dev & test
+__pycache__/
+.git/
+.pytest_cache/
+.mypy_cache/
+application/test/
+plan/
+temp/
+agent-transcripts/
+
+# Logs (generated at runtime)
+log/
+logs/
+application/portal/logs/
+application/自动做测试报告 - cc/log/
+
+# User data (Volume-mounted)
+application/all_in_one - cc/data/editor_workspace/
+user_init_placeholders.json
+.update_cache.json
+
+# Build artifacts
+dist/
+.build_cache/
+
+# Docker files themselves (avoid cache bust)
+Dockerfile
+docker-compose.yml
+.dockerignore
