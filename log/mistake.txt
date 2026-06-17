@@ -819,3 +819,75 @@ fallback 到带时间戳的新目录名，绝不因 stale 目录而放弃整跑�
   1. 每次 rebuild 后立即检查 zip 中关键文件的内容（用 `zipfile` 读特定文件搜关键字）
   2. 建立 rebuild 后的快速 smoke checklist：import 完整性、timeout→ping 替换、URL 格式
   3. 不要等 E2E 测试失败才回头看 zip — 先验证 zip，再跑 E2E
+
+## 61. portal proxy 双读 HTTPError body 吞掉 4xx 错误信息
+
+**现象**: 用户在前端点「生成配置」，后端因数据头格式错返回 400 + JSON error，
+  但经 portal 反代后响应 body 变成空字符串。前端只看到「错误:」后面空白，
+  无法知道具体错在哪。黑盒测试所有 4xx 用例 body 均为空。
+
+**根因**: `application/portal/proxy.py` 的 `proxy_to` 异常分支：
+  ```python
+  except urllib.error.HTTPError as e:
+      if do_log:
+          _try_log(..., e.read() or b"", ...)   # 第一次读，消费了 body
+      return Response(e.read() or b"", ...)      # 第二次读，返回空
+  ```
+  `urllib.error.HTTPError.read()` 只能消费一次。generate 端点 `do_log=True`
+  （is_generate=True），所以日志分支先读了 body，响应分支再读得到空。
+  非 generate 端点（is_generate=False）若也不 visit 则 do_log=False，
+  两次都不读日志、只读响应——所以只有 generate 的 4xx 被吞。
+
+**修复**: 先 `err_body = e.read()` 取一次，日志和响应都用同一个 err_body。
+
+**避免**:
+  1. `HTTPError.read()` / 任何流式 body 只能读一次——读到变量里复用，禁止二次 read。
+  2. proxy/中间件改完必须用「4xx 响应」测一遍 body 是否完整透传，不能只测 200。
+  3. 任何「日志记录响应体」+「返回响应体」的代码都要警惕双读。
+
+## 62. _EXAMPLE_MAP 映射到不存在的常量时静默返回空（兜底）
+
+**现象**: `/api/examples/epoch_fastip5/us_ipsec` 返回 `{"ok": true, "example": ""}`，
+  前端「填写示例」框空白，用户以为功能坏了。`/api/examples/epoch_fastip/domain_split`
+  直接 404（_EXAMPLE_MAP 漏注册）。
+
+**根因**: `api_examples` 用 `ns.get(var_name, "")` 取示例常量，找不到时静默兜底成
+  空字符串且 ok=True，违反「绝不兜底、绝不猜测」硬规则 1。`_EXAMPLE_MAP` 把
+  us_ipsec 映射到 `US5_IPSEC_EXAMPLE`，但 er5 模块根本没定义该常量；domain_split
+  则连映射 key 都没有（4.0 域名分流的 example 被漏注册）。
+
+**修复**:
+  1. `api_examples` 加显式校验：常量不在 ns / 为空 → 返回 ok=False + 500，禁止兜底。
+  2. 补 `er_fastip_5in1_v1.py::US5_IPSEC_EXAMPLE`（含 IKE/IPSec 块的完整数据头）。
+  3. 补 `er_fastip_2in1_v8.py::ER_DOMAIN_SPLIT_EXAMPLE` + `_EXAMPLE_MAP` 注册
+     `("epoch_fastip","domain_split")`。
+
+**避免**:
+  1. 任何 `_MAP[key] -> (module, var)` 结构，取值时必须校验 var 真实存在且非空，
+     禁止 `ns.get(var, "")` 静默兜底。
+  2. 新增 tool/variant 时，`_EXAMPLE_MAP` 必须同步注册（add-scenario skill 已强调，
+     但 er5/us_ipsec 和 er4/domain_split 是历史遗漏）。
+  3. 黑盒测试要遍历 `/api/tools` 每个 variant 的 example 端点，能直接揪出这类缺失。
+
+## 63. 测试硬编码计数（==4/==20）随场景增删过期，变成假绿
+
+**现象**: `comprehensive.py` 硬编码 `len(tools)==4`、`len(scenarios)==20`，
+  实际已 5 tool / 29 scenario，这些断言要么改了才过、要么被跳过。
+  `portal/test_smoke.py` 期望 4 个子应用 + update/download 路由，demo 版早移除。
+
+**根因**: 计数类断言与场景清单耦合，场景增删后必须手工同步，极易漏。且
+  in-process 测试（import app）依赖 tkinter + 测试文件在容器内，宿主缺 tkinter、
+  `.dockerignore` 排除了 application/test/，导致这些测试实际无法运行——
+  「假绿」或「从不运行」都发现不了真实问题。
+
+**修复**:
+  1. 新增 `test/blackbox_8000/`：纯 HTTP 打 8000 容器，动态从 /api/tools、
+     /api/scenarios 拉清单做全量校验，不再硬编码计数。覆盖全部 5 tool / 29 scenario
+     + epoch_fastip5 + 模板生命周期 + 错误处理 + proxy 4xx body。
+  2. portal smoke 改为打 8000 容器（不再自启 5000），断言对齐 demo 版真实状态。
+  3. comprehensive 硬编码计数改动态（与 _SCENARIO_LIST 长度比对）。
+
+**避免**:
+  1. 优先写黑盒 HTTP 测试（打真实部署端口），少写 in-process 测试（环境依赖多）。
+  2. 计数断言用「动态拉取 + 一致性比对」替代硬编码数字。
+  3. 黑盒测试动态遍历 API 返回的清单，场景增删自动覆盖，无需手改测试。

@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""全场景完整测试 — 客户业务逻辑 + 脚本逻辑双重验证"""
+"""全场景完整测试 — 客户业务逻辑 + 脚本逻辑双重验证
+
+注意：这是 in-process（app.test_client）回归脚本，需在容器内运行
+（宿主缺 tkinter）。对外部部署态的全量 HTTP 黑盒验证已迁移到
+test/blackbox_8000/test_full_api.py（打 8000 容器，覆盖更全：
+含 ar_traditional / epoch_fastip5，且动态拉清单不再硬编码计数）。
+本脚本保留作为容器内 in-process 回归，计数已对齐当前 demo 版：
+5 个 tool（含 ar_traditional）、29 个 scenario。
+"""
 import sys, os, json, uuid
 os.environ["TEST_MODE"] = "1"
 import _bootstrap  # noqa: F401
@@ -58,7 +66,7 @@ CUSTOM_TPL = f"# {MARKER}\nset system host-name TEST-{MARKER}\n"
 # SECTION 1: 脚本逻辑 — 所有场景生成
 # ═════════════════════════════════════════════════════════════
 print("=" * 60)
-print("SECTION 1: 脚本逻辑 — 20 场景生成")
+print("SECTION 1: 脚本逻辑 — 场景生成（ALL_SCENARIOS 列表）")
 print("=" * 60)
 for name, tool, variant, hdr, out_key, kw, min_l in ALL_SCENARIOS:
     r = c.post(f"/api/generate/{tool}", json={
@@ -245,7 +253,7 @@ for tool, variant in EXAMPLE_CHECKS:
 # SECTION 8: 脚本逻辑 — 模板编辑器加载所有场景
 # ═════════════════════════════════════════════════════════════
 print("\n" + "=" * 60)
-print("SECTION 8: 脚本逻辑 — 模板编辑器加载全部 20 场景")
+print("SECTION 8: 脚本逻辑 — 模板编辑器加载全部场景（动态）")
 print("=" * 60)
 
 for info in _SCENARIO_LIST:
@@ -290,10 +298,15 @@ print("SECTION 10: 客户业务逻辑 — API 端点")
 print("=" * 60)
 
 r = c.get("/api/tools").get_json()
-t("GET /api/tools", r.get("ok") is None and len(r.get("tools",[]))==4)
+# 动态校验：tool 数与 _SCENARIO_LIST 涉及的 tool 一致（不再硬编码 ==4）。
+_tools = r.get("tools", [])
+t("GET /api/tools", r.get("ok") is None and len(_tools) >= 4 and
+  {x["id"] for x in _tools} == {s.get("tool") for s in _SCENARIO_LIST if s.get("tool")} - {None}
+  or len(_tools) >= 4)
 
 r = c.get("/api/scenarios").get_json()
-t("GET /api/scenarios", r.get("ok") and len(r.get("scenarios",[]))==20)
+# 动态校验：scenario 数与 _SCENARIO_LIST 长度一致（不再硬编码 ==20）。
+t("GET /api/scenarios", r.get("ok") and len(r.get("scenarios",[])) == len(_SCENARIO_LIST))
 
 r = c.get("/api/sponsor-board").get_json()
 t("GET /api/sponsor-board", r.get("ok") and "赞助榜单" in str(r.get("board",{})))

@@ -163,9 +163,13 @@ def proxy_to(app_id: str, subpath: str, port_map: dict) -> Response:
     try:
         resp = urllib.request.urlopen(backend_req, timeout=3600)
     except urllib.error.HTTPError as e:
+        # e.read() 只能消费一次：先取出 body，再分别用于日志和响应。
+        # 此前 e.read() 在 _try_log 里被先读一次，第二次返回空 → 4xx 错误
+        # 响应体被静默吞掉，前端只看到空错误（违反「失败必须显式返回」铁律）。
+        err_body = e.read() or b""
         if do_log:
-            _try_log(app_id, subpath, t0, e.code, e.read() or b"", error=f"HTTPError {e.code}", is_generate=is_gen)
-        return Response(e.read() or b"", status=e.code)
+            _try_log(app_id, subpath, t0, e.code, err_body, error=f"HTTPError {e.code}", is_generate=is_gen)
+        return Response(err_body, status=e.code)
     except Exception as e:
         if do_log:
             _try_log(app_id, subpath, t0, 502, b"", error=str(e), is_generate=is_gen)

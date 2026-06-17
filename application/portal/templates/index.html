@@ -55,6 +55,7 @@
     vertical-align: middle; position: relative; top: -1px;
   }
   .ver-badge.demo { background: rgba(245, 78, 0, 0.12); color: var(--primary); }
+  .ver-badge.beta { background: rgba(36, 102, 220, 0.12); color: #2466dc; }
   .topbar .brand-sub {
     font-size: 11px; font-weight: 400; color: var(--muted);
     margin-left: 2px; white-space: nowrap;
@@ -228,8 +229,8 @@
 <header class="topbar">
   <div class="hdr-row">
     <span class="brand-dot"></span>
-    <span class="brand">帮你节省5分钟 <span class="ver-badge demo">DEMO</span></span>
-    <span class="brand-sub">v{{ local_version or "—" }} · demo试用版</span>
+    <span class="brand">帮你节省5分钟{% if portal_label == "内测版本" %} <span class="ver-badge beta">内测</span>{% else %} <span class="ver-badge demo">DEMO</span>{% endif %}</span>
+    <span class="brand-sub">v{{ local_version or "—" }} · {{ portal_label }}</span>
   </div>
   <div class="hdr-row">
     <button class="hdr-btn" id="toggleSidebar" title="侧栏">&#9776;</button>
@@ -246,7 +247,7 @@
   <div class="help-panel" style="position:relative;">
     <button class="hlp-close" id="hlpClose">&times;</button>
     <h2>帮你节省5分钟</h2>
-    <div class="hlp-ver">Demo 试用版</div>
+    <div class="hlp-ver">{{ portal_label }}</div>
 
     <h3>四个工具</h3>
     <p>左侧菜单切换，每个工具独立运行：</p>

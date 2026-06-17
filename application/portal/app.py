@@ -15,6 +15,9 @@ import proxy
 # ── Pure Demo version ──
 _PORT = 5000
 _SUPERVISOR_MODE = os.environ.get("SUPERVISOR_MODE", "").strip() == "1"
+# 部署环境标识：测试容器（docker-compose.test.yml, 宿主 8000）注入
+# PORTAL_LABEL=内测版本；正式容器不注入 → 保持默认 DEMO。
+_PORTAL_LABEL = os.environ.get("PORTAL_LABEL", "").strip()
 
 app = Flask(__name__)
 
@@ -36,8 +39,11 @@ def _local_version():
 def index():
     apps = process_manager.get_apps_status()
     online_count = sum(1 for a in apps if a["reachable"])
+    # 测试容器注入 PORTAL_LABEL 时，标题显示该标识（如「内测版本」），
+    # 否则保持默认 demo 试用版。
+    label = _PORTAL_LABEL or "demo试用版"
     return render_template("index.html", apps=apps, online_count=online_count, total_count=len(apps),
-                           local_version=_local_version(), is_release=False)
+                           local_version=_local_version(), is_release=False, portal_label=label)
 
 
 @app.route("/api/status")

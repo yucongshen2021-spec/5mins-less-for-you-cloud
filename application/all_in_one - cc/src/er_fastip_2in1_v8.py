@@ -2187,6 +2187,13 @@ ER_NEW_EXIT_EXAMPLE = (
     "10.60.72.45-172.16.13.47\n"
 )
 
+# ── ER 域名分流 示例数据头（每行一个域名，驱动 build_er_domain_split_script）──
+ER_DOMAIN_SPLIT_EXAMPLE = (
+    "google.com\n"
+    "youtube.com\n"
+    "facebook.com\n"
+)
+
 # ── ER 新增出口 FNET Whitelist（track 100.100 / NAT 探测段；三项须同填或同空；仅双线时生效）──
 ER_NE_FNET_PROBE_DEFAULT = "100.100.100.1"
 ER_NE_FNET_EXIT_TUNNEL_DEFAULT = ""

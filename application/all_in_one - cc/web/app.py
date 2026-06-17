@@ -709,8 +709,8 @@ def api_tools():
                     "id": "usg_fastip",
                     "name": "USG FastIP",
                     "variants": [
-                        {"id": "us", "name": "非香港出口"},
                         {"id": "hk", "name": "HK 香港出口"},
+                        {"id": "us", "name": "非香港出口"},
                         {"id": "flink", "name": "飞连"},
                         {"id": "new_exit", "name": "新增出口"},
                     ],
@@ -1439,6 +1439,7 @@ _EXAMPLE_MAP = {
     ("epoch_fastip", "us"): ("er_fastip_2in1_v8.py", "US_EXAMPLE"),
     ("epoch_fastip", "flink"): ("er_fastip_2in1_v8.py", "ER_FL_DEFAULT_HEADERS"),
     ("epoch_fastip", "new_exit"): ("er_fastip_2in1_v8.py", "ER_NEW_EXIT_EXAMPLE"),
+    ("epoch_fastip", "domain_split"): ("er_fastip_2in1_v8.py", "ER_DOMAIN_SPLIT_EXAMPLE"),
     ("usg_fastip", "us"): ("usg_fastip_3in1_v5.py", "US_EXAMPLE"),
     ("usg_fastip", "hk"): ("usg_fastip_3in1_v5.py", "HK_EXAMPLE"),
     ("usg_fastip", "flink"): ("usg_fastip_3in1_v5.py", "USG_FL_EXAMPLE"),
@@ -1468,7 +1469,15 @@ def api_examples(tool, variant):
     module_name, var_name = _EXAMPLE_MAP[key]
     try:
         ns = _load_module(module_name)
+        # 显式校验：映射指向的常量必须在模块里真实存在且非空，
+        # 否则等于示例数据丢失——禁止静默返回空字符串兜底（AGENTS.md 硬规则 1）。
+        if var_name not in ns:
+            return jsonify({"ok": False, "error": _humanize_error(
+                f"示例常量 {var_name} 未在 {module_name} 中定义（数据丢失）")}), 500
         text = str(ns.get(var_name, ""))
+        if not text.strip():
+            return jsonify({"ok": False, "error": _humanize_error(
+                f"示例常量 {var_name} 为空（数据丢失）")}), 500
         return jsonify({"ok": True, "example": text})
     except Exception as e:
         return jsonify({"ok": False, "error": _humanize_error(e)}), 500
