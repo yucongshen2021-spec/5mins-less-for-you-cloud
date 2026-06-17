@@ -7,9 +7,10 @@ import json
 import os
 import re
 import sys
-import tkinter as tk
 from pathlib import Path
-from tkinter import ttk
+
+import tkinter_stub as tk
+from tkinter_stub import ttk
 
 from flask import Flask, jsonify, render_template, request
 
@@ -67,24 +68,16 @@ def _load_module(filename: str) -> dict:
 
     raw = path.read_text(encoding="utf-8-sig")
 
-    # Create hidden Tk root before loading module (only one Tk instance allowed)
-    # In headless Linux/Xvfb this should work; add fallback stub for safety.
-    try:
-        _web_root = tk.Tk()
-        _web_root.withdraw()
-    except Exception as _e:
-        class _StubTk:
-            def withdraw(self): pass
-            def destroy(self): pass
-            def mainloop(self): pass
-        _web_root = _StubTk()
-        print(f"[warn] tk.Tk() failed ({_e}), using stub. UI generation may be limited.", flush=True)
-    _web_frame = tk.Frame(_web_root)
+    # tkinter 已被 tkinter_stub 替代：tk.Tk()/tk.Frame() 等返回 mock 对象，
+    # 无需真实 Tk/DISPLAY/Xvfb。源码改写仍保留（root = tk.Tk() → root = __WEB_FRAME__），
+    # 现在 __WEB_FRAME__ 是一个 _MockWidget。
+    _web_frame = tk.Frame()
 
     # Preprocess: same as all_in_one_v2._preprocess()
-    # - Replace root = tk.Tk() → root = _web_root (hidden)
+    # - Replace root = tk.Tk() → root = __WEB_FRAME__ (mock widget)
     # - Skip lines between Tk() and root.configure( (title/geometry calls)
     # - Comment out root.mainloop()
+    # - Strip ``import tkinter`` / ``from tkinter import ...`` — stub already in ns
     out_lines = []
     in_skip = False
     for line in raw.splitlines(keepends=True):
@@ -100,6 +93,10 @@ def _load_module(filename: str) -> dict:
             continue
         if re.match(r"root\.mainloop\(\)\s*$", s):
             out_lines.append("# [web] mainloop omitted\n")
+            continue
+        # 注释掉 tkinter import（stub 已在 ns 中提供 tk/ttk/messagebox/filedialog）
+        if re.match(r"^\s*import\s+tkinter\b", s) or re.match(r"^\s*from\s+tkinter\b", s):
+            out_lines.append("# [web] " + line)
             continue
         out_lines.append(line)
     code = "".join(out_lines)
@@ -121,12 +118,14 @@ def _load_module(filename: str) -> dict:
         "__name__": "__embedded__",
         "tk": tk,
         "ttk": ttk,
-        "filedialog": None,
+        "tkinter": tk,  # 业务模块的 ``from tkinter import ttk/messagebox/filedialog`` 会走这里
+        "filedialog": tk.filedialog,
+        "messagebox": tk.messagebox,
         "re": re,
         "sys": sys,
         "ipaddress": __import__("ipaddress"),
         "__TAB_FRAME__": _web_frame,
-        "__WEB_ROOT__": _web_root,
+        "__WEB_ROOT__": _web_frame,
         "__WEB_FRAME__": _web_frame,
         "field_coverage": fc_mod,
         "shared_utils": _su,
@@ -174,11 +173,16 @@ def _get_ar_traditional():
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 def _apply_network_to_widgets(widget, ns: dict) -> None:
-    """Clear Entry/Text widgets so GK() fallback uses globals()."""
+    """Clear Entry/Text widgets so GK() fallback uses globals().
+
+    stub 模式下控件是 _MockEntry/_MockText，清空后 .get() 返回空串，
+    闭包的 _pv(entry, placeholder) 返回空，GK("DEFAULT_*") fallback 生效。
+    """
     try:
-        if isinstance(widget, (tk.Entry, ttk.Entry)):
+        cls_name = type(widget).__name__
+        if cls_name in ("_MockEntry", "_MockCombobox"):
             widget.delete(0, tk.END)
-        elif isinstance(widget, tk.Text):
+        elif cls_name == "_MockText":
             widget.delete("1.0", tk.END)
         if hasattr(widget, 'winfo_children'):
             for child in widget.winfo_children():
@@ -275,29 +279,28 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
                             nets.append(part)
                 if nets:
                     d["inner_nets"] = nets
-                    # 重新生成 overseas_nat_block（builder 已用旧 inner_nets 生成，
-                    # 需用表单值覆盖，否则 NAT source address 会是 DEFAULT_INNER_NETS）
-                    if d.get("overseas_nat_block"):
-                        overseas_lines = []
-                        main_tun = d.get("main_tunnel", "")
-                        bk_tun = d.get("bk_tunnel", "")
-                        nat_ip = d.get("hkip_nat", "")
-                        for i, net in enumerate(nets):
-                            r_main = 100 + i
-                            r_bk = 200 + i
-                            overseas_lines.append(
-                                f"set nat source rule {r_main} outbound-interface '{main_tun}'")
-                            overseas_lines.append(
-                                f"set nat source rule {r_main} source address '{net}'")
-                            overseas_lines.append(
-                                f"set nat source rule {r_main} translation address '{nat_ip}'")
-                            overseas_lines.append(
-                                f"set nat source rule {r_bk} outbound-interface '{bk_tun}'")
-                            overseas_lines.append(
-                                f"set nat source rule {r_bk} source address '{net}'")
-                            overseas_lines.append(
-                                f"set nat source rule {r_bk} translation address '{nat_ip}'")
-                        d["overseas_nat_block"] = "\n".join(overseas_lines)
+                    # 重新生成 overseas_nat_block（builder 用控件读 inner_nets，
+                    # stub 模式下控件返回空，需用表单值重新生成 NAT 规则）
+                    overseas_lines = []
+                    main_tun = d.get("main_tunnel", "")
+                    bk_tun = d.get("bk_tunnel", "")
+                    nat_ip = d.get("hkip_nat", "")
+                    for i, net in enumerate(nets):
+                        r_main = 100 + i
+                        r_bk = 200 + i
+                        overseas_lines.append(
+                            f"set nat source rule {r_main} outbound-interface '{main_tun}'")
+                        overseas_lines.append(
+                            f"set nat source rule {r_main} source address '{net}'")
+                        overseas_lines.append(
+                            f"set nat source rule {r_main} translation address '{nat_ip}'")
+                        overseas_lines.append(
+                            f"set nat source rule {r_bk} outbound-interface '{bk_tun}'")
+                        overseas_lines.append(
+                            f"set nat source rule {r_bk} source address '{net}'")
+                        overseas_lines.append(
+                            f"set nat source rule {r_bk} translation address '{nat_ip}'")
+                    d["overseas_nat_block"] = "\n".join(overseas_lines)
     for dhcp_k in ("wan_dhcp", "lan_dhcp", "gen_return_route", "bypass"):
         v = network.get(dhcp_k)
         if v is not None:
@@ -715,7 +718,6 @@ def api_tools():
 def generate_epoch_fastip():
     """Generate Epoch FastIP configuration using the full build_*_format_dict functions."""
     data = request.get_json(force=True)
-    check_and_reload_runtime()
     variant = data.get("variant", "hk")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -856,7 +858,6 @@ def generate_epoch_fastip():
 def generate_epoch_fastip5():
     """Generate Epoch FastIP 5.0 configuration (VyOS set syntax)."""
     data = request.get_json(force=True)
-    check_and_reload_runtime()
     variant = data.get("variant", "hk")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -1035,7 +1036,6 @@ def generate_epoch_fastip5():
 @app.route("/api/generate/usg_fastip", methods=["POST"])
 def generate_usg_fastip():
     data = request.get_json(force=True)
-    check_and_reload_runtime()
     variant = data.get("variant", "us")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -1112,7 +1112,6 @@ def generate_usg_fastip():
 @app.route("/api/generate/epoch_mpls", methods=["POST"])
 def generate_epoch_mpls():
     data = request.get_json(force=True)
-    check_and_reload_runtime()
     variant = data.get("variant", "domestic")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -1284,7 +1283,6 @@ def generate_epoch_mpls():
 @app.route("/api/generate/ar_sdwan", methods=["POST"])
 def generate_ar_sdwan():
     data = request.get_json(force=True)
-    check_and_reload_runtime()
     variant = data.get("variant", "single_ops")
     hdr_text = data.get("header_text", "")
     tool_id = "ar_sdwan"
@@ -1361,7 +1359,6 @@ def generate_ar_sdwan():
 @app.route("/api/generate/ar_traditional", methods=["POST"])
 def generate_ar_traditional():
     data = request.get_json(force=True)
-    check_and_reload_runtime()
     variant = data.get("variant", "dual")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -1946,6 +1943,7 @@ def api_template_load():
             mp_lines.append(f"{v}  {desc}")
         mp = "\n".join(mp_lines)
 
+    _touch_reload_stamp()
     return jsonify({"ok": True, "header": hdr, "mapping": mp, "template": tpl})
 
 
@@ -2055,6 +2053,7 @@ def api_template_reset():
         mp_lines.append(f"{v}  {desc}")
     mp = "\n".join(mp_lines)
 
+    _touch_reload_stamp()
     return jsonify({"ok": True, "header": hdr, "mapping": mp, "template": tpl})
 
 
@@ -2769,12 +2768,15 @@ def _stamp_mtime() -> float:
 
 
 def _touch_reload_stamp() -> None:
-    """Touch sentinel file to signal other workers to reload. Called after saves."""
-    global _runtime_mtime
+    """Touch sentinel file to signal other workers to reload. Called after saves.
+
+    Does NOT update _runtime_mtime: the current worker already applied the
+    change (save/reset updates ns directly). Other workers detect the mtime
+    change via check_and_reload_runtime on their next request.
+    """
     try:
         _RELOAD_STAMP.parent.mkdir(parents=True, exist_ok=True)
         _RELOAD_STAMP.touch()
-        _runtime_mtime = _stamp_mtime()
     except Exception:
         pass
 
@@ -2783,21 +2785,20 @@ def check_and_reload_runtime() -> None:
     """Check if runtime state changed (other worker saved templates/defaults).
 
     Called at the start of each generate request. If the sentinel file's mtime
-    advanced since we last saw it, reload init defaults + workspace templates
-    into this worker's _EMBEDDED_NS. O(1) when nothing changed (one os.stat).
+    advanced since we last saw it, reload workspace templates into this worker's
+    _EMBEDDED_NS. Only reloads templates (not init defaults) to avoid overwriting
+    form-injected network values. O(1) when nothing changed (one os.stat).
     """
     global _runtime_mtime
     cur = _stamp_mtime()
     if cur == _runtime_mtime:
         return
-    # mtime changed → reload from disk
+    # mtime changed -> reload templates only (NOT init defaults)
     try:
-        _load_init_defaults()
-        _load_workspace_templates()
+        _reload_workspace_templates_safe()
         _runtime_mtime = cur
-        print(f"[worker] reloaded runtime (mtime={cur})", flush=True)
-    except Exception as e:
-        print(f"[worker] reload FAILED: {e}", flush=True)
+    except Exception:
+        pass
 
 
 def init_worker() -> None:
@@ -2838,6 +2839,6 @@ if __name__ == "__main__":
         ).start()
 
     # host="0.0.0.0" 允许局域网内其他设备访问
-    # threaded=False: all requests run on main thread so tkinter calls work
-    # （gunicorn 模式下不走 app.run；裸机模式仍需单线程，业务模块依赖 tkinter）
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=False)
+    # threaded=True: tkinter 已被 stub 替代，无线程安全约束，可多线程并发。
+    # （gunicorn 模式下不走 app.run）
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

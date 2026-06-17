@@ -9,10 +9,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 # 使用国内镜像源加速（清华源）
 RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && sed -i 's|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources
 
-# 系统依赖：tk + xvfb + supervisor + curl + Chromium 系统库 + 中文字体
+# 系统依赖：supervisor + curl + Chromium 系统库 + 中文字体
+# tkinter 已被 tkinter_stub 替代，不再需要 tk / xvfb / DISPLAY
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tk \
-    xvfb \
     supervisor \
     curl \
     wget \
@@ -52,7 +51,6 @@ RUN pip install --no-cache-dir -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/
 COPY . .
 
 # 环境变量
-ENV DISPLAY=:99
 ENV BROWSER=echo
 ENV SUPERVISOR_MODE=1
 ENV PYTHONUNBUFFERED=1

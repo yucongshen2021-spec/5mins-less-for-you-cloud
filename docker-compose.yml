@@ -10,7 +10,6 @@ services:
       - portal-logs:/app/application/portal/logs
     environment:
       - SUPERVISOR_MODE=1
-      - DISPLAY=:99
       - BROWSER=echo
     restart: unless-stopped
     healthcheck:

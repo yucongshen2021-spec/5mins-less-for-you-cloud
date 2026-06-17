@@ -9,9 +9,16 @@ from __future__ import annotations
 
 import ipaddress
 import re
-import tkinter as tk
-from tkinter import ttk
 from typing import Any
+
+# tkinter 仅用于 widget_get_value 的 isinstance 类型分发；
+# 用 stub 替代真实 tkinter，避免依赖 DISPLAY/Xvfb。
+try:
+    import tkinter as tk
+    from tkinter import ttk
+except ImportError:
+    import tkinter_stub as tk
+    from tkinter_stub import ttk
 
 
 # ══════════════════════════════════════════════════════════════════════
