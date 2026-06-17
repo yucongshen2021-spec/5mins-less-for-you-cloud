@@ -729,15 +729,15 @@ def generate_epoch_fastip():
     try:
         if variant == "hk":
             build_fn = er.get("build_epoch_hk_format_dict")
-            tpl = er.get("TEMPLATE_EPOCH_HK", "")
+            tpl = _get_effective_template(er, "TEMPLATE_EPOCH_HK")
         elif variant == "us":
             build_fn = er.get("build_epoch_us_format_dict")
-            tpl = er.get("TEMPLATE_EPOCH_US", "")
+            tpl = _get_effective_template(er, "TEMPLATE_EPOCH_US")
         elif variant == "flink":
             parse_fn = er.get("parse_er_flink_headers")
             fmt_fn = er.get("_build_er_flink_format_dict")
             build_fn = er.get("build_er_flink_config")
-            tpl = er.get("TEMPLATE_ER_FLINK_VISUAL", "")
+            tpl = _get_effective_template(er, "TEMPLATE_ER_FLINK_VISUAL")
             if not parse_fn:
                 return jsonify({"ok": False, "error": _humanize_error("Flink parser not found", variant)}), 500
             routes, err = parse_fn(hdr_text)
@@ -760,7 +760,7 @@ def generate_epoch_fastip():
             parse_fn = er.get("parse_er_new_exit_blocks")
             build_fn = er.get("build_er_new_exit_config")
             fmt_fn = er.get("_build_er_new_exit_format_dict")
-            tpl = er.get("TEMPLATE_ER_NEW_EXIT_VISUAL", "")
+            tpl = _get_effective_template(er, "TEMPLATE_ER_NEW_EXIT_VISUAL")
             if not parse_fn or not build_fn:
                 return jsonify({"ok": False, "error": _humanize_error("New exit parser/builder not found", variant)}), 500
             parsed, err = parse_fn(hdr_text)
@@ -814,7 +814,7 @@ def generate_epoch_fastip():
             return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
         elif variant == "domain_split":
             extras_fn = er.get("er_ds_template_preview_extras")
-            tpl = er.get("TEMPLATE_ER_DOMAIN_SPLIT_VISUAL", "")
+            tpl = _get_effective_template(er, "TEMPLATE_ER_DOMAIN_SPLIT_VISUAL")
             if not tpl:
                 return jsonify({"ok": False, "error": _humanize_error("Domain split template not found", variant)}), 500
             d = {}
@@ -871,7 +871,7 @@ def generate_epoch_fastip5():
         hostname_override = str(network.get("hostname") or "").strip()
         if variant == "hk":
             if tunnel_type == "ipsec":
-                tpl = er5.get("TEMPLATE_EPOCH5_HK_IPSEC", "")
+                tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_HK_IPSEC")
                 if not tpl:
                     return jsonify({"ok": False, "error": "HK IPSec — 正在开发中，暂不支持。请使用 OpenVPN。"}), 400
                 build_fn = er5.get("build_epoch5_hk_ipsec_format_dict")
@@ -885,7 +885,7 @@ def generate_epoch_fastip5():
                 output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)
                 return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
             build_fn = er5.get("build_epoch5_hk_format_dict")
-            tpl = er5.get("TEMPLATE_EPOCH5_HK", "")
+            tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_HK")
             if not build_fn:
                 return jsonify({"ok": False, "error": "HK builder not found"}), 500
             result = build_fn(hdr_text)
@@ -902,7 +902,7 @@ def generate_epoch_fastip5():
         elif variant == "us":
             if tunnel_type == "ipsec":
                 build_fn = er5.get("build_epoch5_us_ipsec_format_dict")
-                tpl = er5.get("TEMPLATE_EPOCH5_US_IPSEC", "")
+                tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_US_IPSEC")
                 if not build_fn or not tpl:
                     return jsonify({"ok": False, "error": "非香港 IPSec builder 或模板未找到"}), 500
                 result = build_fn(hdr_text)
@@ -921,7 +921,7 @@ def generate_epoch_fastip5():
                     output = "# " + warning + "\n" + output
                 return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
             build_fn = er5.get("build_epoch5_us_format_dict")
-            tpl = er5.get("TEMPLATE_EPOCH5_US", "")
+            tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_US")
             if not build_fn:
                 return jsonify({"ok": False, "error": "US builder not found"}), 500
             result = build_fn(hdr_text)
@@ -939,7 +939,7 @@ def generate_epoch_fastip5():
             parse_fn = er5.get("parse_epoch5_flink_headers")
             fmt_fn = er5.get("_build_epoch5_flink_format_dict")
             build_fn = er5.get("build_epoch5_flink_config")
-            tpl = er5.get("TEMPLATE_EPOCH5_FLINK", "")
+            tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_FLINK")
             if not parse_fn:
                 return jsonify({"ok": False, "error": "Flink parser not found"}), 500
             routes, err = parse_fn(hdr_text)
@@ -961,7 +961,7 @@ def generate_epoch_fastip5():
         elif variant == "new_exit":
             parse_fn = er5.get("parse_epoch5_new_exit_blocks")
             build_fn = er5.get("build_epoch5_new_exit_format_dict")
-            tpl = er5.get("TEMPLATE_EPOCH5_NEW_EXIT", "")
+            tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_NEW_EXIT")
             if not parse_fn or not build_fn:
                 return jsonify({"ok": False, "error": "5.0 New exit parser/builder not found"}), 500
             parsed, err = parse_fn(hdr_text)
@@ -1048,13 +1048,13 @@ def generate_usg_fastip():
     try:
         if variant == "hk":
             build_fn = usg.get("build_usg_hk_format_dict")
-            tpl = usg.get("TEMPLATE_USG_HK", "")
+            tpl = _get_effective_template(usg, "TEMPLATE_USG_HK")
         elif variant == "us":
             build_fn = usg.get("build_usg_us_format_dict")
-            tpl = usg.get("TEMPLATE_USG_NONHK", "")
+            tpl = _get_effective_template(usg, "TEMPLATE_USG_NONHK")
         elif variant == "flink":
             build_fn = usg.get("build_usg_flink_format_dict")
-            tpl = usg.get("TEMPLATE_USG_FLINK_VISUAL", "")
+            tpl = _get_effective_template(usg, "TEMPLATE_USG_FLINK_VISUAL")
             if build_fn:
                 main_tun = network.get("USG_FL_MAIN_TUN_DEFAULT") or usg.get("USG_FL_MAIN_TUN_DEFAULT", "3000")
                 bk_tun = network.get("USG_FL_BK_TUN_DEFAULT") or usg.get("USG_FL_BK_TUN_DEFAULT", "4000")
@@ -1073,7 +1073,7 @@ def generate_usg_fastip():
             else:
                 parsed = result
             build_fn = usg.get("build_usg_new_exit_format_dict")
-            tpl = usg.get("TEMPLATE_USG_NEW_EXIT_VISUAL", "")
+            tpl = _get_effective_template(usg, "TEMPLATE_USG_NEW_EXIT_VISUAL")
             init_cfg = {
                 "main_tun": int(str(network.get("USG_NE_MAIN_TUN_DEFAULT") or usg.get("USG_NE_MAIN_TUN_DEFAULT", "1001"))),
                 "bk_tun": int(str(network.get("USG_NE_BK_TUN_DEFAULT") or usg.get("USG_NE_BK_TUN_DEFAULT", "1002"))),
@@ -1174,7 +1174,7 @@ def generate_epoch_mpls():
             import traceback as _tb
             try:
                 build_fn = mpls.get("build_mpls_domestic_format_dict" if variant == "domestic" else "build_mpls_overseas_format_dict")
-                tpl = mpls.get("TEMPLATE_MPLS_DOMESTIC" if variant == "domestic" else "TEMPLATE_MPLS_OVERSEAS", "")
+                tpl = _get_effective_template(mpls, "TEMPLATE_MPLS_DOMESTIC" if variant == "domestic" else "TEMPLATE_MPLS_OVERSEAS")
                 wan_blocks_fn = mpls.get("build_wan_lan_blocks")
                 output = ""
                 if build_fn and tpl:
@@ -1368,7 +1368,7 @@ def generate_ar_traditional():
         mod = _get_ar_traditional()
         parse_fn = mod.get("parse_ar_traditional_headers")
         builder_fn = mod.get("build_ar_traditional_format_dict")
-        tpl = mod.get("TEMPLATE_AR_TRADITIONAL", "")
+        tpl = _get_effective_template(mod, "TEMPLATE_AR_TRADITIONAL")
 
         if not parse_fn or not builder_fn:
             return jsonify({"ok": False, "error": _humanize_error("Builder not found", variant)}), 500
@@ -1966,12 +1966,17 @@ def api_template_save():
     slot = info["tpl_slot"]
 
     try:
-        (ws_dir / "headers.txt").write_text(hdr, encoding="utf-8-sig")
-        (ws_dir / "mapping.txt").write_text(mp, encoding="utf-8-sig")
-        (ws_dir / f"{slot}.tpl").write_text(tpl, encoding="utf-8-sig")
-        _apply_template_to_runtime(scenario_key, info, tpl)
+        # 原子写入：先写唯一临时文件再 rename，避免并发 save 临时文件冲突
+        import tempfile, os
+        for fname, content in [("headers.txt", hdr), ("mapping.txt", mp), (f"{slot}.tpl", tpl)]:
+            fp = ws_dir / fname
+            tf = ws_dir / f".{fname}.{os.getpid()}.{id(content)}.tmp"
+            tf.write_text(content, encoding="utf-8-sig")
+            tf.replace(fp)
+        # 不调 _apply_template_to_runtime：generate 从磁盘读模板（_get_effective_template），
+        # ns 里的模板保持出厂值不变，避免 save 影响并发 generate。
         _touch_reload_stamp()
-        return jsonify({"ok": True, "message": f"Saved to {ws_dir} and applied to runtime"})
+        return jsonify({"ok": True, "message": f"Saved to {ws_dir}"})
     except Exception as e:
         return jsonify({"ok": False, "error": _humanize_error(e)}), 500
 
@@ -2011,20 +2016,12 @@ def api_template_reset():
                     break
             except Exception:
                 pass
-    # Fallback: re-exec the source to get factory template
+    # Fallback: read factory template from editor_defaults (no re-exec)
     if not tpl.strip():
-        # Force reload from source (clear cache, re-exec)
-        if info["source"] in _EMBEDDED_NS:
-            del _EMBEDDED_NS[info["source"]]
-        ns2 = _load_module(info["source"])
-        tpl = str(ns2.get(slot, ""))
-    # Also restore runtime template
-    # Restore runtime template by clearing cache and re-loading
-    if tpl.strip():
-        if info["source"] in _EMBEDDED_NS:
-            del _EMBEDDED_NS[info["source"]]
-        ns3 = _load_module(info["source"])
-        ns3[slot] = tpl
+        # Factory template not on disk → read from ns (already loaded at init)
+        tpl = str(ns.get(slot, ""))
+    # 不改 ns：generate 从磁盘读模板（_get_effective_template），
+    # ns 保持出厂值，reset 只删磁盘文件。
 
     # Try example data first
     example_keys = {
@@ -2414,6 +2411,30 @@ def _apply_template_to_runtime(key: str, info: dict, tpl: str) -> None:
     if sk in ():
         _VISUAL_PROG_OVERRIDE[sk] = text
 
+def _get_effective_template(ns: dict, slot: str) -> str:
+    """Get the effective template: workspace file on disk takes priority,
+    otherwise fall back to the factory template in ns.
+
+    Reads disk atomically (save uses tmp+rename). If disk file is empty
+    or read fails, falls back to ns factory template to ensure generate
+    never produces a truncated output.
+    """
+    ws = _DATA_RW_DIR / "editor_workspace"
+    if ws.is_dir():
+        for sdir in ws.iterdir():
+            if not sdir.is_dir():
+                continue
+            tpl_file = sdir / f"{slot}.tpl"
+            if tpl_file.exists():
+                try:
+                    tpl = tpl_file.read_text(encoding="utf-8-sig")
+                    if tpl.strip():
+                        return tpl
+                except Exception:
+                    pass  # read failed (half-written?) → fall back to ns
+    # Fall back to factory template in ns
+    return str(ns.get(slot, ""))
+
 
 def _load_workspace_templates():
     """Load all saved templates from editor_workspace into runtime."""
@@ -2597,9 +2618,12 @@ def api_init_defaults_reset():
 
     # Reload module from source to get true factory globals
     source = info["source"]
-    if source in _EMBEDDED_NS:
-        del _EMBEDDED_NS[source]
+    # Restore factory defaults from snapshot (no del _EMBEDDED_NS — that would
+    # break concurrent generate requests using this ns)
     ns = _load_module(source)
+    factory = _FACTORY_INIT_DEFAULTS.get(source, {})
+    for k, v in factory.items():
+        ns[k] = v
 
     # Re-apply saved init defaults for OTHER scenarios sharing this module
     try:
