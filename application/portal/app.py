@@ -12,6 +12,7 @@ Requests flow:
   /api/health     → 免登录
 """
 
+import json
 import os
 import shutil
 import sys
@@ -53,6 +54,16 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=24)
 
 # ── Auth DB ──────────────────────────────────────────────────────────────────
 _APP_DIR = Path(__file__).resolve().parent.parent  # .../application
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+def _local_version():
+    try:
+        info = json.loads((_PROJECT_ROOT / "RELEASE_INFO.json").read_text(encoding="utf-8-sig"))
+        v = info.get("version")
+        return v if isinstance(v, str) and v.strip() else None
+    except (OSError, json.JSONDecodeError):
+        return None
 if str(_APP_DIR) not in sys.path:
     sys.path.insert(0, str(_APP_DIR))
 from common.auth_db import create_user, get_user_by_id, verify_user  # noqa: E402
@@ -136,7 +147,12 @@ def index():
     user_id = session.get("user_id", "")
     username = session.get("username", "") if user_id else ""
     apps_status = get_apps_status()
-    return render_template("index.html", apps=apps_status, current_user=username)
+    online = sum(1 for a in apps_status if a.get("reachable"))
+    total = len(apps_status)
+    return render_template("index.html",
+        apps=apps_status, current_user=username,
+        local_version=_local_version(), portal_label=_PORTAL_LABEL,
+        online_count=online, total_count=total)
 
 
 @app.route("/api/status")

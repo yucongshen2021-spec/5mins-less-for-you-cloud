@@ -237,14 +237,14 @@
     <button class="hdr-btn" id="toggleHelp" title="帮助">?</button>
     <span class="sep"></span>
     <span class="current-app" id="bannerAppName"><em>选择应用</em></span>
+    <span style="flex:1"></span>
     <span class="live-dot"></span>
     <span class="live-label">Live</span>
-    <span style="flex:1"></span>
     {% if current_user and current_user != "访客" %}
-    <span style="color:#999;font-size:12px;margin-right:6px">{{ current_user }}</span>
-    <a href="/logout" style="color:#e74c3c;font-size:12px;text-decoration:none">退出</a>
+    <span style="color:#999;font-size:12px;margin:0 8px">{{ current_user }}</span>
+    <a href="/logout" class="login-btn" style="background:var(--primary);color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">退出</a>
     {% else %}
-    <a href="/login" style="color:#4a90d9;font-size:12px;text-decoration:none">登录</a>
+    <a href="/login" class="login-btn" style="background:var(--primary);color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">登录</a>
     {% endif %}
   </div>
 </header>
