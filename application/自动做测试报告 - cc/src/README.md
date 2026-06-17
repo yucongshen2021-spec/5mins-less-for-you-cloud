@@ -9,14 +9,16 @@
 ## 命令规则
 
 - CE: `sudo -S ping -c 500 -i 0.01 -s 64|1500 <IP>`
-- PC ping: `ping -n 100 -l 1200 <site>`
-- PC tracert: `tracert -w 1 -d <site>`
+- PC ping (Linux): `ping -c 100 -s 1200 <site>`
+- PC ping (Windows): `ping -n 100 -l 1200 <site>`
+- PC traceroute (Linux): `traceroute -w 1 -n <site>`
+- PC tracert (Windows): `tracert -w 1 -d <site>`
 - 默认站点：`www.baidu.com`、`www.google.com`
 
-## GUI
+## Web 入口
 
-```powershell
-py report_gui.py
+```bash
+python app.py
 ```
 
 - Tab1: `ER FASTIP` 可输入参数并执行
@@ -24,25 +26,12 @@ py report_gui.py
 
 ## CLI
 
-```powershell
-py make_report.py
+```bash
+python src/make_report.py
 ```
 
 或基于已有任务目录：
 
-```powershell
-py make_report.py --resume log\<日期>_<CID>
+```bash
+python src/make_report.py --resume log/<日期>_<CID>
 ```
-
-## 打包
-
-```powershell
-py builder.py --build-builder
-```
-
-生成到项目根目录：
-- `make_report.exe`
-- `report_gui.exe`
-- `builder.exe`（可选）
-
-不会创建 `release` 文件夹。

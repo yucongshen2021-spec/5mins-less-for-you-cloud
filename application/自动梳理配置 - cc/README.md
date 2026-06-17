@@ -1,6 +1,8 @@
-# ER/USG 配置梳理 GUI
+# ER/USG 配置梳理
 
-`er_config_analyzer_gui.py` 是一个本地 Python GUI 工具，支持 `ER` 与 `USG` 两个场景，通过 Tab 切换后分别解析出口关系。
+Web 版配置梳理工具，通过 Flask 提供 `er_config_analyzer.html` 页面，支持 `ER` 与 `USG` 两个场景，通过 Tab 切换后分别解析出口关系。
+
+由 portal 反向代理统一暴露：`http://localhost:5000/app/config_analyzer/`（容器内端口 5004）。
 
 ## 功能
 
@@ -25,14 +27,6 @@
 - `10.60.44.28 -> 218.32.88.83`
 
 可使用中文/英文分号、换行分隔多条映射。
-
-## 运行方式
-
-在 PowerShell 中执行：
-
-```powershell
-py "C:\Users\123\Desktop\自动梳理配置\er_config_analyzer_gui.py"
-```
 
 ## 使用步骤
 

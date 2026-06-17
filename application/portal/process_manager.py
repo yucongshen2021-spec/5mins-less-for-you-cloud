@@ -23,11 +23,10 @@ _NOOP_BROWSER = os.path.join(
 _SUB_ENV = os.environ.copy()
 _SUB_ENV["BROWSER"] = _NOOP_BROWSER
 
-# ── Runtime port switching: RELEASE_MODE=1 → 700x, otherwise → 500x ──
-_RELEASE = os.environ.get("RELEASE_MODE", "").strip() == "1"
-_BASE = 7000 if _RELEASE else 5000
+# ── Port base: fixed at 5000 (pure Demo version) ──
+_BASE = 5000
 
-APPS = [
+_ALL_APPS = [
     {
         "id": "all_in_one",
         "name": "配置生成",
@@ -61,6 +60,12 @@ APPS = [
         "url": "/app/config_analyzer/",
     },
 ]
+
+# Demo version shows only all_in_one (配置生成).
+# domain_capture (域名抓取) 依赖 playwright + 本地 Chromium，当前镜像未安装，
+# 暂时隐藏；test_report 和 config_analyzer 也隐藏。
+_HIDDEN_IDS = {"test_report", "config_analyzer", "domain_capture"}
+APPS = [a for a in _ALL_APPS if a["id"] not in _HIDDEN_IDS]
 
 _processes = {}   # app_id -> subprocess.Popen
 _running = True

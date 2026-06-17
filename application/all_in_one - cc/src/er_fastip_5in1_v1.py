@@ -373,6 +373,32 @@ HK_DEFAULT_WAN_DHCP   = DEFAULT_WAN_DHCP
 HK_DEFAULT_LAN_DHCP   = DEFAULT_LAN_DHCP
 HK_DEFAULT_LAN_GW     = DEFAULT_LAN_GW
 HK_DEFAULT_GEN_RETURN_ROUTE = False
+
+# 5.0 填写示例（显示在主页面的「填写示例」框中）
+HK5_EXAMPLE = (
+    "MAIN\nlineid: 603642Ar3\n主PE： szd-natflr2\nWANIP: 10.40.25.188/30\n"
+    "TUNNEL: vtun40826\nDocking：121.12.81.3\nCE LOIP: 10.20.186.235\n"
+    "HKIP：10.60.241.250 --> 103.48.141.157\nBGPSERVER IP： 10.10.99.168,10.10.99.169\n\n"
+    "BACKUP\nPE：szc-natbk10\nWANIP: 10.41.25.188/30\nTUNNEL: vtun50826\n"
+    "Docking： 120.133.129.72\nCE LOIP: 10.20.186.235\nHKIP：10.60.241.250 --> 103.48.141.157\n"
+    "BGPSERVER IP：10.10.99.198,10.10.99.199\n"
+)
+
+US5_EXAMPLE = (
+    "LineID:609169A1\nPE:gzd-upe5\nTunnel:Tunnel0/0/1165\nwanip:10.55.14.64/30\n"
+    "PE 对接:192.168.247.17\nCE 对接:10.23.0.122\n"
+    "PE:gzd-acvpnpe2\nTunnel:vtun17953\nwanip:10.23.0.120/30\nPE 对接:183.63.68.171\n\n"
+    "LineID:609169A2\nPE:dgb-upebk2\nTunnel:Tunnel0/0/1998\nwanip:10.40.209.220/30\n"
+    "PE 对接:192.168.251.100\nCE 对接:10.30.167.202\n"
+    "PE:dgb-acvpnpe2\nTunnel:vtun50057\nwanip:10.30.167.200/30\nPE 对接:121.12.128.254\n\n"
+    "LineID:609169A5\nPE： twb-natpe2\nWANIP: 10.21.32.124/30\nTUNNEL: tun1267\n"
+    "PE Docking：192.168.239.12\nCE Docking：10.22.241.232\n"
+    "BGPSERVER IP：103.252.19.25,43.229.117.226\n海外出口ip：\n10.60.44.28-218.32.88.83\n\n"
+    "LineID:609169A6\nPE： twb-natpe1\nWANIP: 10.21.31.120/30\nTUNNEL: tun2366\n"
+    "PE Docking：192.168.239.14\nCE Docking：10.22.241.232\n"
+    "BGPSERVER IP：103.252.19.99,43.229.119.251\n海外出口ip：\n10.60.18.22-150.116.112.236\n"
+)
+
 # =====================================================================
 # 5.0 硬编码参数（不暴露给用户）
 # =====================================================================

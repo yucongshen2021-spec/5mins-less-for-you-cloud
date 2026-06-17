@@ -1,10 +1,5 @@
 {
-  "赞助榜单": [
-    "Shy",
-    "Zeta",
-    "Darian"
-  ],
-  "技术榜单": [
-    "Tommy"
-  ]
+  "特别感谢": ["Zeta"],
+  "赞助榜单": ["Theshy", "Darian"],
+  "技术榜单": ["Tommy", "Zelin"]
 }

@@ -1,0 +1,36 @@
+# 测试环境 compose —— 独立容器，与正式 (docker-compose.yml) 完全隔离
+#
+# 用途：所有改动先在 8000 端口测试，通过后再重建正式 5000 容器。
+# 容器内部端口：5000 Portal / 9000 stats，子应用 5001-5004 由 supervisord 按需拉起。
+# 仅通过宿主机端口映射区分：8000 → 容器 5000，8001 → 容器 9000。
+#
+# 启动：  sudo docker compose -f docker-compose.test.yml up -d --build
+# 停止：  sudo docker compose -f docker-compose.test.yml down
+# 日志：  sudo docker compose -f docker-compose.test.yml logs -f
+# 重建：  sudo docker compose -f docker-compose.test.yml up -d --build
+
+services:
+  portal-test:
+    build: .
+    container_name: fivemins-portal-test
+    ports:
+      - "8000:5000"       # 宿主机 8000 → 容器内 Portal 5000（测试入口）
+      - "8001:9000"       # 宿主机 8001 → 容器内 stats 9000（测试环境统计仪表盘）
+    volumes:
+      - portal-test-data:/app/application/all_in_one - cc/data
+      - portal-test-logs:/app/application/portal/logs
+    environment:
+      - SUPERVISOR_MODE=1
+      - DISPLAY=:99
+      - BROWSER=echo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
+
+volumes:
+  portal-test-data:
+  portal-test-logs:

@@ -103,8 +103,8 @@ SPONSOR_BOARD_DIR = APP_ROOT / "sponsor_board"
 SPONSOR_BOARD_DIR.mkdir(parents=True, exist_ok=True)
 SPONSOR_BOARD_FILE = SPONSOR_BOARD_DIR / "rankings.json"
 SPONSOR_BOARD_DEFAULT: dict[str, list[str]] = {
-    "赞助榜单": ["Shy", "Zeta", "Darian"],
-    "技术榜单": ["Tommy"],
+    "赞助榜单": ["Theshy", "Zeta", "Darian"],
+    "技术榜单": ["Tommy", "Zelin"],
 }
 # 19 场景 UI 自检等：与 user_activity（正式页生成 JSONL）分目录存放
 SELFCHECK_LOGS = APP_ROOT / "selfcheck_logs"

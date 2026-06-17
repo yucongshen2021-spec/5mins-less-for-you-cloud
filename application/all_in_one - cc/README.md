@@ -3,10 +3,10 @@
 ## 启动
 
 ```bash
-cd web && py -3 app.py
+cd web && python app.py
 ```
 
-浏览器打开 `http://localhost:5741`，局域网 `http://192.168.5.10:5741`
+浏览器打开 `http://localhost:5003`（由 portal 反向代理统一入口 `http://localhost:5000/app/all_in_one/` 暴露）。
 
 ## 页签
 
@@ -32,5 +32,5 @@ cd web && py -3 app.py
 ## 测试
 
 ```bash
-py -3 test/run_all.py
+python test/run_all.py
 ```

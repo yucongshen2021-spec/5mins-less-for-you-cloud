@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4 console -->
+<!-- v4 console — Demo only -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -55,7 +55,6 @@
     vertical-align: middle; position: relative; top: -1px;
   }
   .ver-badge.demo { background: rgba(245, 78, 0, 0.12); color: var(--primary); }
-  .ver-badge.release { background: rgba(31, 138, 101, 0.12); color: var(--success); }
   .topbar .brand-sub {
     font-size: 11px; font-weight: 400; color: var(--muted);
     margin-left: 2px; white-space: nowrap;
@@ -154,100 +153,6 @@
   .sidebar-ft .ft-status { padding: 0 4px; }
   .sidebar-ft .cnt { color: var(--primary); font-weight: 600; }
 
-  /* ── Download card (sidebar bottom)：永驻 + 状态机 ── */
-  .dl-card {
-    display: block;
-    text-decoration: none;
-    color: var(--ink);
-    background: var(--canvas);
-    border: 1px solid var(--hairline);
-    border-radius: 8px;
-    padding: 9px 10px 8px;
-    /* 关键：文字必须完整可见。按钮高度由内容自然撑开。 */
-    overflow: visible;
-    transition: border-color .12s, background .12s, transform .12s, opacity .12s;
-  }
-  .dl-card.is-empty {
-    cursor: not-allowed;
-    opacity: 0.7;
-  }
-  .dl-card.is-empty .dl-icon {
-    background: var(--hairline);
-    color: var(--muted);
-  }
-  .dl-card.is-empty:hover {
-    border-color: var(--hairline);
-    background: var(--canvas);
-  }
-  /* is-empty 时不显示版本/大小元信息（避免显示 "— · —" 噪声） */
-  .dl-card.is-empty .dl-meta { display: none; }
-  .dl-card.is-ready { cursor: pointer; }
-  .dl-card.is-ready:hover {
-    border-color: var(--primary);
-    background: #fffaf6;
-  }
-  .dl-card.is-ready:active { transform: translateY(1px); }
-  .dl-row {
-    display: flex; align-items: flex-start; gap: 8px;
-    /* min-width:0 让 flex 子项可在窄列中收缩，文字才能换行而不被截断 */
-    min-width: 0;
-    font-size: 12px; font-weight: 500; color: var(--ink);
-    line-height: 1.35;
-  }
-  .dl-icon {
-    width: 18px; height: 18px; flex-shrink: 0;
-    margin-top: 1px;
-    border-radius: 5px; background: var(--primary); color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px; font-weight: 700;
-  }
-  .dl-label {
-    flex: 1 1 auto; min-width: 0;
-    word-break: break-word; white-space: normal;
-  }
-  .dl-meta {
-    margin-top: 4px; padding-left: 26px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--muted);
-    letter-spacing: 0.2px;
-    word-break: break-all;
-  }
-
-  /* ── Upgrade button (sidebar bottom, release only) ── */
-  .upgrade-btn {
-    display: flex; align-items: flex-start; gap: 6px;
-    width: 100%; box-sizing: border-box; min-width: 0;
-    padding: 9px 10px; border: 1px solid var(--hairline);
-    border-radius: 7px; font-size: 12px; font-weight: 500; line-height: 1.4;
-    background: var(--surface); color: var(--ink);
-    cursor: pointer; text-align: left;
-    transition: background .12s, border-color .12s, color .12s;
-  }
-  .upgrade-btn .ub-state-icon { font-size: 11px; margin-top: 1px; opacity: 0.65; flex-shrink: 0; }
-  .upgrade-btn .ub-label { flex: 1 1 auto; min-width: 0; word-break: break-word; white-space: normal; }
-  .upgrade-btn.is-checking { color: var(--muted); cursor: wait; }
-  .upgrade-btn.is-up-to-date { color: var(--muted); background: var(--surface); cursor: default; }
-  .upgrade-btn.is-error { color: var(--ink); border-color: var(--hairline); cursor: pointer; }
-  .upgrade-btn.is-error:hover { background: #faf7f4; }
-  .upgrade-btn.is-available { color: #fff; background: var(--primary); border-color: var(--primary); cursor: pointer; font-weight: 600; }
-  .upgrade-btn.is-available:hover { filter: brightness(1.05); }
-  .upgrade-btn.is-busy { cursor: wait; opacity: 0.85; }
-  .upgrade-btn:disabled { cursor: default; }
-
-  /* sidebar manual check link */
-  .manual-check-link {
-    width: 100%; box-sizing: border-box;
-    padding: 5px 10px; border: none; border-radius: 6px;
-    font-size: 11px; font-weight: 400; color: var(--muted);
-    background: transparent; cursor: pointer;
-    text-align: center;
-    transition: color .15s, background .15s;
-  }
-  .manual-check-link:hover { color: var(--ink); background: rgba(0,0,0,.03); }
-  .manual-check-link.is-latest { color: var(--success); cursor: default; }
-  .manual-check-link.is-error { color: var(--error); }
-
   .nav-item {
     display: flex; align-items: center; gap: 8px;
     padding: 8px 10px; border-radius: 7px; cursor: pointer;
@@ -315,23 +220,6 @@
     opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 99;
   }
   .toast.show { opacity: 1; }
-
-  /* ── Header update button (release only) ── */
-  .hdr-update-btn {
-    font-family: inherit; font-size: 10px; font-weight: 500;
-    letter-spacing: 0.2px; white-space: nowrap;
-    padding: 3px 10px; border-radius: 4px; cursor: pointer;
-    background: none; border: 1px solid var(--hairline); color: var(--muted);
-    transition: background .12s, color .12s, border-color .12s;
-    vertical-align: middle; margin-left: 4px;
-  }
-  .hdr-update-btn:hover { background: var(--canvas); color: var(--ink); border-color: var(--hairline-strong); }
-  .hdr-update-btn:disabled { cursor: default; }
-  .hdr-update-btn.is-latest { color: var(--success); border-color: var(--success); cursor: default; }
-  .hdr-update-btn.is-error { color: var(--error); border-color: var(--error); }
-
-.update-banner.visible{display:block !important}
-.update-banner a:hover{opacity:0.8}
 </style>
 </head>
 <body>
@@ -340,8 +228,8 @@
 <header class="topbar">
   <div class="hdr-row">
     <span class="brand-dot"></span>
-    <span class="brand">帮你节省5分钟{% if not is_release %} <span class="ver-badge demo">DEMO</span>{% else %} <span class="ver-badge release">RELEASE</span>{% endif %}</span>
-    <span class="brand-sub">v{{ local_version or "—" }} · {% if is_release %}正式版{% else %}demo试用版，左下角可下载正式版本{% endif %}</span>
+    <span class="brand">帮你节省5分钟 <span class="ver-badge demo">DEMO</span></span>
+    <span class="brand-sub">v{{ local_version or "—" }} · demo试用版</span>
   </div>
   <div class="hdr-row">
     <button class="hdr-btn" id="toggleSidebar" title="侧栏">&#9776;</button>
@@ -368,9 +256,6 @@
       <li><strong>域名抓取</strong> — 输入网站地址，自动抓取所有请求域名，展示 DNS CNAME 链路和 CDN 归属（支持国内外几十家 CDN 识别）。</li>
       <li><strong>配置梳理</strong> — 粘贴 VyOS 或华为防火墙配置文本，自动解析并画出拓扑图。主线/备线/未知线路分车道显示，隧道类型自动配色，SNAT 网段和默认路由一目了然。</li>
     </ul>
-
-    <h3>下载正式版本</h3>
-    <p>左侧栏底部的 <strong>「下载完整应用」</strong> 按钮，可以下载最新打包的交付版 zip。交付版解压即用，无需安装 Python。</p>
   </div>
 </div>
 
@@ -386,25 +271,9 @@
         <span class="nav-dot {{ 'online' if app.reachable else 'offline' }}"></span>
         <span class="nav-label">{{ app.name }}</span>
       </a>
-      {% endfor %}
-    </nav>
-    <div class="sidebar-ft">
-      {% if is_release %}
-      <button class="upgrade-btn is-checking" id="upgradeBtn" type="button" disabled aria-live="polite">
-        <span class="ub-state-icon">↻</span><span class="ub-label">检查更新中…</span>
-      </button>
-      <button class="manual-check-link" id="btnCheckUpdate" title="手动检查版本更新">手动检查版本</button>
-      {% else %}
-      <a class="dl-card is-empty" id="dlCard" download
-         title="检测可下载的发布包中…"
-         aria-live="polite">
-        <div class="dl-row">
-          <span class="dl-icon">↓</span>
-          <span class="dl-label" id="dlLabel">检测可下载版本…</span>
-        </div>
-        <div class="dl-meta"><span id="dlVersion">—</span> · <span id="dlSize">—</span></div>
-      </a>
-      {% endif %}
+	      {% endfor %}
+	    </nav>
+	    <div class="sidebar-ft">
       <div class="ft-status"><span class="cnt">{{ online_count }}</span> / {{ total_count }} online</div>
     </div>
   </aside>
@@ -428,17 +297,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-
-{% if is_release %}
-  <!-- Update banner — must be BEFORE <script> so getElementById works at IIFE execution time -->
-  <div class="update-banner" id="updateBanner" style="display:none;background:var(--primary);color:#fff;text-align:center;padding:8px 36px 8px 16px;font-size:13px;font-weight:500;position:relative;">
-    <span>有新版本可用：</span>
-    <span id="updateBannerVer" style="font-weight:700;"></span>
-    <a id="updateBannerLink" href="#" style="color:#fff;margin-left:8px;text-decoration:underline;">下载</a>
-    <button id="updateBannerUpgrade" onclick="doUpgradeFromBanner()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:12px;padding:3px 12px;border-radius:5px;cursor:pointer;margin-left:8px;font-weight:600;">一键升级</button>
-    <button onclick="document.getElementById('updateBanner').classList.remove('visible')" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;position:absolute;right:12px;top:50%;transform:translateY(-50%);line-height:1;" title="关闭">&times;</button>
-  </div>
-{% endif %}
 
 <script>
 (function() {
@@ -466,12 +324,10 @@
   var activeId = null;
 
   // One iframe per app, kept alive across switches.
-  // The first app's iframe is pre-rendered in HTML for instant load.
   var frames = {};
   var preIframe = document.getElementById('iframe_first');
   var firstAppId = items[0].dataset.id;
   frames[firstAppId] = preIframe;
-  // Mark as already-loaded (visible class is in HTML)
   preIframe._loaded = true;
 
   function showToast(msg) {
@@ -508,7 +364,6 @@
       pool.appendChild(ifr);
       frames[id] = ifr;
     } else {
-      // Already loaded — show instantly
       frames[id].classList.add('visible');
     }
 
@@ -531,6 +386,7 @@
   var toActivate = firstOnline ? firstOnline.parentElement : items[0];
   if (toActivate) switchApp(toActivate);
 
+  // Status polling — update sidebar dots and online count
   setInterval(function() {
     fetch('/api/status')
       .then(function(r) { return r.json(); })
@@ -548,273 +404,8 @@
       }).catch(function() {});
   }, 10000);
 
-{% if not is_release %}
-  // ── 下载入口 (demo only)：左下角 dlCard，扫描 dist/ 得到可下载版本 ──
-  var dlCard = document.getElementById('dlCard');
-  var dlLabel = document.getElementById('dlLabel');
-  var dlVersion = document.getElementById('dlVersion');
-  var dlSize = document.getElementById('dlSize');
-
-  function setDownloadState(state, opts) {
-    if (!dlCard) return;
-    opts = opts || {};
-    dlCard.classList.remove('is-empty', 'is-ready');
-    dlCard.classList.add('is-' + state);
-    dlLabel.textContent = opts.label || '';
-    if (opts.version) {
-      dlVersion.textContent = 'v' + String(opts.version).replace(/^v/, '');
-    } else {
-      dlVersion.textContent = '—';
-    }
-    if (typeof opts.size_mb === 'number') {
-      dlSize.textContent = opts.size_mb.toFixed(2) + ' MB';
-    } else {
-      dlSize.textContent = '—';
-    }
-    if (opts.title) {
-      dlCard.title = opts.title;
-    } else {
-      dlCard.removeAttribute('title');
-    }
-    if (state === 'ready') {
-      dlCard.setAttribute('href', '/download/latest.zip');
-    } else {
-      dlCard.removeAttribute('href');
-    }
-  }
-
-  if (dlCard) {
-    dlCard.addEventListener('click', function(e) {
-      if (!dlCard.classList.contains('is-ready')) e.preventDefault();
-    });
-  }
-
-  fetch('/api/download/latest')
-    .then(function(r) { return r.json(); })
-    .then(function(info) {
-      if (info && info.available === true) {
-        setDownloadState('ready', {
-          label: '下载完整应用',
-          version: info.version,
-          size_mb: info.size_mb,
-          title: '下载整个工具套件的 zip 包'
-        });
-      } else {
-        setDownloadState('empty', {
-          label: '暂无可下载版本',
-          title: '本地 dist/ 内尚未生成发布包，请先运行 tools/build_release.py'
-        });
-      }
-    })
-    .catch(function() {
-      setDownloadState('empty', {
-        label: '暂无可下载版本',
-        title: '检查下载源失败，请稍后重试'
-      });
-    });
-{% endif %}
-
-{% if is_release %}
-// -- Upgrade button (sidebar bottom, release only) ──
-  var upgradeBtn = document.getElementById('upgradeBtn');
-  var upgradeBtnIcon = upgradeBtn ? upgradeBtn.querySelector('.ub-state-icon') : null;
-  var upgradeBtnLabel = upgradeBtn ? upgradeBtn.querySelector('.ub-label') : null;
-
-  function setUpgradeBtnState(state, label, opts) {
-    if (!upgradeBtn) return;
-    opts = opts || {};
-    upgradeBtn.classList.remove('is-checking', 'is-up-to-date', 'is-error', 'is-available', 'is-busy');
-    upgradeBtn.classList.add('is-' + state);
-    upgradeBtn.disabled = !!opts.disabled;
-    upgradeBtnLabel.textContent = label;
-    upgradeBtnIcon.textContent = opts.icon || '';
-    if (opts.title) { upgradeBtn.title = opts.title; } else { upgradeBtn.removeAttribute('title'); }
-  }
-
-  if (upgradeBtn) {
-    upgradeBtn.addEventListener('click', function() {
-      if (upgradeBtn.disabled) return;
-      if (upgradeBtn.classList.contains('is-available')) {
-        performUpgrade();
-      } else if (upgradeBtn.classList.contains('is-error')) {
-        checkForUpdate(true);
-      }
-    });
-  }
-
-  function performUpgrade() {
-    if (!pendingDownloadUrl) return;
-    setUpgradeBtnState('busy', '正在连接…', { disabled: true, icon: '↓' });
-    fetch('/api/update/upgrade', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ download_url: pendingDownloadUrl })
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (!data.ok || !data.task_id) {
-          showToast(data.error || '升级启动失败');
-          applyCheckResult(lastCheckInfo);
-          return;
-        }
-        // Connect SSE for real-time progress
-        var es = new EventSource('/api/update/progress/' + data.task_id);
-        es.onmessage = function(e) {
-          try {
-            var msg = JSON.parse(e.data);
-            if (msg.ok === false) {
-              showToast(msg.error || '升级失败');
-              applyCheckResult(lastCheckInfo);
-              es.close();
-              return;
-            }
-            if (msg.stage === 'download') {
-              var pct = msg.pct || 0;
-              setUpgradeBtnState('busy', '下载中 ' + pct + '%', { disabled: true, icon: '↓' });
-            } else if (msg.stage === 'verify') {
-              setUpgradeBtnState('busy', '验证中…', { disabled: true, icon: '✓' });
-            } else if (msg.stage === 'install') {
-              setUpgradeBtnState('busy', '安装中…', { disabled: true, icon: '⚙' });
-            } else if (msg.stage === 'launched') {
-              showToast('升级完成，即将自动重启…');
-              setUpgradeBtnState('busy', '正在重启…', { disabled: true, icon: '↻' });
-              es.close();
-              setTimeout(function() {
-                fetch('/api/shutdown', { method: 'POST' }).catch(function(){});
-              }, 2000);
-            }
-          } catch(_) {}
-        };
-        es.onerror = function() { es.close(); };
-      })
-      .catch(function() { showToast('升级请求失败'); applyCheckResult(lastCheckInfo); });
-  }
-
-// -- Update check (RELEASE ONLY) --
-  var updateBanner = document.getElementById('updateBanner');
-  var updateBannerVer = document.getElementById('updateBannerVer');
-  var updateBannerLink = document.getElementById('updateBannerLink');
-  var pendingDownloadUrl = '';
-  var lastCheckInfo = null;
-
-  function applyCheckResult(info) {
-    lastCheckInfo = info || null;
-    if (info && info.status === 'ok' && info.has_update === true && info.download_url) {
-      pendingDownloadUrl = info.download_url;
-      var remote = info.remote_version || '—';
-      setUpgradeBtnState('available', '立即升级 → v' + String(remote).replace(/^v/, ''),
-                         { disabled: false, icon: '↑' });
-    } else if (info && info.status === 'ok' &&
-               (info.comparison === 'same' || info.comparison === 'newer')) {
-      pendingDownloadUrl = '';
-      var localV = info.local_version || '—';
-      setUpgradeBtnState('up-to-date', '已是最新版本 (v' + String(localV).replace(/^v/, '') + ')',
-                         { disabled: true, icon: '✓' });
-    } else {
-      pendingDownloadUrl = '';
-      setUpgradeBtnState('error', '无法检查更新，点击重试',
-                         { disabled: false, icon: '!' });
-    }
-  }
-
-  function checkForUpdate(force) {
-    if (force) setUpgradeBtnState('checking', '检查更新中…', { disabled: true, icon: '↻' });
-    fetch('/api/update/check' + (force ? '?force=1' : ''))
-      .then(function(r) { return r.json(); })
-      .then(function(info) {
-        applyCheckResult(info);
-        if (info && info.status === 'ok' && info.has_update === true) {
-          showBanner(info);
-        }
-      })
-      .catch(function() { applyCheckResult({ status: 'network_error' }); });
-  }
-
-  function showBanner(info) {
-    updateBannerVer.textContent = 'v' + String(info.remote_version || '—').replace(/^v/, '');
-    updateBannerLink.href = info.download_url || '#';
-    var ub = document.getElementById('updateBannerUpgrade');
-    if (ub) { ub.style.display = info.download_url ? 'inline-block' : 'none'; }
-    updateBanner.classList.add('visible');
-  }
-
-  function doUpgradeFromBanner() {
-    if (pendingDownloadUrl) {
-      performUpgrade();
-    }
-  }
-
-  function showUpdateBanner(info) {
-    if (!info || info.status !== 'ok' || !info.has_update) return;
-    updateBannerVer.textContent = 'v' + String(info.remote_version).replace(/^v/, '');
-    if (info.download_url) {
-      updateBannerLink.href = info.download_url;
-    } else {
-      updateBannerLink.href = '/download/latest.zip';
-    }
-    var ub = document.getElementById('updateBannerUpgrade');
-    if (ub) { ub.style.display = info.download_url ? 'inline-block' : 'none'; }
-    updateBanner.classList.add('visible');
-  }
-
-  // Manual check button
-  var btnCheck = document.getElementById('btnCheckUpdate');
-  if (btnCheck) {
-    btnCheck.addEventListener('click', function() {
-      if (btnCheck.disabled && btnCheck.classList.contains('is-latest')) return;
-      setBtnCheckState('checking');
-      fetch('/api/update/check?force=1')
-        .then(function(r) { return r.json(); })
-        .then(function(info) {
-          showUpdateBanner(info);
-          var now = new Date();
-          btnCheck.title = '上次检查: ' + now.toLocaleTimeString();
-          if (info.status === 'ok' && !info.has_update) {
-            setBtnCheckState('latest');
-            showToast('已是最新版本');
-          } else if (info.status !== 'ok') {
-            // Server returned error — show toast but don't change button to error.
-            // The cached result (shown in sidebar) is still valid.
-            setBtnCheckState('normal');
-            showToast('暂时无法连接更新服务器，请稍后重试');
-          } else {
-            setBtnCheckState('normal');
-          }
-        })
-        .catch(function() {
-          // Actual network error — fetch itself failed
-          setBtnCheckState('normal');
-          showToast('网络不可用，请检查连接');
-        });
-    });
-  }
-
-  function setBtnCheckState(state) {
-    if (!btnCheck) return;
-    btnCheck.classList.remove('is-latest', 'is-error');
-    btnCheck.disabled = false;
-    if (state === 'checking') {
-      btnCheck.textContent = '\u68c0\u67e5\u4e2d\u2026'; btnCheck.disabled = true;
-    } else if (state === 'latest') {
-      btnCheck.textContent = '\u5df2\u662f\u6700\u65b0\u7248\u672c'; btnCheck.classList.add('is-latest'); btnCheck.disabled = true;
-    } else if (state === 'error') {
-      btnCheck.textContent = '\u68c0\u67e5\u5931\u8d25\uff0c\u70b9\u51fb\u91cd\u8bd5'; btnCheck.classList.add('is-error'); btnCheck.disabled = false;
-    } else {
-      btnCheck.textContent = '\u624b\u52a8\u68c0\u67e5\u7248\u672c'; btnCheck.disabled = false;
-    }
-  }
-
-  function checkUpdate() {
-    checkForUpdate(true);  // force fresh check on startup, skip stale cache
-  }
-
-  // First check after 5s, then every hour
-  setTimeout(checkUpdate, 5000);
-  setInterval(function() { checkForUpdate(false); }, 3600000);
-{% endif %}
 })();
 </script>
 
 </body>
 </html>
-

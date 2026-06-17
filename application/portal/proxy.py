@@ -1,11 +1,37 @@
-"""Reverse proxy — route /app/<id>/... → http://localhost:<port>/..."""
+"""Reverse proxy — route /app/<id>/... → http://localhost:<port>/...
+
+Logs to the shared stats SQLite DB:
+- Page visits: lightweight (IP, time, app, function — no content)
+- Generate/capture actions: full detail (data-header, generated-content, etc.)
+"""
+
+import gzip
+import json
+import os
 import re
-import urllib.request
+import sys
+import time
 import urllib.error
 import urllib.parse
-import gzip
+import urllib.request
+
 from flask import request, Response
 
+# ── Stats DB import (shared with the 9000-port stats app) ────────────────────
+_APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # …/application
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
+from common.stats_db import (
+    get_db_path,
+    init_db,
+    is_generate_endpoint,
+    log_access as _db_log,
+)
+
+# Ensure the DB exists on first import (tables + indexes).
+init_db()
+
+# ── Hop-by-hop / filtered headers ────────────────────────────────────────────
 _HOP_HEADERS = {
     "connection", "keep-alive", "proxy-authenticate",
     "proxy-authorization", "te", "trailers", "transfer-encoding", "upgrade",
@@ -20,20 +46,19 @@ _ATTR_RE = re.compile(
 )
 
 # Rewrite absolute-path string literals in JavaScript code.
-# Matches "/api/..." or '/api/...' but NOT "//cdn...", "/app/...", or "/" alone.
 _JS_STR_RE = re.compile(
     r"""(["'])(/(?!/|app/)(?=[^"'\s;]*[a-zA-Z])([^"'\s;]{2,}))\1""",
 )
 
 
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
 def _rewrite_paths(text: str, app_id: str) -> str:
     """Rewrite absolute paths in HTML attributes and JS string literals."""
-    # HTML attributes: src="/static/..." → src="/app/<id>/static/..."
     def _attr(m):
         return f'{m.group(1)}="/app/{app_id}/{m.group(3)}"'
     text = _ATTR_RE.sub(_attr, text)
 
-    # JS string literals: "/api/..." → "/app/<id>/api/..."
     def _js_str(m):
         return f'{m.group(1)}/app/{app_id}/{m.group(3)}{m.group(1)}'
     text = _JS_STR_RE.sub(_js_str, text)
@@ -56,6 +81,64 @@ def _build_proxy_request(target_url: str) -> urllib.request.Request:
     return urllib.request.Request(target_url, data=data, headers=headers, method=request.method)
 
 
+# ── Stats helpers ────────────────────────────────────────────────────────────
+
+def _client_ip() -> str:
+    """Best-effort real client IP.
+
+    The portal is the primary entry-point, so ``request.remote_addr`` is
+    usually correct.  If the portal itself sits behind a reverse proxy we
+    also check ``X-Forwarded-For`` / ``X-Real-IP``.
+    """
+    xff = request.headers.get("X-Forwarded-For", "").strip()
+    if xff:
+        return xff.split(",")[0].strip() or request.remote_addr
+    xri = request.headers.get("X-Real-IP", "").strip()
+    if xri:
+        return xri
+    return request.remote_addr or "unknown"
+
+
+def _now_iso() -> str:
+    """Beijing time (UTC+8) ISO timestamp."""
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() + 8 * 3600))
+
+
+def _try_log(app_id: str, subpath: str, start_s: float,
+             resp_status: int, resp_body: bytes,
+             error: str = None, is_generate: bool = False) -> None:
+    """Fire-and-forget: write one access record.  Never raises.
+
+    For generate actions (is_generate=True) we capture the full request/response
+    body so the stats page can show data-header + generated-content.
+    For ordinary page visits we only log metadata (IP, time, function).
+    """
+    try:
+        req_body = request.get_data() or b""
+        _db_log(
+            ts=_now_iso(),
+            ip=_client_ip(),
+            app_id=app_id,
+            method=request.method,
+            path=request.path,
+            query=request.query_string.decode("utf-8") or "",
+            status=resp_status,
+            duration_ms=int((time.time() - start_s) * 1000),
+            req_size=len(req_body),
+            resp_size=len(resp_body) if resp_body is not None else -1,
+            subpath=subpath,
+            req_body_bytes=req_body if is_generate else None,
+            resp_body_bytes=resp_body if is_generate else None,
+            error=error,
+            user_agent=request.headers.get("User-Agent", ""),
+            referer=request.headers.get("Referer", ""),
+        )
+    except Exception:
+        pass  # logging must never break proxying
+
+
+# ── Proxy entry point ────────────────────────────────────────────────────────
+
 def proxy_to(app_id: str, subpath: str, port_map: dict) -> Response:
     port = port_map.get(app_id)
     if port is None:
@@ -66,11 +149,26 @@ def proxy_to(app_id: str, subpath: str, port_map: dict) -> Response:
         target += "?" + request.query_string.decode("utf-8")
 
     backend_req = _build_proxy_request(target)
+
+    # ── Stats preamble ──────────────────────────────────────────────────
+    # Log only: (a) page visits (empty subpath = app root), and
+    #           (b) generate / capture actions (POST that produce content).
+    # Background API calls (sponsor-board, examples, etc.) are skipped.
+    is_gen = is_generate_endpoint(app_id, request.method, subpath)
+    is_visit = not subpath
+    do_log = is_visit or is_gen
+    t0 = time.time() if do_log else 0
+    # ── /stats preamble ─────────────────────────────────────────────────
+
     try:
         resp = urllib.request.urlopen(backend_req, timeout=3600)
     except urllib.error.HTTPError as e:
+        if do_log:
+            _try_log(app_id, subpath, t0, e.code, e.read() or b"", error=f"HTTPError {e.code}", is_generate=is_gen)
         return Response(e.read() or b"", status=e.code)
     except Exception as e:
+        if do_log:
+            _try_log(app_id, subpath, t0, 502, b"", error=str(e), is_generate=is_gen)
         return Response(f"Proxy error: {e}", status=502)
 
     resp_headers = _filter_headers(dict(resp.headers))
@@ -78,6 +176,9 @@ def proxy_to(app_id: str, subpath: str, port_map: dict) -> Response:
     is_sse = "text/event-stream" in content_type
 
     if is_sse:
+        # Log SSE without buffering the body
+        if do_log:
+            _try_log(app_id, subpath, t0, resp.status, None, is_generate=is_gen)
         def generate():
             try:
                 while True:
@@ -103,6 +204,11 @@ def proxy_to(app_id: str, subpath: str, port_map: dict) -> Response:
         except Exception:
             pass
         resp_headers.pop("Content-Encoding", None)
+
+    # ── Stats: log the full (non-streamed) response ─────────────────────
+    if do_log:
+        _try_log(app_id, subpath, t0, resp.status, body, is_generate=is_gen)
+    # ── /stats ──────────────────────────────────────────────────────────
 
     is_html = any(m in content_type for m in _HTML_MIMES)
     is_js = any(m in content_type for m in _JS_MIMES)

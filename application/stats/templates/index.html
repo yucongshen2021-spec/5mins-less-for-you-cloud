@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>访问统计</title>
+<style>
+:root {
+  --canvas: #f7f7f4;
+  --ink: #26251e;
+  --body: #5a5852;
+  --muted: #807d72;
+  --surface: #ffffff;
+  --hairline: #e6e5e0;
+  --hairline-strong: #cfcdc4;
+  --primary: #f54e00;
+  --primary-dim: rgba(245,78,0,.08);
+  --success: #1f8a65;
+  --success-dim: rgba(31,138,101,.08);
+  --error: #cf2d56;
+  --error-dim: rgba(207,45,86,.08);
+  --gutter: 20px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Inter',system-ui,-apple-system,'Microsoft YaHei','PingFang SC',sans-serif;
+  font-size:14px;line-height:1.5;color:var(--body);
+  background:var(--canvas);
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+}
+
+/* ── Top bar ── */
+.topbar{
+  flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--hairline);
+  padding:12px var(--gutter);display:flex;align-items:center;gap:12px;
+}
+.topbar .brand{font-size:18px;font-weight:700;color:var(--ink)}
+.topbar .brand-sub{font-size:12px;color:var(--muted)}
+.topbar .spacer{flex:1}
+.topbar .refresh{font-size:12px;color:var(--muted);cursor:pointer;padding:4px 10px;border:1px solid var(--hairline);border-radius:6px;background:none;transition:background .1s}
+.topbar .refresh:hover{background:var(--canvas)}
+
+/* ── Summary cards ── */
+.summary-row{
+  flex-shrink:0;display:flex;gap:12px;padding:0 var(--gutter) 12px;
+  flex-wrap:wrap;
+}
+.card{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:8px;
+  padding:14px 18px;min-width:120px;flex:1;
+  display:flex;flex-direction:column;gap:4px;
+}
+.card .c-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.card .c-value{font-size:26px;font-weight:700;color:var(--ink)}
+.card .c-value.err{color:var(--error)}
+
+/* ── Charts row ── */
+.charts-row{
+  flex-shrink:0;display:flex;gap:12px;padding:0 var(--gutter) 12px;
+}
+.chart-box{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:8px;
+  padding:14px 16px;flex:1;min-width:200px;
+}
+.chart-box h3{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+.chart-bar-wrap{display:flex;align-items:center;gap:8px;margin:3px 0}
+.chart-bar-wrap .bar-label{font-size:11px;color:var(--body);width:100px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.chart-bar-wrap .bar-track{flex:1;height:16px;background:var(--hairline);border-radius:4px;overflow:hidden}
+.chart-bar-wrap .bar-fill{height:100%;background:var(--primary);border-radius:4px;min-width:2px;transition:width .3s}
+.chart-bar-wrap .bar-val{font-size:11px;color:var(--muted);width:36px;flex-shrink:0;text-align:right}
+
+/* ── Filters ── */
+.filters{
+  flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;padding:0 var(--gutter) 12px;align-items:center;
+}
+.filters label{font-size:12px;font-weight:600;color:var(--muted)}
+.filters input,.filters select{
+  border:1px solid var(--hairline-strong);border-radius:6px;
+  padding:5px 10px;font-size:13px;background:var(--surface);color:var(--ink);
+  outline:none;transition:border-color .15s;
+}
+.filters input:focus,.filters select:focus{border-color:var(--primary)}
+.filters input{width:120px}
+.filters input.wide{width:180px}
+.filters .btn{
+  background:var(--primary);color:#fff;border:none;border-radius:6px;
+  padding:6px 16px;font-size:13px;font-weight:500;cursor:pointer;
+  transition:background .1s;
+}
+.filters .btn:hover{background:#d04200}
+.filters .btn.ghost{
+  background:transparent;color:var(--primary);border:1px solid var(--hairline-strong);
+}
+.filters .btn.ghost:hover{background:var(--primary-dim)}
+
+/* ── Table ── */
+.table-wrap{flex:1;min-height:0;overflow:auto;padding:0 var(--gutter) var(--gutter)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{position:sticky;top:0;z-index:2}
+th{
+  background:var(--canvas);border-bottom:2px solid var(--hairline-strong);
+  text-align:left;padding:8px 10px;font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.3px;color:var(--muted);white-space:nowrap;
+}
+td{
+  padding:7px 10px;border-bottom:1px solid var(--hairline);
+  white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis;
+}
+tr:hover td{background:var(--primary-dim)}
+tr.clickable{cursor:pointer}
+td.code{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)}
+td.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.badge{
+  display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;
+  letter-spacing:.3px;
+}
+.badge.ok{background:var(--success-dim);color:var(--success)}
+.badge.err{background:var(--error-dim);color:var(--error)}
+.badge.info{background:var(--primary-dim);color:var(--primary)}
+
+/* ── Pagination ── */
+.pager{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px 0;flex-shrink:0;
+}
+.pager button{
+  background:var(--surface);border:1px solid var(--hairline-strong);border-radius:6px;
+  padding:5px 14px;font-size:13px;cursor:pointer;transition:background .1s;
+}
+.pager button:hover{background:var(--canvas)}
+.pager button:disabled{opacity:.35;cursor:default}
+.pager .pg-info{font-size:13px;color:var(--muted)}
+
+/* ── Modal ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:100;align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex}
+.modal-panel{
+  background:var(--surface);border-radius:12px;border:1px solid var(--hairline);
+  max-width:900px;width:95vw;max-height:85vh;display:flex;flex-direction:column;
+}
+.modal-hd{
+  display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--hairline);
+}
+.modal-hd h2{font-size:16px;font-weight:600;color:var(--ink);flex:1}
+.modal-hd .close-btn{
+  background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;line-height:1;
+}
+.modal-body{padding:16px 20px;overflow-y:auto;flex:1}
+.modal-body .field{margin-bottom:14px}
+.modal-body .field-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px}
+.modal-body .field-value{
+  font-size:13px;color:var(--ink);word-break:break-all;line-height:1.6;
+}
+.modal-body pre{
+  font-family:'JetBrains Mono',monospace;font-size:12px;
+  background:var(--canvas);border:1px solid var(--hairline);border-radius:6px;
+  padding:12px;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-all;
+  color:var(--ink);line-height:1.7;
+}
+
+/* ── Loading overlap ── */
+.loading{text-align:center;padding:32px;color:var(--muted)}
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <span class="brand">📊 访问统计</span>
+  <span class="brand-sub">当前 DB: 自动刷新</span>
+  <span class="spacer"></span>
+  <button class="refresh" onclick="refresh()">🔄 刷新</button>
+</div>
+
+<!-- Summary cards -->
+<div class="summary-row" id="summaryCards"></div>
+
+<!-- Charts row -->
+<div class="charts-row">
+  <div class="chart-box" id="topIpsChart"><h3>Top IPs</h3></div>
+  <div class="chart-box" id="topFuncsChart"><h3>Top 功能</h3></div>
+  <div class="chart-box" id="dailyChart"><h3>每日趋势 (14天)</h3></div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <label>IP</label><input id="fIp" placeholder="模糊匹配">
+  <label>应用</label>
+  <select id="fApp">
+    <option value="">全部</option>
+    <option value="all_in_one">配置生成</option>
+    <option value="domain_capture">域名抓取</option>
+  </select>
+  <label>功能</label><input id="fFunc" placeholder="如：生成·epoch_fastip">
+  <label>时间</label><input type="date" id="fStart"> – <input type="date" id="fEnd">
+  <label>搜索</label><input class="wide" id="fQ" placeholder="路径 / 数据头 / 生成内容">
+  <button class="btn" onclick="search()">🔍 搜索</button>
+  <button class="btn ghost" onclick="resetFilters()">重置</button>
+  <button class="btn ghost" id="exportBtn" onclick="exportCSV()">⬇ 导出 CSV</button>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+  <th>ID</th><th>时间</th><th>IP</th><th>应用</th><th>功能</th>
+  <th>方法</th><th>路径</th><th>版本</th><th>状态</th>
+  <th>耗时</th><th>请求</th><th>响应</th>
+</tr>
+</thead>
+<tbody id="tBody"></tbody>
+</table>
+<div class="loading" id="loader">加载中…</div>
+<div class="empty" id="emptyMsg" style="display:none">暂无记录。通过门户访问应用后记录将出现在这里。</div>
+</div>
+
+<!-- Pagination -->
+<div class="pager" id="pager"></div>
+
+<!-- Detail modal -->
+<div class="modal-overlay" id="modal">
+<div class="modal-panel">
+  <div class="modal-hd">
+    <h2 id="modalTitle">记录详情</h2>
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+  </div>
+  <div class="modal-body" id="modalBody"></div>
+</div>
+</div>
+
+<script>
+var currentPage = 1;
+var currentFilters = {};
+
+function $(id){return document.getElementById(id)}
+
+// ── Data fetching ──
+function buildQuery(extra){
+  var q = new URLSearchParams(currentFilters);
+  if(extra) Object.keys(extra).forEach(function(k){q.set(k,extra[k])});
+  return q.toString();
+}
+
+function refresh(){
+  loadSummary();
+  loadRecords(currentPage);
+}
+
+function loadSummary(){
+  fetch('/api/summary').then(function(r){return r.json()}).then(function(s){
+    renderSummary(s);
+    renderCharts(s);
+  }).catch(function(e){console.error(e)});
+}
+
+function loadRecords(page){
+  currentPage = page;
+  var qs = buildQuery({page:page,per_page:50});
+  $('loader').style.display = 'block';
+  $('emptyMsg').style.display = 'none';
+  fetch('/api/records?'+qs).then(function(r){return r.json()}).then(function(d){
+    renderTable(d);
+    renderPager(d);
+    $('loader').style.display = 'none';
+    if(!d.rows || d.rows.length===0) $('emptyMsg').style.display = 'block';
+  }).catch(function(e){console.error(e);$('loader').style.display='none'});
+}
+
+// ── Render ──
+function renderSummary(s){
+  var cards = [
+    {label:'总访问',value:s.total||0,cls:''},
+    {label:'唯一 IP',value:s.unique_ips||0,cls:''},
+    {label:'生成次数',value:s.generate_count||0,cls:''},
+    {label:'错误',value:s.error_count||0,cls:s.error_count>0?'err':''},
+  ];
+  var html = '';
+  cards.forEach(function(c){
+    html += '<div class="card"><span class="c-label">'+c.label+'</span><span class="c-value'+(c.cls?' '+c.cls:'')+'">'+c.value+'</span></div>';
+  });
+  $('summaryCards').innerHTML = html;
+}
+
+function renderCharts(s){
+  renderBarChart($('topIpsChart'), s.top_ips||[], 'ip', 6);
+  renderBarChart($('topFuncsChart'), s.top_functions||[], 'function', 6);
+  renderDayChart($('dailyChart'), s.daily_trend||[]);
+}
+
+function renderBarChart(container, items, key, maxItems){
+  var html = '<h3>'+container.querySelector('h3').textContent+'</h3>';
+  if(!items.length){html+='<div style="font-size:11px;color:var(--muted)">暂无数据</div>';container.innerHTML=html;return}
+  var max = items[0].cnt;
+  items.slice(0,maxItems).forEach(function(item){
+    var label = (item[key]||'-').substring(0,24);
+    var pct = Math.round(item.cnt/max*100);
+    html += '<div class="chart-bar-wrap">';
+    html += '<span class="bar-label" title="'+escapeHtml(item[key]||'')+'">'+escapeHtml(label)+'</span>';
+    html += '<span class="bar-track"><span class="bar-fill" style="width:'+pct+'%"></span></span>';
+    html += '<span class="bar-val">'+item.cnt+'</span>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function renderDayChart(container, items){
+  var html = '<h3>'+container.querySelector('h3').textContent+'</h3>';
+  if(!items.length){html+='<div style="font-size:11px;color:var(--muted)">暂无数据</div>';container.innerHTML=html;return}
+  var max = Math.max.apply(null, items.map(function(d){return d.cnt}));
+  if(max===0)max=1;
+  items.forEach(function(d){
+    var pct = Math.round(d.cnt/max*100);
+    var day = (d.day||'').substring(5);
+    html += '<div class="chart-bar-wrap">';
+    html += '<span class="bar-label">'+day+'</span>';
+    html += '<span class="bar-track"><span class="bar-fill" style="width:'+pct+'%"></span></span>';
+    html += '<span class="bar-val">'+d.cnt+'</span>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function renderTable(d){
+  if(!d.rows||!d.rows.length){$('tBody').innerHTML='';return}
+  var lines = '';
+  d.rows.forEach(function(r){
+    var statusCls = (!r.error && r.status>=200 && r.status<400) ? 'ok' : 'err';
+    var dur = r.duration_ms != null ? (r.duration_ms+'ms') : (r.resp_size===-1 ? 'SSE' : '-');
+    lines += '<tr class="clickable" onclick="showDetail('+r.id+')">';
+    lines += '<td class="mono">'+r.id+'</td>';
+    lines += '<td>'+(r.ts||'-')+'</td>';
+    lines += '<td class="mono">'+escapeHtml(r.ip||'-')+'</td>';
+    lines += '<td>'+appLabel(r.app_id)+'</td>';
+    lines += '<td>'+escapeHtml(r.function||'-')+'</td>';
+    lines += '<td class="mono">'+(r.method||'-')+'</td>';
+    lines += '<td class="code" title="'+escapeHtml(r.path||'')+'">'+escapeHtml(shortPath(r.path))+'</td>';
+    lines += '<td class="mono">'+(r.variant||'')+'</td>';
+    lines += '<td><span class="badge '+statusCls+'">'+(r.status||'-')+'</span></td>';
+    lines += '<td class="mono">'+dur+'</td>';
+    lines += '<td class="mono">'+fmtSize(r.req_size)+'</td>';
+    lines += '<td class="mono">'+fmtSize(r.resp_size)+'</td>';
+    lines += '</tr>';
+  });
+  $('tBody').innerHTML = lines;
+}
+
+function renderPager(d){
+  var html = '';
+  html += '<button '+(d.page<=1?'disabled':'')+' onclick="loadRecords('+(d.page-1)+')">← 上一页</button>';
+  html += '<span class="pg-info">第 '+d.page+' / '+d.pages+' 页 （共 '+d.total+' 条）</span>';
+  html += '<button '+(d.page>=d.pages?'disabled':'')+' onclick="loadRecords('+(d.page+1)+')">下一页 →</button>';
+  $('pager').innerHTML = html;
+}
+
+// ── Detail modal ──
+function showDetail(id){
+  fetch('/api/records/'+id).then(function(r){return r.json()}).then(function(d){
+    var fields = [
+      {label:'ID',value:d.id},
+      {label:'时间',value:d.ts},
+      {label:'IP',value:d.ip},
+      {label:'应用',value:appLabel(d.app_id)},
+      {label:'功能',value:d.function},
+      {label:'方法',value:d.method},
+      {label:'路径',value:d.path},
+      {label:'查询',value:d.query||''},
+      {label:'状态码',value:d.status},
+      {label:'耗时',value:d.duration_ms!=null?d.duration_ms+' ms':'-'},
+      {label:'请求大小',value:fmtSize(d.req_size)},
+      {label:'响应大小',value:fmtSize(d.resp_size)},
+      {label:'Variant',value:d.variant||'-'},
+      {label:'User-Agent',value:d.user_agent||'-'},
+      {label:'Referer',value:d.referer||'-'},
+      {label:'错误',value:d.error||'-'},
+    ];
+    var hasDH = d.data_header && d.data_header.trim();
+    var hasRB = d.response_body && d.response_body.trim();
+    var hasReqBody = d.request_body && d.request_body.trim();
+
+    var html = '';
+    fields.forEach(function(f){
+      if(!f.value)return;
+      html += '<div class="field"><div class="field-label">'+f.label+'</div><div class="field-value">'+escapeHtml(String(f.value))+'</div></div>';
+    });
+    if(hasReqBody){
+      html += '<div class="field"><div class="field-label">请求体 (network 参数等)</div><pre>'+escapeHtml(d.request_body)+'</pre></div>';
+    }
+    if(hasDH){
+      html += '<div class="field"><div class="field-label">📥 数据头</div><pre>'+escapeHtml(d.data_header)+'</pre></div>';
+    }
+    if(hasRB){
+      html += '<div class="field"><div class="field-label">📤 生成内容</div><pre>'+escapeHtml(d.response_body)+'</pre></div>';
+    }
+    $('modalTitle').textContent = '记录 #'+d.id+ ' · '+escapeHtml(d.function||'');
+    $('modalBody').innerHTML = html;
+    $('modal').classList.add('open');
+  }).catch(function(e){console.error(e)});
+}
+
+function closeModal(){
+  $('modal').classList.remove('open');
+}
+$('modal').addEventListener('click',function(e){if(e.target===$('modal'))closeModal()});
+
+// ── Filters & search ──
+function search(){
+  currentFilters = {
+    ip: $('fIp').value.trim(),
+    app_id: $('fApp').value,
+    function: $('fFunc').value.trim(),
+    start: $('fStart').value,
+    end: $('fEnd').value,
+    q: $('fQ').value.trim(),
+  };
+  Object.keys(currentFilters).forEach(function(k){if(!currentFilters[k])delete currentFilters[k]});
+  loadRecords(1);
+}
+
+function resetFilters(){
+  $('fIp').value='';$('fApp').value='';$('fFunc').value='';
+  $('fStart').value='';$('fEnd').value='';$('fQ').value='';
+  currentFilters={};loadRecords(1);
+}
+
+function exportCSV(){
+  var qs = buildQuery();
+  window.open('/api/export.csv?'+qs,'_blank');
+}
+
+// ── Utils ──
+function escapeHtml(s){
+  if(!s)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function shortPath(p){
+  if(!p)return'-';
+  var s = String(p);
+  if(s.length<=50)return s;
+  return s.substring(0,47)+'…';
+}
+function appLabel(id){
+  var m = {all_in_one:'配置生成',domain_capture:'域名抓取',test_report:'测试报告',config_analyzer:'配置梳理',portal:'门户'};
+  return m[id]||id||'-';
+}
+function fmtSize(n){
+  if(n==null||n<0)return'-';
+  if(n<1024)return n+' B';
+  if(n<1048576)return (n/1024).toFixed(1)+' KB';
+  return (n/1048576).toFixed(1)+' MB';
+}
+
+// ── Init ──
+refresh();
+// Auto-refresh every 30s
+setInterval(refresh,30000);
+</script>
+</body>
+</html>

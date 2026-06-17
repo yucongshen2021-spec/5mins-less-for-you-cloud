@@ -1,73 +1,26 @@
-"""Portal Flask app — unified shell + reverse proxy for all sub-apps."""
+"""Portal Flask app — unified shell + reverse proxy for all sub-apps (Demo only)."""
 import json
 import os
-import queue
-import subprocess
 import sys
 import threading
 import webbrowser
-import zipfile
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from flask import Flask, abort, jsonify, render_template, request, send_file, Response, stream_with_context
+from flask import Flask, jsonify, render_template
 import process_manager
 import proxy
-import upgrade
 
-# ── Release mode ──
-_RELEASE = os.environ.get("RELEASE_MODE", "").strip() == "1"
-_PORT = 7000 if _RELEASE else 5000
+# ── Pure Demo version ──
+_PORT = 5000
 _SUPERVISOR_MODE = os.environ.get("SUPERVISOR_MODE", "").strip() == "1"
 
 app = Flask(__name__)
 
 _PORT_MAP = {a["id"]: a["port"] for a in process_manager.APPS}
 
-# ── 下载通道：扫描项目根 dist/*.zip ──────────────────────────────────────
-# portal 部署位置：<project_root>/application/portal/app.py
-# 所以项目根 = parents[2]
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_DIST_DIR = _PROJECT_ROOT / "dist"
-
-
-def _find_latest_release():
-    """扫描 dist/*.zip，返回最新一份合法包的元数据；不存在或非法则返回 None。
-
-    "合法" 严格要求 zip 内含 RELEASE_INFO.json，缺失者视为不可用，
-    避免根据文件名等弱信号猜测版本号。
-    """
-    if not _DIST_DIR.is_dir():
-        return None
-    zips = sorted(_DIST_DIR.glob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not zips:
-        return None
-    latest = zips[0]
-
-    meta = None
-    try:
-        with zipfile.ZipFile(latest) as zf:
-            for name in zf.namelist():
-                if name.endswith("/RELEASE_INFO.json") or name == "RELEASE_INFO.json":
-                    with zf.open(name) as f:
-                        meta = json.loads(f.read().decode("utf-8"))
-                    break
-    except (zipfile.BadZipFile, OSError, ValueError, json.JSONDecodeError):
-        return None
-    if meta is None:
-        return None
-
-    size = latest.stat().st_size
-    return {
-        "available": True,
-        "filename": latest.name,
-        "size": size,
-        "size_mb": round(size / 1024 / 1024, 2),
-        "version": meta.get("version"),
-        "built_at": meta.get("built_at"),
-        "mtime": int(latest.stat().st_mtime),
-    }
 
 
 def _local_version():
@@ -84,7 +37,7 @@ def index():
     apps = process_manager.get_apps_status()
     online_count = sum(1 for a in apps if a["reachable"])
     return render_template("index.html", apps=apps, online_count=online_count, total_count=len(apps),
-                           local_version=_local_version(), is_release=_RELEASE)
+                           local_version=_local_version(), is_release=False)
 
 
 @app.route("/api/status")
@@ -92,122 +45,10 @@ def api_status():
     return jsonify(process_manager.get_apps_status())
 
 
-@app.route("/api/download/latest")
-def api_download_latest():
-    """返回最新可分发包的元数据；本地无包时返回 {"available": false}。"""
-    info = _find_latest_release()
-    if info is None:
-        return jsonify({"available": False})
-    return jsonify(info)
-
-
-@app.route("/api/update/check")
-def api_update_check():
-    """版本更新检查。强制刷新时传 ?force=1 跳过缓存。"""
-    import update_check
-    force = request.args.get("force", "0") == "1"
-    return jsonify(update_check.check(force=force))
-
-
-# Upgrade progress streams (like mock report SSE)
-_upgrade_streams: dict[str, queue.Queue] = {}
-
-
-@app.route("/api/update/upgrade", methods=["POST"])
-def api_update_upgrade():
-    """执行在线升级：下载 → 验证 → 安装 → 重启。SSE 流式推送进度。"""
-    if _SUPERVISOR_MODE:
-        return jsonify({"ok": False, "error": "Docker 环境不支持在线升级，请更新镜像"}), 400
-    data = request.get_json(silent=True) or {}
-    download_url = (data.get("download_url") or "").strip()
-    if not download_url:
-        return jsonify({"ok": False, "error": "缺少 download_url"}), 400
-
-    task_id = f"upgrade_{int(__import__('time').time())}"
-    q: queue.Queue[str] = queue.Queue()
-    _upgrade_streams[task_id] = q
-
-    def _run():
-        try:
-            for update in upgrade.perform_upgrade_progress(download_url):
-                q.put(json.dumps(update, ensure_ascii=False))
-        except Exception as exc:
-            import traceback
-            detail = traceback.format_exc()
-            print(f"[UPGRADE ERROR] {detail}", flush=True)
-            q.put(json.dumps({
-                "ok": False,
-                "error": f"Upgrade failed: {type(exc).__name__}: {exc}",
-                "stage": "exception"
-            }, ensure_ascii=False))
-        finally:
-            q.put("__DONE__")
-
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
-    return jsonify({"ok": True, "task_id": task_id})
-
-
-@app.route("/api/update/progress/<task_id>")
-def api_update_progress(task_id):
-    q = _upgrade_streams.get(task_id)
-    def generate():
-        try:
-            if q is None:
-                yield "data: {\"error\": \"任务不存在\"}\n\n"
-                return
-            while True:
-                try:
-                    line = q.get(timeout=300)
-                    yield f"data: {line}\n\n"
-                    if line == "__DONE__":
-                        break
-                except queue.Empty:
-                    yield "data: {\"stage\": \"timeout\"}\n\n"
-                    break
-        finally:
-            _upgrade_streams.pop(task_id, None)
-    return Response(stream_with_context(generate()), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-
 @app.route("/api/health")
 def api_health():
     """Docker / load-balancer health check."""
     return jsonify({"ok": True, "mode": "supervisor" if _SUPERVISOR_MODE else "direct"})
-
-
-@app.route("/api/shutdown", methods=["POST"])
-def api_shutdown():
-    """Gracefully shutdown portal — called by frontend after upgrade launch.
-
-    Release-only: the demo runtime (RELEASE_MODE unset) has no upgrade flow
-    (see CLAUDE.md 双版本架构), so it must not expose a self-shutdown endpoint.
-    """
-    if not _RELEASE:
-        abort(404)
-    import signal as _sig
-    import os as _os
-    def _do():
-        import time as _t; _t.sleep(0.5)
-        _os.kill(_os.getpid(), _sig.SIGTERM)
-    import threading as _th; _th.Thread(target=_do, daemon=True).start()
-    return jsonify({"ok": True})
-
-
-@app.route("/download/latest.zip")
-def download_latest_zip():
-    """下发最新可分发包；本地无包时 404。"""
-    info = _find_latest_release()
-    if info is None:
-        abort(404, description="本地暂无可分发 zip，请先在项目根运行 python tools/build_release.py")
-    file_path = _DIST_DIR / info["filename"]
-    return send_file(
-        file_path,
-        as_attachment=True,
-        download_name=info["filename"],
-        mimetype="application/zip",
-    )
 
 
 # ── Reverse proxy for sub-apps ──────────────────────────────────────────
@@ -223,25 +64,8 @@ def proxy_route(app_id, subpath):
     return proxy.proxy_to(app_id, subpath, _PORT_MAP)
 
 
-def _start_mirror() -> subprocess.Popen | None:
-    """Demo mode: start mirror server on port 8000 so download/update work."""
-    mirror_script = _PROJECT_ROOT / "tools" / "serve_mirror.py"
-    if not mirror_script.is_file():
-        print("[portal] WARNING: mirror script not found, skipping")
-        return None
-    # Kill stale mirror processes
-    process_manager._kill_port(8000)
-    print("[portal] Starting mirror server on port 8000...")
-    return subprocess.Popen(
-        [sys.executable, str(mirror_script), "--port", "8000", "--dist", str(_DIST_DIR)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
-
-
 def main():
     # Clean stale .pyc bytecode before importing anything important.
-    # Prevents "fixed the code but portal runs old version" bugs
-    # (Python loads cached .pyc if it appears newer than source).
     import shutil
     for pyc_dir in _PROJECT_ROOT.rglob("__pycache__"):
         try:
@@ -250,23 +74,13 @@ def main():
             pass
 
     process_manager.start_all()
-    mirror_proc = None
-    if not _RELEASE:
-        mirror_proc = _start_mirror()
-    port = 7000 if _RELEASE else 5000
     if os.environ.get("BROWSER") not in ("echo", "", "none"):
-        threading.Timer(2.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
+        threading.Timer(2.5, lambda: webbrowser.open(f"http://localhost:{_PORT}")).start()
     try:
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+        app.run(host="0.0.0.0", port=_PORT, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         pass
     finally:
-        if mirror_proc:
-            mirror_proc.terminate()
-            try:
-                mirror_proc.wait(timeout=5)
-            except Exception:
-                mirror_proc.kill()
         process_manager.shutdown_all()
 
 

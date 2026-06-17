@@ -1,8 +1,0 @@
-# 客户分发包内 runtime/ 需要装的运行时依赖。
-# 此处只列运行期必需的；开发期工具（pyinstaller、pytest 等）不进客户包。
-flask>=3.0
-dnspython>=2.0
-python-docx>=1.1.0
-Pillow>=10.0.0
-paramiko>=3.4.0
-playwright>=1.40.0

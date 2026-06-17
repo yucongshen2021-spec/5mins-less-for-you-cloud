@@ -10,16 +10,14 @@
 ## 不可逾越的硬规则
 
 1. **绝不兜底，绝不猜测**。失败必须显式返回 `config_error / network_error / incomparable`，前端文案禁止在异常时显示"已是最新"。任何"如果用户没传 X 就当成 Y"都要先问用户。
-2. **没证据不宣称完成**。改 update / manifest / build 链路至少要拿到 `/api/update/check?force=1` 的 `status: ok` 输出 + zip duplicate 0 校验，才能说"修好了"。
+2. **没证据不宣称完成**。改 portal / proxy / 子应用链路后，必须启动 portal 并逐个验证子应用可加载、能交互，才能说"修好了"。
 3. **新犯的错立刻补进 `log/mistake.txt`**，按已有格式（现象 / 根因 / 避免）追加。不允许只在聊天里说"下次注意"。
 
 ## 高频踩坑速查（详细版本在 log/mistake.txt）
 
-- 端口：demo `5000-5004`，release `7000-7004`。改一处必全仓库 `rg`。
-- mirror_urls 顺序就是优先级：`72.219`（NAT 外层）→ `5.10`（实际服务）。
-- 发新版必同步三件：构建产物 + 仓库根 `RELEASE_INFO.json` + `application/portal/update_config.json`。
-- PowerShell 写 commit message：`Out-File -Encoding utf8` + `git commit -F`，禁止 `$(cat <<'EOF')`，写完 `Format-Hex` 看头三字节确认无 BOM。
-- 验证 portal 模板内容用 `app.app.test_client()`，别真打 `Invoke-WebRequest /`（会被 sub-app 健康检查拖死）。
+- 端口：统一 5000 系列（portal `5000` + 4 个子应用 `5001-5004`）。改一处必全仓库 `rg`。
+- 容器内由 supervisord 拉起 portal + 各子应用（见 `docker/supervisord.conf`）；`SUPERVISOR_MODE=1` 时 portal 只等待子应用端口、不自行 spawn。
+- 验证 portal 模板内容用 `app.app.test_client()`，别真打 `curl /`（会被 sub-app 健康检查拖死）。
 - 文件下载断言走 RFC 5987：`f"filename*=UTF-8''{quote(name)}" in disposition`。
 
 ## 测试铁律：禁止偷懒，必须从用户视角完整测试
@@ -28,13 +26,14 @@
 
 ### 1. 全量自动化测试（必须全绿）
 
-```powershell
-py -3 -m pytest application/test/all_in_one/ -q
+```bash
+python -m pytest application/test/all_in_one/ -q
 ```
 
 ### 2. Portal 全应用冒烟（修改 portal / proxy / 子应用时必须手动 + Playwright）
 
-启动 portal：`cd application/portal && py -3 app.py`
+启动 portal（裸机开发）：`cd application/portal && python app.py`
+或容器内：`docker compose up -d` 后访问 `http://localhost:5000`
 
 逐一验证：
 - [ ] **配置生成** — 点击加载正常，无 502/代理错误
@@ -48,23 +47,11 @@ py -3 -m pytest application/test/all_in_one/ -q
 
 **修改 proxy.py 后必须验证以上所有 4 个子应用。proxy 路径重写可能破坏任意一个子应用的 JS 正则。**
 
-### 3. 构建后验证
-
-```bash
-py -3 tools/build_release.py --version vX.X.X --mirror-url http://<IP>:8000/api/update/manifest
-```
-
-- [ ] 无 `Duplicate name` 警告
-- [ ] zip 内无 `.png` `.jpg` `record.json` `record.txt`（注：`*.docx` 不能全局排除，测试报告 script/ 下有合法模板）
-- [ ] 解压后 `start_all.bat` 可正常启动
-- [ ] 解压后**全部 4 个子应用功能正常**（含测试报告生成）
-
 ## 跑测试的标准命令
 
-```powershell
-py -m pytest application/test/portal/test_update_check.py -q
-py -3 -m pytest tools/test_build_release.py -q
+```bash
+python -m pytest application/test/portal/test_update_check.py -q
 
 cd application/test
-py -3 -m pytest --deselect all_in_one/test_e2e_playwright.py -q
+python -m pytest --deselect all_in_one/test_e2e_playwright.py -q
 ```
