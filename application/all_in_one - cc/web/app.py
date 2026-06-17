@@ -263,6 +263,41 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
             map_k = {"wan_gw": "DEFAULT_WAN_GW", "lan_gw": "DEFAULT_LAN_GW",
                      "inner_nets": "DEFAULT_INNER_NETS", "dns1": "DEFAULT_DNS1", "dns2": "DEFAULT_DNS2"}[k]
             d[map_k] = sv
+            # Also set d["inner_nets"] as parsed list: overseas_nat_block 等
+            # 用 d.get("inner_nets") 读列表，不是 DEFAULT_INNER_NETS 字符串
+            if k == "inner_nets":
+                nets = []
+                for part in re.split(r'[\n,，\s]+', sv):
+                    part = part.strip()
+                    if part and "/" in part:
+                        parts = part.split("/")
+                        if len(parts) == 2 and parts[0].count(".") == 3 and parts[1].isdigit():
+                            nets.append(part)
+                if nets:
+                    d["inner_nets"] = nets
+                    # 重新生成 overseas_nat_block（builder 已用旧 inner_nets 生成，
+                    # 需用表单值覆盖，否则 NAT source address 会是 DEFAULT_INNER_NETS）
+                    if d.get("overseas_nat_block"):
+                        overseas_lines = []
+                        main_tun = d.get("main_tunnel", "")
+                        bk_tun = d.get("bk_tunnel", "")
+                        nat_ip = d.get("hkip_nat", "")
+                        for i, net in enumerate(nets):
+                            r_main = 100 + i
+                            r_bk = 200 + i
+                            overseas_lines.append(
+                                f"set nat source rule {r_main} outbound-interface '{main_tun}'")
+                            overseas_lines.append(
+                                f"set nat source rule {r_main} source address '{net}'")
+                            overseas_lines.append(
+                                f"set nat source rule {r_main} translation address '{nat_ip}'")
+                            overseas_lines.append(
+                                f"set nat source rule {r_bk} outbound-interface '{bk_tun}'")
+                            overseas_lines.append(
+                                f"set nat source rule {r_bk} source address '{net}'")
+                            overseas_lines.append(
+                                f"set nat source rule {r_bk} translation address '{nat_ip}'")
+                        d["overseas_nat_block"] = "\n".join(overseas_lines)
     for dhcp_k in ("wan_dhcp", "lan_dhcp", "gen_return_route", "bypass"):
         v = network.get(dhcp_k)
         if v is not None:
