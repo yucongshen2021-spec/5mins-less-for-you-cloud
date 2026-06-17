@@ -15,7 +15,7 @@ import os
 bind = ["127.0.0.1:5003"]
 
 # worker 数：默认 8（4c4g 可支持）。可用 GUNICORN_WORKERS 环境变量覆盖。
-workers = int(os.environ.get("GUNICORN_WORKERS", "8"))
+workers = int(os.environ.get("GUNICORN_WORKERS", "16"))
 
 # worker 类型：默认 sync（每 worker 单线程串行处理），符合 tkinter 单线程约束。
 worker_class = "sync"
