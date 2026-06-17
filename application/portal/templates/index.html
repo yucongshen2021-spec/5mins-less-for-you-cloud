@@ -239,6 +239,11 @@
     <span class="current-app" id="bannerAppName"><em>选择应用</em></span>
     <span class="live-dot"></span>
     <span class="live-label">Live</span>
+    {% if current_user %}
+    <span style="flex:1"></span>
+    <span style="color:#999;font-size:12px;margin-right:6px">{{ current_user }}</span>
+    <a href="/logout" style="color:#e74c3c;font-size:12px;text-decoration:none">退出</a>
+    {% endif %}
   </div>
 </header>
 

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · 帮你节省5分钟</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f0f2f5; display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; color: #333;
+  }
+  .card {
+    background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.08);
+    padding: 40px; width: 380px; max-width: 90vw;
+  }
+  h1 { text-align: center; font-size: 22px; margin-bottom: 8px; color: #1a1a1a; }
+  .sub { text-align: center; font-size: 13px; color: #999; margin-bottom: 28px; }
+  .form-group { margin-bottom: 18px; }
+  label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+  input[type="text"], input[type="password"] {
+    width: 100%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 6px;
+    font-size: 14px; outline: none; transition: border-color .2s;
+  }
+  input:focus { border-color: #4a90d9; }
+  .btn {
+    width: 100%; padding: 10px; border: none; border-radius: 6px;
+    font-size: 15px; cursor: pointer; transition: background .2s;
+  }
+  .btn-primary { background: #4a90d9; color: #fff; }
+  .btn-primary:hover { background: #3a7bc8; }
+  .err {
+    color: #e74c3c; font-size: 13px; margin-top: 8px; text-align: center;
+    min-height: 20px;
+  }
+  .toggle { text-align: center; margin-top: 18px; font-size: 13px; color: #999; }
+  .toggle a { color: #4a90d9; cursor: pointer; text-decoration: none; }
+  .toggle a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>帮你节省5分钟</h1>
+  <p class="sub">登录以使用配置生成工具</p>
+
+  <!-- 登录表单 -->
+  <form id="loginForm" method="POST" action="/login" onsubmit="return doLogin(event)">
+    <div class="form-group">
+      <label>用户名</label>
+      <input type="text" name="username" id="loginUser" required autocomplete="username" placeholder="请输入用户名">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" name="password" id="loginPass" required autocomplete="current-password" placeholder="请输入密码">
+    </div>
+    <p class="err" id="loginErr"></p>
+    <button class="btn btn-primary" type="submit">登 录</button>
+  </form>
+
+  <!-- 注册表单（默认隐藏） -->
+  <form id="regForm" method="POST" action="/register" style="display:none" onsubmit="return doReg(event)">
+    <div class="form-group">
+      <label>用户名</label>
+      <input type="text" name="username" id="regUser" required autocomplete="username" placeholder="至少 2 个字符">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" name="password" id="regPass" required autocomplete="new-password" placeholder="至少 4 个字符">
+    </div>
+    <p class="err" id="regErr"></p>
+    <button class="btn btn-primary" type="submit">注 册</button>
+  </form>
+
+  <p class="toggle">
+    <span id="toggleLabel">没有账号？</span>
+    <a id="toggleLink" onclick="toggleForm()">注册</a>
+  </p>
+</div>
+
+<script>
+  let isLogin = true;
+  function toggleForm() {
+    isLogin = !isLogin;
+    document.getElementById('loginForm').style.display = isLogin ? '' : 'none';
+    document.getElementById('regForm').style.display = isLogin ? 'none' : '';
+    document.getElementById('toggleLabel').textContent = isLogin ? '没有账号？' : '已有账号？';
+    document.getElementById('toggleLink').textContent = isLogin ? '注册' : '登录';
+    document.getElementById('loginErr').textContent = '';
+    document.getElementById('regErr').textContent = '';
+  }
+
+  async function doLogin(e) {
+    e.preventDefault();
+    const err = document.getElementById('loginErr');
+    err.textContent = '';
+    try {
+      const r = await fetch('/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          username: document.getElementById('loginUser').value,
+          password: document.getElementById('loginPass').value,
+        }),
+      });
+      const d = await r.json();
+      if (d.ok) { window.location.href = d.redirect || '/'; }
+      else { err.textContent = d.error || '登录失败'; }
+    } catch(ex) { err.textContent = '网络错误，请重试'; }
+    return false;
+  }
+
+  async function doReg(e) {
+    e.preventDefault();
+    const err = document.getElementById('regErr');
+    err.textContent = '';
+    const pw = document.getElementById('regPass').value;
+    if (pw.length < 4) { err.textContent = '密码至少 4 个字符'; return false; }
+    try {
+      const r = await fetch('/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          username: document.getElementById('regUser').value,
+          password: pw,
+        }),
+      });
+      const d = await r.json();
+      if (d.ok) { err.style.color = '#27ae60'; err.textContent = '注册成功！点击上方「登录」切换'; }
+      else { err.textContent = d.error || '注册失败'; }
+    } catch(ex) { err.textContent = '网络错误，请重试'; }
+    return false;
+  }
+</script>
+</body>
+</html>

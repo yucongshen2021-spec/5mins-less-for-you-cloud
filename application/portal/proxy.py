@@ -21,7 +21,7 @@ import urllib.parse
 import urllib.request
 from collections import deque
 
-from flask import request, Response
+from flask import request, Response, session
 
 # ── Stats DB import (shared with the 9000-port stats app) ────────────────────
 _APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # …/application
@@ -135,6 +135,13 @@ def _filter_headers(headers: dict) -> dict:
 def _build_proxy_request(target_url: str) -> urllib.request.Request:
     headers = _filter_headers(dict(request.headers))
     headers.pop("Host", None)
+    # 删除客户端可能伪造的 X-User-Id/X-Username，再注入可信的 session 值
+    headers.pop("X-User-Id", None)
+    headers.pop("X-Username", None)
+    uid = session.get("user_id", "")
+    if uid:
+        headers["X-User-Id"] = uid
+        headers["X-Username"] = session.get("username", uid)
     data = request.get_data() or None
     return urllib.request.Request(target_url, data=data, headers=headers, method=request.method)
 

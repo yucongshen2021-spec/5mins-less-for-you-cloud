@@ -23,6 +23,7 @@ services:
       - SUPERVISOR_MODE=1
       - PORTAL_LABEL=内测版本
       - BROWSER=echo
+      - SECRET_KEY=test-secret-do-not-use-in-prod
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]

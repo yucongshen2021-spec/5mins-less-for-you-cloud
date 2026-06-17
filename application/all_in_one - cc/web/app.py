@@ -36,6 +36,37 @@ SRC_DIR = _BUNDLE_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+# ── 用户 workspace 隔离 ──────────────────────────────────────────────────────
+# 每用户独立目录 data/users/<user_id>/，首次访问自动创建并复制出厂模板。
+# 用户身份由 portal proxy 注入的 X-User-Id header 确定（不可信）。
+# 裸机/test_client（无 X-User-Id）fallback 到 _DATA_RW_DIR（兼容旧数据）。
+
+
+def _get_user_data_dir() -> Path:
+    """返回当前用户的 workspace 目录。无请求上下文时返回默认 _DATA_RW_DIR。"""
+    try:
+        from flask import has_request_context
+        if has_request_context():
+            uid = (request.headers.get("X-User-Id") or "").strip()
+            if uid:
+                u_dir = _DATA_RW_DIR / "users" / uid
+                # 首次访问：创建目录 + 复制出厂 editor_defaults
+                if not (u_dir / ".init_done").exists():
+                    u_dir.mkdir(parents=True, exist_ok=True)
+                    src = _DATA_RO_DIR / "editor_defaults"
+                    if src.is_dir():
+                        import shutil as _shutil
+                        dst = u_dir / "editor_defaults"
+                        if not dst.is_dir():
+                            _shutil.copytree(str(src), str(dst))
+                    # 空 user_init_placeholders.json
+                    (u_dir / "user_init_placeholders.json").write_text("{}", encoding="utf-8")
+                    (u_dir / ".init_done").touch()
+                return u_dir
+    except Exception:
+        pass
+    return _DATA_RW_DIR
+
 try:
     from user_activity_log import log_generate_config
 except ImportError:
@@ -1866,7 +1897,7 @@ def api_template_load():
     slot = info["tpl_slot"]
     disk_key = _DISK_ALIASES.get(scenario_key, scenario_key)
     safe_key = re.sub(r"[^\w一-鿿]", "_", disk_key)
-    ws_dir = _DATA_RW_DIR / "editor_workspace" / safe_key
+    ws_dir = _get_user_data_dir() / "editor_workspace" / safe_key
     def_dir = _DATA_RO_DIR / "editor_defaults" / safe_key
 
     def _read_file(name):
@@ -1961,7 +1992,7 @@ def api_template_save():
 
     disk_key = _DISK_ALIASES.get(scenario_key, scenario_key)
     safe_key = re.sub(r"[^\w一-鿿]", "_", disk_key)
-    ws_dir = _DATA_RW_DIR / "editor_workspace" / safe_key
+    ws_dir = _get_user_data_dir() / "editor_workspace" / safe_key
     ws_dir.mkdir(parents=True, exist_ok=True)
     slot = info["tpl_slot"]
 
@@ -1996,7 +2027,7 @@ def api_template_reset():
     safe_key = re.sub(r"[^\w一-鿿]", "_", disk_key)
 
     # Delete workspace files so next restart loads factory template
-    ws_dir = _DATA_RW_DIR / "editor_workspace" / safe_key
+    ws_dir = _get_user_data_dir() / "editor_workspace" / safe_key
     if ws_dir.is_dir():
         for fname in ("headers.txt", "mapping.txt", f"{slot}.tpl"):
             fp = ws_dir / fname
@@ -2419,7 +2450,7 @@ def _get_effective_template(ns: dict, slot: str) -> str:
     or read fails, falls back to ns factory template to ensure generate
     never produces a truncated output.
     """
-    ws = _DATA_RW_DIR / "editor_workspace"
+    ws = _get_user_data_dir() / "editor_workspace"
     if ws.is_dir():
         for sdir in ws.iterdir():
             if not sdir.is_dir():
@@ -2439,7 +2470,7 @@ def _get_effective_template(ns: dict, slot: str) -> str:
 def _load_workspace_templates():
     """Load all saved templates from editor_workspace into runtime."""
     import re as _re_lwt
-    ws = _DATA_RW_DIR / "editor_workspace"
+    ws = _get_user_data_dir() / "editor_workspace"
     if not ws.is_dir():
         return
     count = 0
@@ -2485,7 +2516,7 @@ def _snapshot_factory_defaults():
 
 def _load_init_defaults():
     """Load saved init defaults from user_init_placeholders.json into module globals."""
-    json_path = _DATA_RW_DIR / "user_init_placeholders.json"
+    json_path = _get_user_data_dir() / "user_init_placeholders.json"
     if not json_path.exists():
         return
     try:
@@ -2539,7 +2570,7 @@ def api_init_defaults_get(scenario_key):
     # Start from factory defaults (snapshot before any requests polluted the globals)
     values = dict(_FACTORY_INIT_DEFAULTS.get(scenario_key, {}))
     # Overlay user-saved values from JSON
-    json_path = _DATA_RW_DIR / "user_init_placeholders.json"
+    json_path = _get_user_data_dir() / "user_init_placeholders.json"
     try:
         if json_path.exists():
             saved = json.loads(json_path.read_text(encoding="utf-8-sig"))
@@ -2569,7 +2600,7 @@ def api_init_defaults_save():
               if not (isinstance(v, str) and v.strip().lower() == 'dhcp' and k in _LAN_KEYS)}
 
     # Write to user_init_placeholders.json
-    json_path = _DATA_RW_DIR / "user_init_placeholders.json"
+    json_path = _get_user_data_dir() / "user_init_placeholders.json"
     try:
         all_values = {}
         if json_path.exists():
@@ -2606,7 +2637,7 @@ def api_init_defaults_reset():
         return jsonify({"ok": False, "error": _humanize_error("Scenario not found")}), 404
 
     # Remove from JSON first
-    json_path = _DATA_RW_DIR / "user_init_placeholders.json"
+    json_path = _get_user_data_dir() / "user_init_placeholders.json"
     try:
         if json_path.exists():
             all_values = json.loads(json_path.read_text(encoding="utf-8-sig"))
@@ -2642,7 +2673,7 @@ def api_init_defaults_reset():
     # Also re-apply workspace templates for this module
     try:
         import re as _re_reset
-        ws = _DATA_RW_DIR / "editor_workspace"
+        ws = _get_user_data_dir() / "editor_workspace"
         if ws.is_dir():
             for si in _SCENARIO_LIST:
                 if si["source"] != source:
@@ -2779,7 +2810,7 @@ def _preload_all_modules():
 #
 # sentinel 文件 data/.reload_stamp 在每次保存后被 touch，作为统一的变更信号。
 
-_RELOAD_STAMP = _DATA_RW_DIR / ".reload_stamp"
+_RELOAD_STAMP = _get_user_data_dir() / ".reload_stamp"
 _runtime_mtime: float = 0.0
 
 
@@ -2826,14 +2857,16 @@ def check_and_reload_runtime() -> None:
 
 
 def init_worker() -> None:
-    """Initialize a worker process: preload modules + snapshot defaults + load
-    saved runtime state. Called by gunicorn post_fork (once per worker) and also
-    safe to call in __main__ single-process mode.
+    """Initialize a worker process: preload modules + snapshot factory defaults.
+    Called by gunicorn post_fork (once per worker) and also safe to call in
+    __main__ single-process mode (bare metal dev).
+
+    Does NOT load per-user init defaults or workspace templates — those are
+    user-specific and read on-demand via _get_effective_template /
+    _get_user_data_dir. Module globals start as factory defaults.
     """
     _preload_all_modules()
     _snapshot_factory_defaults()
-    _load_init_defaults()
-    _load_workspace_templates()
     # Record current sentinel mtime so we don't immediately re-reload.
     global _runtime_mtime
     _runtime_mtime = _stamp_mtime()
