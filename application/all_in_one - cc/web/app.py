@@ -190,82 +190,6 @@ def _apply_network_to_widgets(widget, ns: dict) -> None:
         pass
 
 
-def _set_closure_vars(ns: dict, is_hk: bool = False) -> None:
-    """Set ALL tkinter variables captured in builder closures from module globals.
-
-    Builder functions (hk_get_net, hk_get_raw, us_get_net, etc.) capture
-    BooleanVars (DHCP), Text widgets (inner nets), and Entry widgets (WAN/LAN IP/GW)
-    in their closures. We set them all from the module's current global values.
-    """
-    # Map: (closure function name, cell index) → (globals key, value type)
-    # ER HK/US closures
-    # Cell indices verified empirically 2026-05-14:
-    #   get_net cells: [7]=bypass, [8]=inner text, [9]=lan_cidr, [10]=wan_gw, [11]=wan_cidr,
-    #                  [12]=lan_dhcp, [13]=lan_eth, [14]=return_route, [15]=wan_dhcp, [16]=wan_eth
-    er_map = {
-        # hk_get_raw: Entry widgets for WAN/LAN IP/GW + Text for inner nets
-        ("hk_get_raw", 1): ("DEFAULT_INNER_NETS", "text"),    # inner nets Text
-        ("hk_get_raw", 2): ("DEFAULT_LAN_GW", "entry"),       # LAN GW Entry
-        ("hk_get_raw", 3): ("DEFAULT_LAN_CIDR", "entry"),     # LAN CIDR Entry
-        ("hk_get_raw", 4): ("DEFAULT_WAN_GW", "entry"),       # WAN GW Entry
-        ("hk_get_raw", 5): ("DEFAULT_WAN_CIDR", "entry"),     # WAN CIDR Entry
-        # hk_get_net: BooleanVars [7]=bypass_var, [12]=lan_dhcp_var, [14]=return_route_var, [15]=wan_dhcp_var
-        ("hk_get_net", 7):  ("DEFAULT_BYPASS", "bool"),
-        ("hk_get_net", 8):  ("DEFAULT_INNER_NETS", "text"),
-        ("hk_get_net", 12): ("DEFAULT_LAN_DHCP", "bool"),
-        ("hk_get_net", 14): ("DEFAULT_GEN_RETURN_ROUTE", "bool"),
-        ("hk_get_net", 15): ("DEFAULT_WAN_DHCP", "bool"),
-        # us_get_raw (same structure as hk)
-        ("us_get_raw", 1): ("DEFAULT_INNER_NETS", "text"),
-        ("us_get_raw", 2): ("DEFAULT_LAN_GW", "entry"),
-        ("us_get_raw", 3): ("DEFAULT_LAN_CIDR", "entry"),
-        ("us_get_raw", 4): ("DEFAULT_WAN_GW", "entry"),
-        ("us_get_raw", 5): ("DEFAULT_WAN_CIDR", "entry"),
-        # us_get_net (same BooleanVar ordering as hk)
-        ("us_get_net", 7):  ("DEFAULT_BYPASS", "bool"),
-        ("us_get_net", 8):  ("DEFAULT_INNER_NETS", "text"),
-        ("us_get_net", 12): ("DEFAULT_LAN_DHCP", "bool"),
-        ("us_get_net", 14): ("DEFAULT_GEN_RETURN_ROUTE", "bool"),
-        ("us_get_net", 15): ("DEFAULT_WAN_DHCP", "bool"),
-    }
-    # For HK variant, override WAN_DHCP/LAN_DHCP with HK_ prefix
-    hk_overrides = {
-        ("hk_get_net", 15): "HK_DEFAULT_WAN_DHCP",
-        ("hk_get_net", 12): "HK_DEFAULT_LAN_DHCP",
-    }
-    if is_hk:
-        for k, v in hk_overrides.items():
-            if k in er_map:
-                er_map[k] = (v, er_map[k][1])
-
-    for (fn_name, cell_idx), (glob_key, val_type) in er_map.items():
-        fn = ns.get(fn_name)
-        if not fn or not hasattr(fn, '__closure__') or not fn.__closure__:
-            continue
-        try:
-            cell = fn.__closure__[cell_idx]
-            widget = cell.cell_contents
-            val = ns.get(glob_key)
-            if val is None:
-                continue
-            if val_type == "bool" and isinstance(widget, tk.BooleanVar):
-                widget.set(bool(val) if not isinstance(val, bool) else val)
-            elif val_type == "text" and isinstance(widget, tk.Text):
-                widget.delete("1.0", tk.END)
-                widget.insert("1.0", str(val))
-            elif val_type == "entry" and isinstance(widget, tk.Entry):
-                s = str(val)
-                if s.strip().lower() == 'dhcp' and glob_key == "DEFAULT_LAN_GW":
-                    continue
-                widget.delete(0, tk.END)
-                widget.insert(0, s)
-        except Exception:
-            pass
-
-    # USG builders (_build_usg_format_dict_common) read directly from module globals,
-    # not from tkinter widget closures. No closure cells to update.
-
-
 def _inject_network_to_module(ns: dict, network: dict, *, is_usg: bool = False, is_hk: bool = False) -> None:
     """Inject web form network values into module globals before calling builder.
 
@@ -313,7 +237,12 @@ def _inject_network_to_module(ns: dict, network: dict, *, is_usg: bool = False, 
 
 
 def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
-    """Override format dict with web form network values. Works around tkinter widget state."""
+    """Override format dict with web form network values.
+
+    ER 2in1 的 builder 通过 tkinter 闭包读取控件值，但在 web exec() 模式下
+    控件状态不可靠（BooleanVar 等）。本函数在 builder 返回 d 后，用表单
+    network 参数覆盖所有网络相关字段，确保输出与用户输入一致。
+    """
     if not d or not network:
         return
     if is_usg:
@@ -342,9 +271,9 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
                      "bypass": "DEFAULT_BYPASS"}[dhcp_k]
             d[map_k] = bool(v)
 
-    # Override wan_addr / wan_route_block from web form network values.
-    # The _set_closure_vars approach for BooleanVars is fragile in the web exec() context,
-    # so the builder may produce stale DHCP/static values. We recompute both branches here.
+    # Recompute wan_addr / wan_route_block from web form network values.
+    # Builder 读取的 tkinter BooleanVar (wan_dhcp_var) 在 web 模式下状态不可靠，
+    # 这里根据表单 wan_dhcp 重算两个分支。
     wan_if = d.get("wan_if", "")
     if network.get("wan_dhcp"):
         if not is_usg:
@@ -367,8 +296,7 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
                 d["wan_route_block"] = ""
 
     # Recompute return_routes_block from form state.
-    # (The _set_closure_vars approach for BooleanVars is fragile in the web exec() context,
-    #  so bypass_var and return_route_var both stay False. We recompute here instead.)
+    # bypass_var / return_route_var 在 web 模式下状态不可靠，这里根据表单值重算。
     if not is_usg:
         bypass = network.get("bypass", False)
         gen_rr = network.get("gen_return_route", False)
@@ -378,8 +306,7 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
             d["lan_if_block"] = ""
             d["dhcp_server_block"] = ""
         else:
-            # Non-bypass: ensure lan_if_block is populated (closure BooleanVar may
-            # have wrong state due to _set_closure_vars cell index mismatch)
+            # Non-bypass: ensure lan_if_block is populated (builder closure state may be stale)
             if not d.get("lan_if_block"):
                 lan_eth = d.get("lan_eth_num", "5")
                 lan_if = f"eth{lan_eth}" if not str(lan_eth).startswith("GE") else str(lan_eth)
@@ -753,6 +680,7 @@ def api_tools():
 def generate_epoch_fastip():
     """Generate Epoch FastIP configuration using the full build_*_format_dict functions."""
     data = request.get_json(force=True)
+    check_and_reload_runtime()
     variant = data.get("variant", "hk")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -760,7 +688,6 @@ def generate_epoch_fastip():
 
     er = _get_er()
     _inject_network_to_module(er, network, is_hk=(variant == "hk"))
-    _set_closure_vars(er, is_hk=(variant == "hk"))
 
     try:
         if variant == "hk":
@@ -894,6 +821,7 @@ def generate_epoch_fastip():
 def generate_epoch_fastip5():
     """Generate Epoch FastIP 5.0 configuration (VyOS set syntax)."""
     data = request.get_json(force=True)
+    check_and_reload_runtime()
     variant = data.get("variant", "hk")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -1072,6 +1000,7 @@ def generate_epoch_fastip5():
 @app.route("/api/generate/usg_fastip", methods=["POST"])
 def generate_usg_fastip():
     data = request.get_json(force=True)
+    check_and_reload_runtime()
     variant = data.get("variant", "us")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -1079,7 +1008,6 @@ def generate_usg_fastip():
 
     usg = _get_usg()
     _inject_network_to_module(usg, network, is_usg=True, is_hk=(variant == "hk"))
-    _set_closure_vars(usg, is_hk=(variant == "hk"))
     _apply_network_to_widgets(usg.get("__TAB_FRAME__", usg.get("__WEB_FRAME__")), usg)
 
     try:
@@ -1149,6 +1077,7 @@ def generate_usg_fastip():
 @app.route("/api/generate/epoch_mpls", methods=["POST"])
 def generate_epoch_mpls():
     data = request.get_json(force=True)
+    check_and_reload_runtime()
     variant = data.get("variant", "domestic")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -1156,7 +1085,6 @@ def generate_epoch_mpls():
 
     mpls = _get_mpls()
     _inject_network_to_module(mpls, network)
-    _apply_network_to_widgets(mpls.get("__TAB_FRAME__", mpls.get("__WEB_FRAME__")), mpls)
     _apply_network_to_widgets(mpls.get("__TAB_FRAME__", mpls.get("__WEB_FRAME__")), mpls)
 
     try:
@@ -1321,6 +1249,7 @@ def generate_epoch_mpls():
 @app.route("/api/generate/ar_sdwan", methods=["POST"])
 def generate_ar_sdwan():
     data = request.get_json(force=True)
+    check_and_reload_runtime()
     variant = data.get("variant", "single_ops")
     hdr_text = data.get("header_text", "")
     tool_id = "ar_sdwan"
@@ -1397,6 +1326,7 @@ def generate_ar_sdwan():
 @app.route("/api/generate/ar_traditional", methods=["POST"])
 def generate_ar_traditional():
     data = request.get_json(force=True)
+    check_and_reload_runtime()
     variant = data.get("variant", "dual")
     hdr_text = data.get("header_text", "")
     network = data.get("network", {})
@@ -2007,6 +1937,7 @@ def api_template_save():
         (ws_dir / "mapping.txt").write_text(mp, encoding="utf-8-sig")
         (ws_dir / f"{slot}.tpl").write_text(tpl, encoding="utf-8-sig")
         _apply_template_to_runtime(scenario_key, info, tpl)
+        _touch_reload_stamp()
         return jsonify({"ok": True, "message": f"Saved to {ws_dir} and applied to runtime"})
     except Exception as e:
         return jsonify({"ok": False, "error": _humanize_error(e)}), 500
@@ -2124,7 +2055,21 @@ def api_template_preview():
                 d = result[0] if isinstance(result, tuple) else result
                 if d:
                     rendered = tpl.format(**d)
+        elif slot == "TEMPLATE_EPOCH_HK_IPSEC":
+            fn = ns.get("build_epoch_hk_format_dict")
+            if fn:
+                result = fn(hdr_text)
+                d = result[0] if isinstance(result, tuple) else result
+                if d:
+                    rendered = tpl.format(**d)
         elif slot == "TEMPLATE_EPOCH_US":
+            fn = ns.get("build_epoch_us_format_dict")
+            if fn:
+                result = fn(hdr_text)
+                d = result[0] if isinstance(result, tuple) else result
+                if d:
+                    rendered = tpl.format(**d)
+        elif slot == "TEMPLATE_EPOCH_US_IPSEC":
             fn = ns.get("build_epoch_us_format_dict")
             if fn:
                 result = fn(hdr_text)
@@ -2352,8 +2297,24 @@ def api_template_preview():
                         d.update(blocks)
                 _inject_network_to_parsed(ns, d)
                 rendered = gen_fn(d)
+        elif slot == "TEMPLATE_AR_TRADITIONAL":
+            parse_fn = ns.get("parse_ar_traditional_headers")
+            builder_fn = ns.get("build_ar_traditional_format_dict")
+            if parse_fn and builder_fn and tpl:
+                main_line, backup_line, err = parse_fn(hdr_text)
+                if err:
+                    parse_err = str(err)
+                else:
+                    d = builder_fn(main_line, backup_line)
+                    if isinstance(d, tuple):
+                        d = d[0]
+                    if isinstance(d, dict):
+                        try:
+                            rendered = tpl.format(**d)
+                        except Exception:
+                            rendered = ""
         elif "TEMPLATE_AR_" in slot:
-            # Map each AR slot to its builder function
+            # Map each AR SD-WAN slot to its builder function
             _AR_SLOT_BUILDERS = {
                 "TEMPLATE_AR_OPS_SINGLE_WAN1": "build_ar_ops_single_wan1_fd",
                 "TEMPLATE_AR_FACTORY_SINGLE_WAN1": "build_ar_factory_single_wan1_fd",
@@ -2381,20 +2342,6 @@ def api_template_preview():
                     parsed = parse_fn(hdr_text)
                     init_cfg = {"mode": "ops", "device_type": "single", "device_role": "pri"}
                     rendered = ops_fn(parsed, init_cfg)
-            elif slot == "TEMPLATE_AR_TRADITIONAL":
-                parse_fn = ns.get("parse_ar_traditional_headers")
-                builder_fn = ns.get("build_ar_traditional_format_dict")
-                if parse_fn and builder_fn and tpl:
-                    main_line, backup_line, err = parse_fn(hdr_text)
-                    if not err:
-                        d = builder_fn(main_line, backup_line)
-                        if isinstance(d, tuple):
-                            d = d[0]
-                        if isinstance(d, dict):
-                            try:
-                                rendered = tpl.format(**d)
-                            except Exception:
-                                rendered = ""
 
         if not rendered:
             if parse_err:
@@ -2590,6 +2537,7 @@ def api_init_defaults_save():
                     continue
                 ns[k] = sv
 
+    _touch_reload_stamp()
     return jsonify({"ok": True, "message": "Saved"})
 
 
@@ -2766,6 +2714,71 @@ def _preload_all_modules():
     print("Preload done.")
 
 
+# ── 多 worker 状态同步（mtime 轮询重载）──────────────────────────────────
+# 多 worker 进程隔离下，worker A 保存模板/默认值后写磁盘，其他 worker 内存 ns
+# 不会自动同步。用文件 mtime 轮询：每个 generate 请求开始前检查 mtime 是否变化，
+# 变化则重载 init defaults + workspace templates 到当前 worker 的 _EMBEDDED_NS。
+#
+# sentinel 文件 data/.reload_stamp 在每次保存后被 touch，作为统一的变更信号。
+
+_RELOAD_STAMP = _DATA_RW_DIR / ".reload_stamp"
+_runtime_mtime: float = 0.0
+
+
+def _stamp_mtime() -> float:
+    """Return current sentinel file mtime (0 if absent)."""
+    try:
+        return _RELOAD_STAMP.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _touch_reload_stamp() -> None:
+    """Touch sentinel file to signal other workers to reload. Called after saves."""
+    global _runtime_mtime
+    try:
+        _RELOAD_STAMP.parent.mkdir(parents=True, exist_ok=True)
+        _RELOAD_STAMP.touch()
+        _runtime_mtime = _stamp_mtime()
+    except Exception:
+        pass
+
+
+def check_and_reload_runtime() -> None:
+    """Check if runtime state changed (other worker saved templates/defaults).
+
+    Called at the start of each generate request. If the sentinel file's mtime
+    advanced since we last saw it, reload init defaults + workspace templates
+    into this worker's _EMBEDDED_NS. O(1) when nothing changed (one os.stat).
+    """
+    global _runtime_mtime
+    cur = _stamp_mtime()
+    if cur == _runtime_mtime:
+        return
+    # mtime changed → reload from disk
+    try:
+        _load_init_defaults()
+        _load_workspace_templates()
+        _runtime_mtime = cur
+        print(f"[worker] reloaded runtime (mtime={cur})", flush=True)
+    except Exception as e:
+        print(f"[worker] reload FAILED: {e}", flush=True)
+
+
+def init_worker() -> None:
+    """Initialize a worker process: preload modules + snapshot defaults + load
+    saved runtime state. Called by gunicorn post_fork (once per worker) and also
+    safe to call in __main__ single-process mode.
+    """
+    _preload_all_modules()
+    _snapshot_factory_defaults()
+    _load_init_defaults()
+    _load_workspace_templates()
+    # Record current sentinel mtime so we don't immediately re-reload.
+    global _runtime_mtime
+    _runtime_mtime = _stamp_mtime()
+
+
 if __name__ == "__main__":
     import logging
     import threading
@@ -2776,14 +2789,8 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5003
     print(f"all_in_one web · http://localhost:{port}")
 
-    # 预加载所有模块（创建 Tk root + exec 模块代码），避免首次请求阻塞
-    _preload_all_modules()
-    # 快照出厂默认值（在加载用户保存值之前，供 reset API 使用）
-    _snapshot_factory_defaults()
-    # 加载已保存的初始化默认值到模块 globals
-    _load_init_defaults()
-    # 加载已保存的工作区模板到运行时
-    _load_workspace_templates()
+    # 单进程裸机模式：自行初始化（gunicorn 模式下由 post_fork 调 init_worker）
+    init_worker()
 
     # 1.2 秒后自动打开浏览器（仅本机）；TEST_MODE / NO_BROWSER / BROWSER=echo 下跳过。
     if (
@@ -2797,4 +2804,5 @@ if __name__ == "__main__":
 
     # host="0.0.0.0" 允许局域网内其他设备访问
     # threaded=False: all requests run on main thread so tkinter calls work
+    # （gunicorn 模式下不走 app.run；裸机模式仍需单线程，业务模块依赖 tkinter）
     app.run(host="0.0.0.0", port=port, debug=False, threaded=False)

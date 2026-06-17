@@ -57,8 +57,8 @@ def test_generate_success():
     assert data["ok"], f"Generation failed: {data.get('error', '')}"
     output = data["output"]
     assert len(output) > 500
-    assert "Tunnel0/0/1000" in output and "Tunnel0/0/2000" in output
-    assert "LoopBack1000" in output and "LoopBack2000" in output
+    assert "Tunnel0/0/1000" in output and "Tunnel0/0/1001" in output
+    assert "LoopBack1000" in output and "LoopBack1001" in output
     assert "nqa test-instance admin ipsecmain" in output
     assert "undo portswitch" in output       # LAN 接口
     assert "173.15.20.10" in output           # LAN IP

@@ -71,6 +71,8 @@ credentials.json
 # ---- 运行期缓存（portal 更新检查、临时数据）----
 .update_cache.json
 **/.update_cache.json
+.reload_stamp
+**/.reload_stamp
 
 # ---- 临时测试运行产物 ----
 temp/

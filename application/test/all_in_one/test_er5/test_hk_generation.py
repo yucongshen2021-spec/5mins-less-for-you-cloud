@@ -337,20 +337,36 @@ class TestEpochFastIP5OtherVariants(unittest.TestCase):
         self.assertNotIn("ER5_NE_MAIN_MSS_DEFAULT", values)
         self.assertNotIn("ER5_NE_BK_MSS_DEFAULT", values)
 
-    def test_domain_split_unimplemented(self):
+    def test_domain_split_generates_config(self):
+        """domain_split 已实现：提供域名 + address-group 应成功生成配置。"""
         resp = self.client.post("/api/generate/epoch_fastip5", json={
             "variant": "domain_split",
             "header_text": VALID_HEADER_MAIN_BACKUP,
+            "network": {
+                "ER5_DS_DOMAINS_DEFAULT": "www.example.com\napi.example.com",
+                "ER5_DS_ADDR_GROUP_DEFAULT": "DS_TEST",
+                "ER5_DS_SOURCE_CIDR_DEFAULT": "192.168.0.0/24",
+                "ER5_DS_ETH_DEFAULT": "eth1",
+            },
+        })
+        data = resp.get_json()
+        self.assertTrue(data.get("ok"),
+                        f"domain_split generation failed: {data.get('error', '')}")
+        output = data.get("output", "")
+        self.assertGreater(len(output), 100)
+        self.assertIn("www.example.com", output)
+        self.assertIn("api.example.com", output)
+
+    def test_domain_split_empty_domains_returns_400(self):
+        """domain_split 未提供域名时应返回 400。"""
+        resp = self.client.post("/api/generate/epoch_fastip5", json={
+            "variant": "domain_split",
+            "header_text": "",
             "network": {},
         })
-        self.assertEqual(resp.status_code, 400,
-                         f"Expected 400 for variant 'domain_split', got {resp.status_code}")
+        self.assertEqual(resp.status_code, 400)
         data = resp.get_json()
-        self.assertFalse(data.get("ok"),
-                         "Expected ok=False for variant 'domain_split'")
-        err = data.get("error", "")
-        self.assertIn("尚未实现", err,
-                      f"Expected '尚未实现' in error for domain_split, got: {err}")
+        self.assertFalse(data.get("ok"))
 
     def test_unknown_variant_returns_400(self):
         """An unknown variant should return 400."""

@@ -3,6 +3,10 @@
 Logs to the shared stats SQLite DB:
 - Page visits: lightweight (IP, time, app, function — no content)
 - Generate/capture actions: full detail (data-header, generated-content, etc.)
+
+Access logs are written asynchronously via a background worker thread so the
+proxy request thread never blocks on SQLite I/O (critical for multi-worker
+concurrency — all portal threads share one stats DB + _write_lock).
 """
 
 import gzip
@@ -10,10 +14,12 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import deque
 
 from flask import request, Response
 
@@ -49,6 +55,58 @@ _ATTR_RE = re.compile(
 _JS_STR_RE = re.compile(
     r"""(["'])(/(?!/|app/)(?=[^"'\s;]*[a-zA-Z])([^"'\s;]{2,}))\1""",
 )
+
+
+# ── Async log writer (background thread + deque) ─────────────────────────────
+# 请求线程只做 O(1) 的 deque.append，后台线程批量写 SQLite，避免每个请求
+# 都同步等 _write_lock + connect + commit。高并发下 portal 工作线程不再被
+# 日志写入阻塞。
+
+_log_queue: deque = deque()
+_log_lock = threading.Lock()
+_log_flush_event = threading.Event()
+_log_started = False
+
+
+def _log_writer_loop():
+    """Background daemon thread: drain the queue and write to SQLite in batches."""
+    while True:
+        # Wait for work or periodic flush
+        _log_flush_event.wait(timeout=0.5)
+        _log_flush_event.clear()
+        # Drain everything currently queued
+        with _log_lock:
+            batch = list(_log_queue)
+            _log_queue.clear()
+        for record in batch:
+            try:
+                _db_log(**record)
+            except Exception:
+                pass  # logging must never break the proxy
+
+
+def _ensure_log_writer():
+    """Start the background writer thread once (idempotent, thread-safe)."""
+    global _log_started
+    if _log_started:
+        return
+    with _log_lock:
+        if _log_started:
+            return
+        t = threading.Thread(target=_log_writer_loop, name="stats-log-writer", daemon=True)
+        t.start()
+        _log_started = True
+
+
+_ensure_log_writer()
+
+
+def _enqueue_log(record: dict) -> None:
+    """Enqueue a log record for async writing. Non-blocking."""
+    with _log_lock:
+        _log_queue.append(record)
+        if len(_log_queue) >= 50:
+            _log_flush_event.set()  # batch threshold reached, flush now
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -107,32 +165,35 @@ def _now_iso() -> str:
 def _try_log(app_id: str, subpath: str, start_s: float,
              resp_status: int, resp_body: bytes,
              error: str = None, is_generate: bool = False) -> None:
-    """Fire-and-forget: write one access record.  Never raises.
+    """Enqueue one access record for async writing. Never raises.
 
-    For generate actions (is_generate=True) we capture the full request/response
-    body so the stats page can show data-header + generated-content.
-    For ordinary page visits we only log metadata (IP, time, function).
+    Must capture all request-context data HERE (in the request thread) because
+    the background writer thread has no Flask request context. For generate
+    actions (is_generate=True) we capture the full request/response body so the
+    stats page can show data-header + generated-content. For ordinary page
+    visits we only log metadata (IP, time, function).
     """
     try:
         req_body = request.get_data() or b""
-        _db_log(
-            ts=_now_iso(),
-            ip=_client_ip(),
-            app_id=app_id,
-            method=request.method,
-            path=request.path,
-            query=request.query_string.decode("utf-8") or "",
-            status=resp_status,
-            duration_ms=int((time.time() - start_s) * 1000),
-            req_size=len(req_body),
-            resp_size=len(resp_body) if resp_body is not None else -1,
-            subpath=subpath,
-            req_body_bytes=req_body if is_generate else None,
-            resp_body_bytes=resp_body if is_generate else None,
-            error=error,
-            user_agent=request.headers.get("User-Agent", ""),
-            referer=request.headers.get("Referer", ""),
-        )
+        record = {
+            "ts": _now_iso(),
+            "ip": _client_ip(),
+            "app_id": app_id,
+            "method": request.method,
+            "path": request.path,
+            "query": request.query_string.decode("utf-8") or "",
+            "status": resp_status,
+            "duration_ms": int((time.time() - start_s) * 1000),
+            "req_size": len(req_body),
+            "resp_size": len(resp_body) if resp_body is not None else -1,
+            "subpath": subpath,
+            "req_body_bytes": req_body if is_generate else None,
+            "resp_body_bytes": resp_body if is_generate else None,
+            "error": error,
+            "user_agent": request.headers.get("User-Agent", ""),
+            "referer": request.headers.get("Referer", ""),
+        }
+        _enqueue_log(record)
     except Exception:
         pass  # logging must never break proxying
 
