@@ -70,7 +70,7 @@ _AUTH_WHITELIST_PREFIXES = ("/static/",)
 # ── Auth middleware ──────────────────────────────────────────────────────────
 @app.before_request
 def _check_auth():
-    """拦截未登录请求（白名单除外）。"""
+    """未登录自动给访客 session（默认 workspace），白名单完全跳过。"""
     path = request.path.rstrip("/")
     if path in _AUTH_WHITELIST:
         return None
@@ -78,14 +78,12 @@ def _check_auth():
         if request.path.startswith(prefix):
             return None
     user_id = session.get("user_id")
-    if not user_id:
-        # Accept JSON → 401; browser → 302
-        if request.is_json or request.headers.get("Accept", "").startswith("application/json"):
-            resp = jsonify({"ok": False, "error": "请先登录"})
-            resp.status_code = 401
-            return resp
-        return redirect("/login")
-    # 刷新 session 24h 过期
+    if user_id is None:
+        # 无 session → 自动创建访客（无需注册，用默认共享 workspace）
+        session["user_id"] = ""
+        session["username"] = "访客"
+        session.permanent = True
+    # 刷新 24h
     session.permanent = True
 
 
@@ -129,7 +127,7 @@ def register():
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect("/login")
+    return redirect("/")
 
 
 # ── Portal pages ─────────────────────────────────────────────────────────────

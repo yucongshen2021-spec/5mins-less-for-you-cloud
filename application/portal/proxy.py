@@ -199,6 +199,8 @@ def _try_log(app_id: str, subpath: str, start_s: float,
             "error": error,
             "user_agent": request.headers.get("User-Agent", ""),
             "referer": request.headers.get("Referer", ""),
+            "user_id": session.get("user_id", "") or "",
+            "username": session.get("username", "") or "",
         }
         _enqueue_log(record)
     except Exception:

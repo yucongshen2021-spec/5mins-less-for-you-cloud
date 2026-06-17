@@ -60,7 +60,9 @@ CREATE TABLE IF NOT EXISTS access_log (
     response_body   TEXT,
     user_agent      TEXT,
     referer         TEXT,
-    error           TEXT
+    error           TEXT,
+    user_id         TEXT DEFAULT '',
+    username        TEXT DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_access_ts       ON access_log(ts);
@@ -81,6 +83,11 @@ def init_db(db_path: str = None) -> str:
         try:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(_SCHEMA_SQL)
+            # 兼容旧库：无 user_id/username 列时自动添加
+            try: conn.execute("ALTER TABLE access_log ADD COLUMN user_id TEXT DEFAULT ''")
+            except Exception: pass
+            try: conn.execute("ALTER TABLE access_log ADD COLUMN username TEXT DEFAULT ''")
+            except Exception: pass
             conn.commit()
         finally:
             conn.close()
@@ -267,6 +274,8 @@ def log_access(
     error: str = None,
     user_agent: str = None,
     referer: str = None,
+    user_id: str = None,
+    username: str = None,
 ) -> bool:
     """Write one access record.  Swallows all exceptions (never breaks the caller)."""
     try:
@@ -312,6 +321,8 @@ def log_access(
             "user_agent": _trunc(user_agent),
             "referer": _trunc(referer),
             "error": _trunc(error),
+            "user_id": _trunc(user_id) or "",
+            "username": _trunc(username) or "",
         }
 
         db_path = get_db_path()
@@ -326,14 +337,15 @@ def log_access(
                        (ts, ip, app_id, method, path, query, status,
                         duration_ms, req_size, resp_size, function, variant,
                         data_header, request_body, response_body,
-                        user_agent, referer, error)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        user_agent, referer, error, user_id, username)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (row["ts"], row["ip"], row["app_id"], row["method"],
                      row["path"], row["query"], row["status"],
                      row["duration_ms"], row["req_size"], row["resp_size"],
                      row["function"], row["variant"],
                      row["data_header"], row["request_body"], row["response_body"],
-                     row["user_agent"], row["referer"], row["error"]),
+                     row["user_agent"], row["referer"], row["error"],
+                     row["user_id"], row["username"]),
                 )
                 conn.commit()
             finally:
@@ -443,6 +455,10 @@ def query_summary(db_path: str) -> dict:
         total = conn.execute("SELECT COUNT(*) FROM access_log").fetchone()[0]
         unique_ips = conn.execute(
             "SELECT COUNT(DISTINCT ip) FROM access_log").fetchone()[0]
+        unique_users = conn.execute(
+            "SELECT COUNT(DISTINCT user_id) FROM access_log WHERE user_id IS NOT NULL AND user_id != ''").fetchone()[0]
+        guest_count = conn.execute(
+            "SELECT COUNT(*) FROM access_log WHERE user_id = ''").fetchone()[0]
         generate_count = conn.execute(
             "SELECT COUNT(*) FROM access_log WHERE response_body IS NOT NULL").fetchone()[0]
         error_count = conn.execute(
@@ -477,6 +493,8 @@ def query_summary(db_path: str) -> dict:
         return {
             "total": total,
             "unique_ips": unique_ips,
+            "unique_users": unique_users,
+            "guest_count": guest_count,
             "generate_count": generate_count,
             "error_count": error_count,
             "top_ips": top_ips,
