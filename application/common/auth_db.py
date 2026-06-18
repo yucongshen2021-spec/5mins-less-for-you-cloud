@@ -158,5 +158,65 @@ def update_user_password(user_id: str, new_password: str) -> dict:
             conn.close()
 
 
+def list_all_users() -> list:
+    """返回所有用户列表，按创建时间排序。每项含 user_id, username, created_at。"""
+    conn = sqlite3.connect(str(_db_path))
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        rows = conn.execute(
+            "SELECT id, username, created_at FROM users ORDER BY created_at"
+        ).fetchall()
+        return [{"user_id": r[0], "username": r[1], "created_at": r[2]} for r in rows]
+    finally:
+        conn.close()
+
+
+def delete_user(user_id: str) -> dict:
+    """删除用户。保护 yucs 管理员不可删除。返回 {ok: True} 或 {ok: False, error}。"""
+    # 先查用户名，保护 yucs
+    conn = sqlite3.connect(str(_db_path))
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        row = conn.execute(
+            "SELECT username FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if not row:
+            return {"ok": False, "error": "用户不存在"}
+        if row[0] == _ADMIN_USER:
+            return {"ok": False, "error": f"管理员 {_ADMIN_USER} 不可删除"}
+    finally:
+        conn.close()
+    with _write_lock:
+        conn = sqlite3.connect(str(_db_path))
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+            return {"ok": True}
+        finally:
+            conn.close()
+
+
+def admin_reset_user_password(user_id: str, new_password: str) -> dict:
+    """管理员重置任意用户密码（不需旧密码）。返回 {ok: True} 或 {ok: False, error}。"""
+    if not new_password or len(new_password) < 4:
+        return {"ok": False, "error": "新密码至少 4 个字符"}
+    pw_hash = generate_password_hash(new_password)
+    with _write_lock:
+        conn = sqlite3.connect(str(_db_path))
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            cur = conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (pw_hash, user_id),
+            )
+            conn.commit()
+            if cur.rowcount == 0:
+                return {"ok": False, "error": "用户不存在"}
+            return {"ok": True}
+        finally:
+            conn.close()
+
+
 # 模块加载时自动建表
 init_auth_db()

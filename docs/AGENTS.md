@@ -24,6 +24,7 @@
 - **模板专属注释**：保存模板时自动在 `.tpl` 顶部加注释行 `# xxx专属yyy场景模板-yymmdd`（xxx=用户名，yyy=场景名，yymmdd=日期）。重复保存自动更新注释，不累积。
 - **并发 vs 用户数**：16 = gunicorn worker 数 = 最大同时并发请求数，不是用户数上限。用户数和 workspace 走磁盘（每用户约 10-50KB），与内存无关。16 worker ≈ 2.6GB 内存。
 - **按用户工作区隔离**：`_get_user_data_dir()` 按 `X-User-Id` header 路由到 `data/users/<uid>/`，proxy 防伪造（剥离客户端 X-User-Id）。
+- **管理后台**：9000 端口 `/admin` 路径，独立密码登录（`ADMIN_PASSWORD` 环境变量，默认 `yucs123`）。可列出/删除用户、重置用户密码。yucs 不可删除。stats app 设置了 `secret_key` 和 `session`。
 
 ## 高频踩坑速查（详细版本在 log/mistake.txt）
 

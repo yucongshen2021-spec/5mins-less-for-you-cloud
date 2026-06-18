@@ -11,15 +11,20 @@ import os
 import sys
 from datetime import datetime, timedelta
 
-from flask import Flask, Response, render_template, request, jsonify
+from flask import Flask, Response, render_template, request, jsonify, session
 
 # Allow import of the shared common module
 _APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../application
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 from common import stats_db
+from common import auth_db
 
 app = Flask(__name__)
+
+# ── Session config (for admin panel) ─────────────────────────────────────────
+app.secret_key = os.environ.get("STATS_SECRET_KEY", os.environ.get("SECRET_KEY", "stats-default-secret"))
+_ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "yucs123")
 
 # ── DB init ──────────────────────────────────────────────────────────────────
 
@@ -110,6 +115,65 @@ def api_export_csv():
             "Content-Disposition": f'attachment; filename="access_log_{ts}.csv"',
         },
     )
+
+
+# ── Admin panel ──────────────────────────────────────────────────────────────
+
+def _admin_logged_in() -> bool:
+    return session.get("admin") is True
+
+
+@app.route("/admin")
+def admin_page():
+    """管理后台页面。未登录显示登录表单，已登录显示用户管理。"""
+    return render_template("admin.html", logged_in=_admin_logged_in())
+
+
+@app.route("/admin/login", methods=["POST"])
+def admin_login():
+    """管理后台登录：验证密码。"""
+    data = request.get_json(force=True, silent=True) or {}
+    password = data.get("password", "")
+    if password == _ADMIN_PASSWORD:
+        session["admin"] = True
+        session.permanent = True
+        return jsonify({"ok": True})
+    return jsonify({"ok": False, "error": "密码错误"}), 401
+
+
+@app.route("/admin/logout", methods=["POST"])
+def admin_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.route("/admin/api/users")
+def admin_list_users():
+    """列出所有用户。"""
+    if not _admin_logged_in():
+        return jsonify({"ok": False, "error": "未登录"}), 401
+    users = auth_db.list_all_users()
+    return jsonify({"ok": True, "users": users})
+
+
+@app.route("/admin/api/users/<user_id>/delete", methods=["POST"])
+def admin_delete_user(user_id):
+    """删除用户（保护 yucs）。"""
+    if not _admin_logged_in():
+        return jsonify({"ok": False, "error": "未登录"}), 401
+    result = auth_db.delete_user(user_id)
+    return jsonify(result)
+
+
+@app.route("/admin/api/users/<user_id>/reset-password", methods=["POST"])
+def admin_reset_password(user_id):
+    """管理员重置用户密码。"""
+    if not _admin_logged_in():
+        return jsonify({"ok": False, "error": "未登录"}), 401
+    data = request.get_json(force=True, silent=True) or {}
+    new_password = data.get("new_password", "")
+    result = auth_db.admin_reset_user_password(user_id, new_password)
+    return jsonify(result)
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────

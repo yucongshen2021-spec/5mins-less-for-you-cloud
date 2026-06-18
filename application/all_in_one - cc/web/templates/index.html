@@ -488,9 +488,9 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <div class="card" style="margin-bottom:10px"><div class="card-h" onclick="tg(this)"><span>初始化默认</span><span class="carr">▼</span></div>
 <div class="card-b" id="tpl-init-body"><span style="color:var(--mu);font-size:12px">选择场景后加载初始化参数…</span></div></div>
 <div class="tgrid">
-<div class="tpane"><div class="card"><div class="card-h"><span>① 数据头</span><button class="fs-btn" onclick="fsToggle(this,'tpl-header')">⛶</button></div><div class="card-b"><textarea class="ft" id="tpl-header" placeholder="选择场景后自动生成…"></textarea></div></div></div>
+<div class="tpane"><div class="card"><div class="card-h"><span>① 数据头</span><button class="fs-btn" onclick="fsToggle(this,'tpl-header')">⛶</button></div><div class="card-b"><textarea class="ft" id="tpl-header" readonly placeholder="选择场景后自动生成…"></textarea></div></div></div>
 <div class="tpane"><div class="card"><div class="card-h"><span>② 变量映射</span><button class="fs-btn" onclick="fsToggle(this,'tpl-mapping')">⛶</button></div><div class="card-b"><textarea class="ft" id="tpl-mapping" readonly placeholder="选择场景后自动生成…" style="background:var(--cvs)"></textarea></div></div></div>
-<div class="tpane"><div class="card"><div class="card-h"><span>③ 生成模板</span><button class="fs-btn" onclick="fsToggle(this,'tpl-template')">⛶</button></div><div class="card-b"><textarea class="ft" id="tpl-template" placeholder="template.tpl"></textarea></div></div></div>
+<div class="tpane"><div class="card"><div class="card-h"><span>③ 生成模板</span><button class="fs-btn" onclick="fsToggle(this,'tpl-template')">⛶</button></div><div class="card-b"><textarea class="ft" id="tpl-template" readonly placeholder="template.tpl"></textarea></div></div></div>
 <div class="tpane"><div class="card"><div class="card-h"><span>④ 预览效果</span><button class="fs-btn" onclick="fsToggle(this,'tpl-preview')">⛶</button></div><div class="card-b"><textarea class="ft code-out" id="tpl-preview" readonly placeholder="选择场景 → 编辑模板 → 预览…"></textarea></div></div></div>
 </div>
 <div class="btn-row" style="margin-top:12px"><button class="btn btn-w" id="btn-rst-tpl" onclick="rstTpl()">恢复最初模板</button><button class="btn btn-s" id="btn-prev-tpl" onclick="prevTpl()">预览模板</button><button class="btn btn-p" id="btn-save-tpl" onclick="saveTpl()">保存模板</button><span class="status" id="template-status"></span></div>
@@ -835,23 +835,30 @@ function toast(m){let t=$('toast');t.textContent=m;t.classList.add('show');setTi
 function updateTemplateAdminUI(){
   /* 非登录用户：禁用所有模板编辑操作 */
   let editable=TEMPLATE_EDITABLE===true;
-  // 提示横幅：非 admin 显示只读提示
+  // 提示横幅
   let banner=$('tpl-admin-banner');if(banner){banner.style.display=editable?'none':'block'}
   // 三个主按钮
   ['btn-save-tpl','btn-prev-tpl','btn-rst-tpl'].forEach(id=>{
     let el=$(id);if(el){el.disabled=!editable;el.style.opacity=editable?'':'0.4';el.style.cursor=editable?'':'not-allowed'}
   });
-  // 四个编辑区置为只读（非 admin 时）
+  // 编辑区只读控制 + 键盘拦截
   ['tpl-header','tpl-template','tpl-mapping'].forEach(id=>{
-    let el=$(id);if(el){el.readOnly=!editable;el.style.background=editable?'':'var(--hls)'}
+    let el=$(id);if(el){
+      el.readOnly=!editable;
+      el.style.background=editable?'':'var(--hls)';
+      if(editable){
+        el.onkeydown=null;el.oncut=null;el.onpaste=null;
+      }else{
+        el.onkeydown=function(e){if(e.ctrlKey&&(e.key==='c'||e.key==='C'||e.key==='a'||e.key==='A'))return true;e.preventDefault();return false};
+        el.oncut=function(e){e.preventDefault();return false};
+        el.onpaste=function(e){e.preventDefault();return false};
+      }
+    }
   });
-  // 预览区始终只读（本来就是 readonly），但也调暗
-  let prev=$('tpl-preview');if(prev){prev.style.background=admin?'':'var(--hls)'}
-  // 场景选择 chips 中的 × 按钮：非 admin 隐藏
+  let prev=$('tpl-preview');if(prev){prev.style.background=editable?'':'var(--hls)'}
   if(!editable){
     document.querySelectorAll('#tpl-chips .chip-x').forEach(x=>x.style.display='none');
   }
-  // 动态生成的 init-defaults 按钮在 loadInitDefaults 里处理
 }
 window.addEventListener('DOMContentLoaded',()=>{updateTemplateAdminUI()});
 

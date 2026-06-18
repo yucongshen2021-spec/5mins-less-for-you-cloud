@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 · 访问统计</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #f0f2f5; --card: #fff; --border: #e0e0e0;
+    --text: #333; --muted: #999; --primary: #4a90d9; --danger: #e74c3c;
+    --ok: #27ae60;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  .topbar {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+  }
+  .topbar .brand { font-size: 16px; font-weight: 600; }
+  .topbar .spacer { flex: 1; }
+  .topbar a { color: var(--primary); text-decoration: none; font-size: 14px; }
+  .topbar a:hover { text-decoration: underline; }
+  .container { max-width: 900px; margin: 32px auto; padding: 0 20px; }
+
+  /* Login form */
+  .login-card {
+    background: var(--card); border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    padding: 40px; width: 380px; max-width: 90vw; margin: 60px auto;
+  }
+  .login-card h1 { font-size: 22px; text-align: center; margin-bottom: 8px; }
+  .login-card .sub { text-align: center; font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+  .form-group input {
+    width: 100%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 6px;
+    font-size: 14px; outline: none; transition: border-color .2s;
+  }
+  .form-group input:focus { border-color: var(--primary); }
+  .btn {
+    width: 100%; padding: 10px; border: none; border-radius: 6px;
+    font-size: 15px; cursor: pointer; transition: background .2s;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: #3a7bc8; }
+  .btn-sm { width: auto; padding: 6px 14px; font-size: 13px; border-radius: 4px; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #c0392b; }
+  .err { color: var(--danger); font-size: 13px; text-align: center; min-height: 20px; margin-top: 8px; }
+
+  /* User table */
+  .section-h { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+  .user-table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 8px; overflow: hidden; }
+  .user-table th { background: #fafafa; padding: 12px 16px; text-align: left; font-size: 13px; color: #666; border-bottom: 1px solid var(--border); }
+  .user-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .user-table tr:hover { background: #f9f9f9; }
+  .user-table .mono { font-family: monospace; font-size: 13px; color: var(--muted); }
+  .badge-admin { background: #fff3cd; color: #856404; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal-panel { background: var(--card); border-radius: 12px; padding: 32px; width: 380px; max-width: 90vw; }
+  .modal-panel h2 { font-size: 18px; margin-bottom: 20px; }
+  .modal-panel .actions { display: flex; gap: 12px; margin-top: 20px; }
+  .modal-panel .actions .btn { flex: 1; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 24px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; z-index: 200; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="brand">⚙ 管理后台</span>
+  <span class="spacer"></span>
+  <a href="/">📊 返回看板</a>
+  {% if logged_in %}
+  <a href="#" onclick="doLogout(); return false;">退出管理</a>
+  {% endif %}
+</div>
+
+{% if not logged_in %}
+<!-- Login form -->
+<div class="login-card">
+  <h1>管理后台</h1>
+  <p class="sub">请输入管理密码</p>
+  <form onsubmit="return doLogin(event)">
+    <div class="form-group">
+      <label>管理密码</label>
+      <input type="password" id="adminPass" required placeholder="请输入密码" autocomplete="current-password">
+    </div>
+    <p class="err" id="loginErr"></p>
+    <button class="btn btn-primary" type="submit">登 录</button>
+  </form>
+</div>
+{% else %}
+<!-- User management -->
+<div class="container">
+  <div class="section-h">用户管理（<span id="userCount">-</span> 个用户）</div>
+  <table class="user-table">
+    <thead>
+      <tr>
+        <th>用户名</th><th>用户 ID</th><th>创建时间</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="userBody">
+      <tr><td colspan="4" style="text-align:center;color:var(--muted)">加载中…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Reset password modal -->
+<div class="modal-overlay" id="resetModal">
+  <div class="modal-panel">
+    <h2>重置密码</h2>
+    <p style="margin-bottom:12px;font-size:14px">用户：<b id="resetUsername"></b></p>
+    <div class="form-group">
+      <label>新密码</label>
+      <input type="password" id="newPass" placeholder="至少 4 个字符">
+    </div>
+    <div class="actions">
+      <button class="btn btn-sm" style="background:#eee" onclick="closeResetModal()">取消</button>
+      <button class="btn btn-sm btn-primary" onclick="confirmReset()">确认重置</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-panel">
+    <h2>确认删除</h2>
+    <p style="margin-bottom:12px;font-size:14px">确定要删除用户 <b id="deleteUsername"></b> 吗？此操作不可撤销。</p>
+    <div class="actions">
+      <button class="btn btn-sm" style="background:#eee" onclick="closeDeleteModal()">取消</button>
+      <button class="btn btn-sm btn-danger" onclick="confirmDelete()">确认删除</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="toast" id="toast"></div>
+
+<script>
+function $(id){return document.getElementById(id)}
+function toast(msg){var t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2000)}
+
+{% if not logged_in %}
+async function doLogin(e){
+  e.preventDefault();
+  var err=$('loginErr');
+  err.textContent='';
+  try{
+    var r=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('adminPass').value})});
+    var d=await r.json();
+    if(d.ok){window.location.reload();}
+    else{err.textContent=d.error||'登录失败';}
+  }catch(ex){err.textContent='网络错误';}
+  return false;
+}
+{% else %}
+var _resetUserId='', _deleteUserId='';
+
+function loadUsers(){
+  fetch('/admin/api/users').then(function(r){return r.json()}).then(function(d){
+    if(!d.ok){$('userBody').innerHTML='<tr><td colspan="4" style="color:var(--danger)">加载失败</td></tr>';return}
+    $('userCount').textContent=d.users.length;
+    var html='';
+    d.users.forEach(function(u){
+      var isAdmin=u.username==='yucs';
+      html+='<tr>';
+      html+='<td>'+escapeHtml(u.username)+(isAdmin?' <span class="badge-admin">管理员</span>':'')+'</td>';
+      html+='<td class="mono">'+escapeHtml(u.user_id)+'</td>';
+      html+='<td class="mono">'+escapeHtml(u.created_at||'-')+'</td>';
+      html+='<td>';
+      html+='<button class="btn btn-sm btn-primary" onclick="openResetModal(\''+u.user_id+'\',\''+escapeHtml(u.username)+'\')">重置密码</button>';
+      if(!isAdmin){
+        html+=' <button class="btn btn-sm btn-danger" onclick="openDeleteModal(\''+u.user_id+'\',\''+escapeHtml(u.username)+'\')">删除</button>';
+      }
+      html+='</td>';
+      html+='</tr>';
+    });
+    $('userBody').innerHTML=html;
+  }).catch(function(e){console.error(e)});
+}
+
+function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;')}
+
+function openResetModal(uid,username){
+  _resetUserId=uid;
+  $('resetUsername').textContent=username;
+  $('newPass').value='';
+  $('resetModal').classList.add('show');
+}
+function closeResetModal(){$('resetModal').classList.remove('show')}
+
+async function confirmReset(){
+  var pw=$('newPass').value;
+  if(pw.length<4){toast('新密码至少 4 个字符');return}
+  try{
+    var r=await fetch('/admin/api/users/'+_resetUserId+'/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({new_password:pw})});
+    var d=await r.json();
+    if(d.ok){toast('密码已重置');closeResetModal();}
+    else{toast(d.error||'重置失败');}
+  }catch(e){toast('网络错误')}
+}
+
+function openDeleteModal(uid,username){
+  _deleteUserId=uid;
+  $('deleteUsername').textContent=username;
+  $('deleteModal').classList.add('show');
+}
+function closeDeleteModal(){$('deleteModal').classList.remove('show')}
+
+async function confirmDelete(){
+  try{
+    var r=await fetch('/admin/api/users/'+_deleteUserId+'/delete',{method:'POST'});
+    var d=await r.json();
+    if(d.ok){toast('用户已删除');closeDeleteModal();loadUsers();}
+    else{toast(d.error||'删除失败');}
+  }catch(e){toast('网络错误')}
+}
+
+async function doLogout(){
+  await fetch('/admin/logout',{method:'POST'});
+  window.location.reload();
+}
+
+// Load users on page load
+loadUsers();
+{% endif %}
+</script>
+</body>
+</html>

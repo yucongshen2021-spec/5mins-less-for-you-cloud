@@ -859,3 +859,132 @@ class TestPermissionControl:
             u.opener.open(req, timeout=15).read()
         except Exception:
             pass
+
+
+# ═════════════════════════════════════════════════════════════
+# 测试组 E：管理后台（9000 端口）
+# ═════════════════════════════════════════════════════════════
+STATS_BASE = os.environ.get("STATS_BASE", "http://127.0.0.1:8001").rstrip("/")
+
+
+def _admin_login_stats(password=None):
+    """登录 stats 管理后台，返回 Cookie header dict。"""
+    pw = password or os.environ.get("ADMIN_PASSWORD", "yucs123")
+    cj = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    data = json.dumps({"password": pw}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{STATS_BASE}/admin/login", data=data,
+        headers={"Content-Type": "application/json", "User-Agent": "admin-test/1.0"},
+        method="POST",
+    )
+    try:
+        with opener.open(req, timeout=10) as r:
+            body = json.loads(r.read().decode("utf-8", errors="replace"))
+            if not body.get("ok"):
+                return None, body
+    except urllib.error.HTTPError as e:
+        return None, json.loads(e.read().decode("utf-8", errors="replace"))
+    # Extract session cookie
+    cookie_header = ""
+    for c in cj:
+        if c.name == "session":
+            cookie_header = f"session={c.value}"
+            break
+    return ({"Cookie": cookie_header} if cookie_header else None), body
+
+
+class TestAdminPanel:
+    """验证 9000 端口管理后台：登录、用户列表、删除、重置密码。"""
+
+    def test_admin_login_wrong_password(self, container_up):
+        """错误密码登录失败。"""
+        cookie, body = _admin_login_stats("WRONG_PASSWORD")
+        assert cookie is None, "错误密码不应登录成功"
+        assert body.get("ok") is False, f"错误密码应返回 ok=false: {body}"
+
+    def test_admin_login_correct_password(self, container_up):
+        """正确密码登录成功。"""
+        cookie, body = _admin_login_stats()
+        assert cookie is not None, f"正确密码登录失败: {body}"
+        assert body.get("ok") is True, f"登录应返回 ok=true: {body}"
+
+    def test_admin_list_users(self, container_up):
+        """登录后能列出用户列表。"""
+        cookie, _ = _admin_login_stats()
+        assert cookie is not None, "管理登录失败"
+        st, body = _req("GET", f"{STATS_BASE}/admin/api/users", extra_headers=cookie)
+        assert st == 200, f"列出用户应返回 200，实际 {st}"
+        assert body.get("ok") is True, f"列出用户应返回 ok=true: {body}"
+        users = body.get("users", [])
+        assert len(users) > 0, "用户列表不应为空（至少有 yucs）"
+        usernames = [u["username"] for u in users]
+        assert "yucs" in usernames, f"用户列表应包含 yucs: {usernames}"
+
+    def test_admin_list_users_requires_login(self, container_up):
+        """未登录访问用户列表返回 401。"""
+        st, body = _req("GET", f"{STATS_BASE}/admin/api/users")
+        assert st == 401, f"未登录应返回 401，实际 {st}"
+
+    def test_admin_delete_user(self, container_up):
+        """删除一个测试用户成功。"""
+        # 先注册一个临时用户
+        st, body = _req("POST", f"{BASE}/register",
+                        body={"username": "deltest01", "password": "test123456"})
+        if st == 409 or (body.get("error") and "已存在" in str(body.get("error", ""))):
+            pass  # 已存在
+        # 获取用户列表找到 deltest01 的 user_id
+        cookie, _ = _admin_login_stats()
+        assert cookie is not None, "管理登录失败"
+        st, body = _req("GET", f"{STATS_BASE}/admin/api/users", extra_headers=cookie)
+        users = body.get("users", [])
+        del_user = next((u for u in users if u["username"] == "deltest01"), None)
+        assert del_user is not None, "deltest01 不在用户列表中"
+        uid = del_user["user_id"]
+        # 删除
+        st, body = _req("POST", f"{STATS_BASE}/admin/api/users/{uid}/delete",
+                        extra_headers=cookie)
+        assert st == 200 and body.get("ok"), f"删除用户失败: {body}"
+        # 验证已删除
+        st, body = _req("GET", f"{STATS_BASE}/admin/api/users", extra_headers=cookie)
+        users = body.get("users", [])
+        assert not any(u["username"] == "deltest01" for u in users), "删除后用户仍在列表中"
+
+    def test_admin_cannot_delete_yucs(self, container_up):
+        """删除 yucs 管理员被拒。"""
+        cookie, _ = _admin_login_stats()
+        assert cookie is not None, "管理登录失败"
+        st, body = _req("GET", f"{STATS_BASE}/admin/api/users", extra_headers=cookie)
+        users = body.get("users", [])
+        yucs_user = next((u for u in users if u["username"] == "yucs"), None)
+        assert yucs_user is not None, "yucs 不在用户列表中"
+        uid = yucs_user["user_id"]
+        st, body = _req("POST", f"{STATS_BASE}/admin/api/users/{uid}/delete",
+                        extra_headers=cookie)
+        assert body.get("ok") is False, "删除 yucs 应被拒绝"
+        assert "不可删除" in str(body.get("error", "")), f"应提示不可删除: {body}"
+
+    def test_admin_reset_password(self, container_up):
+        """管理员重置用户密码成功。"""
+        # 注册临时用户
+        _req("POST", f"{BASE}/register",
+             body={"username": "resettest02", "password": "oldpass123"})
+        cookie, _ = _admin_login_stats()
+        assert cookie is not None, "管理登录失败"
+        st, body = _req("GET", f"{STATS_BASE}/admin/api/users", extra_headers=cookie)
+        users = body.get("users", [])
+        target = next((u for u in users if u["username"] == "resettest02"), None)
+        assert target is not None, "resettest02 不在用户列表中"
+        uid = target["user_id"]
+        # 重置密码
+        st, body = _req("POST", f"{STATS_BASE}/admin/api/users/{uid}/reset-password",
+                        body={"new_password": "newpass456"}, extra_headers=cookie)
+        assert st == 200 and body.get("ok"), f"重置密码失败: {body}"
+        # 验证新密码可登录
+        st, body = _req("POST", f"{BASE}/login",
+                        body={"username": "resettest02", "password": "newpass456"})
+        assert body.get("ok") is True, f"新密码登录失败: {body}"
+        # 验证旧密码不可登录
+        st, body = _req("POST", f"{BASE}/login",
+                        body={"username": "resettest02", "password": "oldpass123"})
+        assert body.get("ok") is False, "旧密码不应再能登录"
