@@ -14,11 +14,19 @@
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
-| **Portal** | 5000 | 统一入口，反向代理，状态监控 |
-| **配置生成（all_in_one）** | 5003 | gunicorn 8 worker 多进程并发 |
-| **stats 访问看板** | 9000 | 访问日志统计仪表盘 |
+| **Portal** | 5000 | 统一入口，反向代理，登录鉴权，状态监控 |
+| **配置生成（all_in_one）** | 5003 | gunicorn 16 worker 多进程并发 |
+| **stats 访问看板** | 9000 | 访问日志统计仪表盘（含用户搜索） |
 
 域名抓取（5001）、测试报告（5002）、配置梳理（5004）当前已停用（代码保留，supervisord 注释），恢复时取消 `docker/supervisord.conf` 对应段注释即可。
+
+### 登录系统
+
+- **自动访客模式**：未登录自动获得访客 session，使用共享默认 workspace。
+- **注册/登录/重置密码**：登录页支持三态切换（登录 ↔ 注册 ↔ 重置密码）。重置密码需输入用户名 + 旧密码 + 新密码。
+- **管理员 yucs**：首次部署时自动创建 `yucs` 账号（密码从 `ADMIN_PASSWORD` 环境变量读取，默认 `yucs123`）。只有 `yucs` 可操作「我来定模板」编辑器，其他用户只读。
+- **按用户工作区隔离**：每个用户有独立的 `data/users/<uid>/editor_workspace/`，模板互不串号。
+- **会话有效期**：24 小时（Flask permanent session）。
 
 ---
 
@@ -26,7 +34,7 @@
 
 Epoch FastIP / USG FastIP / Epoch MPLS / AR SD-WAN / AR 传统组网 一键生成；可视化模板编辑器。
 
-**多并发架构**：gunicorn 8 worker 进程隔离，每个 worker 独立加载业务模块，worker 间天然并发。tkinter 已被 `tkinter_stub.py` 完全替代，**无需 Xvfb / DISPLAY**，无线程安全约束。
+**多并发架构**：gunicorn 16 worker 进程隔离，每个 worker 独立加载业务模块，worker 间天然并发。tkinter 已被 `tkinter_stub.py` 完全替代，**无需 Xvfb / DISPLAY**，无线程安全约束。
 
 打开 portal 统一入口即可访问全部子应用。点击右上角 **"?"** 查看使用教程。
 
@@ -74,7 +82,7 @@ sudo docker-compose -f docker-compose.test.yml down            # 停止
 .
 ├── application/
 │   ├── portal/                      统一入口 + 反向代理 :5000
-│   ├── all_in_one - cc/             配置生成 :5003（gunicorn 8 worker）
+│   ├── all_in_one - cc/             配置生成 :5003（gunicorn 16 worker）
 │   │   ├── web/
 │   │   │   ├── app.py               Flask 后端
 │   │   │   ├── wsgi.py              gunicorn 入口
@@ -119,7 +127,16 @@ cd application/test
 python -m pytest blackbox_8000/ -q
 ```
 
-### 并发验证（8 worker，无串号）
+### 多用户并发测试（16 用户 + 工作区隔离 + 权限控制）
+
+```bash
+cd application/test
+YUCS_PASSWORD=yucs123 python -m pytest blackbox_8000/test_multiuser_concurrency.py -v
+```
+
+覆盖：16 用户登录、session 隔离、工作区目录独立、模板不串号、16 并发生成无 5xx、yucs 权限控制。
+
+### 并发验证（16 worker，无串号）
 
 ```bash
 # 启动测试容器后，并发发 8 个不同参数的 generate 请求
@@ -149,6 +166,9 @@ playwright install chromium
 - **TDD**：先写测试，再写实现
 - **每次有动作记一笔**：`log/` 目录存变动记录
 - **多并发安全**：generate 从磁盘读模板（`_get_effective_template`），save/reset 只操作磁盘不改 ns，避免并发竞态
+- **模板编辑器权限**：只有 `yucs` 账号可 save/reset/preview 模板和 init-defaults，其他用户按钮置灰 + 前端/后端双重 403 拦截
+- **登录系统**：注册/登录/重置密码（旧密码验证）。首次部署自动创建 yucs 管理员。访客自动 session 用共享 workspace
+- **stats 用户搜索**：9000 看板支持按用户名模糊搜索，表格含用户列，Top 用户图表
 - **tkinter 已移除**：业务模块用 `tkinter_stub.py` 替代，不要恢复 `import tkinter` 或添加 Xvfb 依赖
 
 ---
