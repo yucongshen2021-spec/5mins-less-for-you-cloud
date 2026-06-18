@@ -170,7 +170,7 @@
         }),
       });
       const d = await r.json();
-      if (d.ok) { err.style.color = '#27ae60'; err.textContent = '注册成功！点击上方「登录」切换'; }
+      if (d.ok) { err.style.color = '#27ae60'; err.textContent = '注册成功！正在跳转…'; setTimeout(function(){window.location.href = d.redirect || '/';}, 600); }
       else { err.textContent = d.error || '注册失败'; }
     } catch(ex) { err.textContent = '网络错误，请重试'; }
     return false;

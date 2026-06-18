@@ -31,6 +31,22 @@ _ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "yucs123")
 _DB_PATH = stats_db.init_db()
 print(f"[stats] DB at {_DB_PATH}")
 
+# ── Audit log ────────────────────────────────────────────────────────────────
+import logging
+_audit_logger = logging.getLogger("stats.admin")
+_audit_logger.setLevel(logging.INFO)
+_audit_handler = logging.FileHandler(
+    os.path.join(os.path.dirname(_DB_PATH), "admin_audit.log"), encoding="utf-8"
+)
+_audit_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+_audit_logger.addHandler(_audit_handler)
+
+
+def _audit(action: str, detail: str = ""):
+    """记录管理后台操作审计日志。"""
+    from datetime import datetime
+    _audit_logger.info(f"[{action}] {detail}")
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -162,6 +178,8 @@ def admin_delete_user(user_id):
     if not _admin_logged_in():
         return jsonify({"ok": False, "error": "未登录"}), 401
     result = auth_db.delete_user(user_id)
+    if result.get("ok"):
+        _audit("DELETE_USER", f"user_id={user_id}")
     return jsonify(result)
 
 
@@ -173,6 +191,8 @@ def admin_reset_password(user_id):
     data = request.get_json(force=True, silent=True) or {}
     new_password = data.get("new_password", "")
     result = auth_db.admin_reset_user_password(user_id, new_password)
+    if result.get("ok"):
+        _audit("RESET_PASSWORD", f"user_id={user_id}")
     return jsonify(result)
 
 

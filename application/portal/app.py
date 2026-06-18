@@ -138,6 +138,12 @@ def register():
     password = data.get("password", "")
     result = create_user(username, password)
     status = 200 if result.get("ok") else 409
+    # 注册成功后自动登录
+    if result.get("ok"):
+        session["user_id"] = result["user_id"]
+        session["username"] = username
+        session.permanent = True
+        result["redirect"] = "/"
     return jsonify(result), status
 
 

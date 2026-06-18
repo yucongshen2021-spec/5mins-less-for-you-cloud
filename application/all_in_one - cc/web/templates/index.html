@@ -212,6 +212,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <button class="nav-tab" data-panel="templates">我来定模板</button>
 <button class="nav-tab" data-panel="thanks">感谢</button>
 </div></nav>
+<div id="guest-banner" style="display:none;padding:6px 16px;background:rgba(245,78,0,0.08);border-bottom:1px solid var(--bd);font-size:12px;color:var(--mu);text-align:center">您正在以访客模式浏览，<a href="/login" style="color:var(--primary);font-weight:600">登录</a>后可编辑专属脚本模板</div>
 <main class="main-content">
 
 <!-- ═══ Epoch FastIP ═══ -->
@@ -860,7 +861,7 @@ function updateTemplateAdminUI(){
     document.querySelectorAll('#tpl-chips .chip-x').forEach(x=>x.style.display='none');
   }
 }
-window.addEventListener('DOMContentLoaded',()=>{updateTemplateAdminUI()});
+window.addEventListener('DOMContentLoaded',()=>{updateTemplateAdminUI();let gb=$('guest-banner');if(gb){gb.style.display=TEMPLATE_EDITABLE?'none':'block'}});
 
 /* Template Editor */
 let _selKeys=[];
@@ -962,7 +963,7 @@ async function loadInitDefaults(key){try{let r=await fetch('/api/init-defaults/'
     'DEFAULT_LAN_ETH':'LAN 接口号','DEFAULT_LAN_IP':'LAN IP / CIDR',
     'DEFAULT_LAN_GW':'LAN 网关',
     'DEFAULT_INNER_NETS':'内网段',
-    'DEFAULT_GEN_RETURN_ROUTE':'生成回程路由','DEFAULT_BYPASS':'旁挂模式'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else if(k==='DEFAULT_INNER_NETS'){h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><textarea class=\"ft ft-sm\" id=ti_'+k+'>'+val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</textarea></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults() '+(TEMPLATE_EDITABLE?'':'disabled style=opacity:0.4;cursor:not-allowed')+'>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults() '+(TEMPLATE_EDITABLE?'':'disabled style=opacity:0.4;cursor:not-allowed')+'>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
+    'DEFAULT_GEN_RETURN_ROUTE':'生成回程路由','DEFAULT_BYPASS':'旁挂模式'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else if(k==='DEFAULT_INNER_NETS'){h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><textarea class=\"ft ft-sm\" id=ti_'+k+'>'+val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</textarea></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults() '+(TEMPLATE_EDITABLE?'':'disabled style=opacity:0.4;cursor:not-allowed')+'>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults() '+(TEMPLATE_EDITABLE?'':'disabled style=opacity:0.4;cursor:not-allowed')+'>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h;if(!TEMPLATE_EDITABLE){document.querySelectorAll('#tpl-init-body input, #tpl-init-body textarea').forEach(function(el){el.disabled=true;el.style.opacity=0.6})}}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
 async function saveInitDefaults(){if(!TEMPLATE_EDITABLE){toast('请登录后操作模板编辑器');return}let vs={};document.querySelectorAll('#tpl-init-body input, #tpl-init-body textarea').forEach(el=>{let k=el.id.replace('ti_','');if(el.type==='checkbox')vs[k]=el.checked;else vs[k]=el.value});try{let r=await fetch('/api/init-defaults/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,values:vs})});let d=await r.json();toast(d.ok?'已保存':'保存失败: '+d.error)}catch(e){toast('保存失败')}}
 async function resetInitDefaults(){if(!TEMPLATE_EDITABLE){toast('请登录后操作模板编辑器');return}if(!confirm('恢复出厂初始化默认值？'))return;try{let r=await fetch('/api/init-defaults/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok&&d.values){let vs=d.values;for(let[k,v]of Object.entries(vs)){let el=document.getElementById('ti_'+k);if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else el.value=typeof v==='boolean'?(v?'true':'false'):String(v)}
       toast('已恢复出厂')}}catch(e){toast('恢复失败')}}
