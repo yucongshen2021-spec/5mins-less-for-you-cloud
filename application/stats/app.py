@@ -35,6 +35,7 @@ def _filters_from_args() -> dict:
         "ip": request.args.get("ip", "").strip() or None,
         "app_id": request.args.get("app_id", "").strip() or None,
         "function": request.args.get("function", "").strip() or None,
+        "username": request.args.get("username", "").strip() or None,
         "start": request.args.get("start", "").strip() or None,
         "end": request.args.get("end", "").strip() or None,
         "q": request.args.get("q", "").strip() or None,

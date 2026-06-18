@@ -184,6 +184,7 @@ td.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
 <!-- Charts row -->
 <div class="charts-row">
   <div class="chart-box" id="topIpsChart"><h3>Top IPs</h3></div>
+  <div class="chart-box" id="topUsersChart"><h3>Top 用户</h3></div>
   <div class="chart-box" id="topFuncsChart"><h3>Top 功能</h3></div>
   <div class="chart-box" id="dailyChart"><h3>每日趋势 (14天)</h3></div>
 </div>
@@ -198,6 +199,7 @@ td.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
     <option value="domain_capture">域名抓取</option>
   </select>
   <label>功能</label><input id="fFunc" placeholder="如：生成·epoch_fastip">
+  <label>用户</label><input id="fUser" placeholder="模糊匹配">
   <label>时间</label><input type="date" id="fStart"> – <input type="date" id="fEnd">
   <label>搜索</label><input class="wide" id="fQ" placeholder="路径 / 数据头 / 生成内容">
   <button class="btn" onclick="search()">🔍 搜索</button>
@@ -211,7 +213,7 @@ td.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
 <thead>
 <tr>
   <th>ID</th><th>时间</th><th>IP</th><th>应用</th><th>功能</th>
-  <th>方法</th><th>路径</th><th>版本</th><th>状态</th>
+  <th>方法</th><th>路径</th><th>版本</th><th>用户</th><th>状态</th>
   <th>耗时</th><th>请求</th><th>响应</th>
 </tr>
 </thead>
@@ -291,6 +293,7 @@ function renderSummary(s){
 
 function renderCharts(s){
   renderBarChart($('topIpsChart'), s.top_ips||[], 'ip', 6);
+  renderBarChart($('topUsersChart'), s.top_users||[], 'username', 6);
   renderBarChart($('topFuncsChart'), s.top_functions||[], 'function', 6);
   renderDayChart($('dailyChart'), s.daily_trend||[]);
 }
@@ -343,6 +346,7 @@ function renderTable(d){
     lines += '<td class="mono">'+(r.method||'-')+'</td>';
     lines += '<td class="code" title="'+escapeHtml(r.path||'')+'">'+escapeHtml(shortPath(r.path))+'</td>';
     lines += '<td class="mono">'+(r.variant||'')+'</td>';
+    lines += '<td>'+escapeHtml(r.username||'访客')+'</td>';
     lines += '<td><span class="badge '+statusCls+'">'+(r.status||'-')+'</span></td>';
     lines += '<td class="mono">'+dur+'</td>';
     lines += '<td class="mono">'+fmtSize(r.req_size)+'</td>';
@@ -377,6 +381,7 @@ function showDetail(id){
       {label:'请求大小',value:fmtSize(d.req_size)},
       {label:'响应大小',value:fmtSize(d.resp_size)},
       {label:'Variant',value:d.variant||'-'},
+      {label:'用户',value:d.username||'访客'},
       {label:'User-Agent',value:d.user_agent||'-'},
       {label:'Referer',value:d.referer||'-'},
       {label:'错误',value:d.error||'-'},
@@ -416,6 +421,7 @@ function search(){
     ip: $('fIp').value.trim(),
     app_id: $('fApp').value,
     function: $('fFunc').value.trim(),
+    username: $('fUser').value.trim(),
     start: $('fStart').value,
     end: $('fEnd').value,
     q: $('fQ').value.trim(),
@@ -425,7 +431,7 @@ function search(){
 }
 
 function resetFilters(){
-  $('fIp').value='';$('fApp').value='';$('fFunc').value='';
+  $('fIp').value='';$('fApp').value='';$('fFunc').value='';$('fUser').value='';
   $('fStart').value='';$('fEnd').value='';$('fQ').value='';
   currentFilters={};loadRecords(1);
 }

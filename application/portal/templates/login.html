@@ -56,6 +56,7 @@
     </div>
     <p class="err" id="loginErr"></p>
     <button class="btn btn-primary" type="submit">登 录</button>
+    <p style="text-align:right;margin-top:10px;font-size:12px"><a style="color:#4a90d9;cursor:pointer" onclick="showResetForm()">重置密码</a></p>
   </form>
 
   <!-- 注册表单（默认隐藏） -->
@@ -72,6 +73,24 @@
     <button class="btn btn-primary" type="submit">注 册</button>
   </form>
 
+  <!-- 重置密码表单（默认隐藏） -->
+  <form id="resetForm" method="POST" style="display:none" onsubmit="return doReset(event)">
+    <div class="form-group">
+      <label>用户名</label>
+      <input type="text" id="resetUser" required autocomplete="username" placeholder="请输入用户名">
+    </div>
+    <div class="form-group">
+      <label>旧密码</label>
+      <input type="password" id="resetOldPass" required autocomplete="current-password" placeholder="请输入当前密码">
+    </div>
+    <div class="form-group">
+      <label>新密码</label>
+      <input type="password" id="resetNewPass" required autocomplete="new-password" placeholder="至少 4 个字符">
+    </div>
+    <p class="err" id="resetErr"></p>
+    <button class="btn btn-primary" type="submit">重置密码</button>
+  </form>
+
   <p class="toggle">
     <span id="toggleLabel">没有账号？</span>
     <a id="toggleLink" onclick="toggleForm()">注册</a>
@@ -80,14 +99,39 @@
 
 <script>
   let isLogin = true;
+  function _hideAll() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('regForm').style.display = 'none';
+    document.getElementById('resetForm').style.display = 'none';
+  }
+  function _showLogin() {
+    _hideAll();
+    document.getElementById('loginForm').style.display = '';
+    document.getElementById('toggleLabel').textContent = '没有账号？';
+    document.getElementById('toggleLink').textContent = '注册';
+    document.getElementById('loginErr').textContent = '';
+  }
+  function _showReg() {
+    _hideAll();
+    document.getElementById('regForm').style.display = '';
+    document.getElementById('toggleLabel').textContent = '已有账号？';
+    document.getElementById('toggleLink').textContent = '登录';
+    document.getElementById('regErr').textContent = '';
+  }
+  function _showReset() {
+    _hideAll();
+    document.getElementById('resetForm').style.display = '';
+    document.getElementById('toggleLabel').textContent = '已有账号？';
+    document.getElementById('toggleLink').textContent = '登录';
+    document.getElementById('resetErr').textContent = '';
+  }
   function toggleForm() {
     isLogin = !isLogin;
-    document.getElementById('loginForm').style.display = isLogin ? '' : 'none';
-    document.getElementById('regForm').style.display = isLogin ? 'none' : '';
-    document.getElementById('toggleLabel').textContent = isLogin ? '没有账号？' : '已有账号？';
-    document.getElementById('toggleLink').textContent = isLogin ? '注册' : '登录';
-    document.getElementById('loginErr').textContent = '';
-    document.getElementById('regErr').textContent = '';
+    if (isLogin) { _showLogin(); } else { _showReg(); }
+  }
+  function showResetForm() {
+    isLogin = false;
+    _showReset();
   }
 
   async function doLogin(e) {
@@ -128,6 +172,34 @@
       const d = await r.json();
       if (d.ok) { err.style.color = '#27ae60'; err.textContent = '注册成功！点击上方「登录」切换'; }
       else { err.textContent = d.error || '注册失败'; }
+    } catch(ex) { err.textContent = '网络错误，请重试'; }
+    return false;
+  }
+
+  async function doReset(e) {
+    e.preventDefault();
+    const err = document.getElementById('resetErr');
+    err.style.color = '';
+    err.textContent = '';
+    const newPw = document.getElementById('resetNewPass').value;
+    if (newPw.length < 4) { err.textContent = '新密码至少 4 个字符'; return false; }
+    try {
+      const r = await fetch('/reset-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          username: document.getElementById('resetUser').value,
+          old_password: document.getElementById('resetOldPass').value,
+          new_password: newPw,
+        }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        err.style.color = '#27ae60';
+        err.textContent = '密码已重置！点击上方「登录」切换';
+      } else {
+        err.textContent = d.error || '重置失败';
+      }
     } catch(ex) { err.textContent = '网络错误，请重试'; }
     return false;
   }

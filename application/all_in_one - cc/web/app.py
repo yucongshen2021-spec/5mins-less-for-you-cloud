@@ -42,6 +42,28 @@ if str(SRC_DIR) not in sys.path:
 # 裸机/test_client（无 X-User-Id）fallback 到 _DATA_RW_DIR（兼容旧数据）。
 
 
+def _get_request_username() -> str:
+    """返回当前请求的 X-Username（由 portal proxy 注入），无请求上下文时返回空串。"""
+    try:
+        from flask import has_request_context
+        if has_request_context():
+            return (request.headers.get("X-Username") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+_TEMPLATE_ADMIN_USER = "yucs"
+
+
+def _require_template_admin() -> tuple | None:
+    """检查当前用户是否为模板管理员（yucs）。非管理员返回 (jsonify(...), 403)，管理员返回 None。"""
+    username = _get_request_username()
+    if username != _TEMPLATE_ADMIN_USER:
+        return jsonify({"ok": False, "error": f"权限不足：仅 {_TEMPLATE_ADMIN_USER} 可操作模板编辑器"}), 403
+    return None
+
+
 def _get_user_data_dir() -> Path:
     """返回当前用户的 workspace 目录。无请求上下文时返回默认 _DATA_RW_DIR。"""
     try:
@@ -675,7 +697,11 @@ def _humanize_error(err, variant: str = "") -> str:
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    username = _get_request_username()
+    template_admin = (username == _TEMPLATE_ADMIN_USER)
+    return render_template("index.html",
+                           username=username,
+                           template_admin=template_admin)
 
 
 @app.errorhandler(500)
@@ -1980,6 +2006,9 @@ def api_template_load():
 
 @app.route("/api/template/save", methods=["POST"])
 def api_template_save():
+    denied = _require_template_admin()
+    if denied:
+        return denied
     data = request.get_json(force=True)
     scenario_key = data.get("key", "")
     hdr = data.get("header", "")
@@ -2014,6 +2043,9 @@ def api_template_save():
 
 @app.route("/api/template/reset", methods=["POST"])
 def api_template_reset():
+    denied = _require_template_admin()
+    if denied:
+        return denied
     data = request.get_json(force=True)
     scenario_key = data.get("key", "")
     info = next((s for s in _SCENARIO_LIST if s["key"] == scenario_key), None)
@@ -2089,6 +2121,9 @@ def api_template_reset():
 
 @app.route("/api/template/preview", methods=["POST"])
 def api_template_preview():
+    denied = _require_template_admin()
+    if denied:
+        return denied
     """Real preview using parser + builder, same as original VisualEditorTab.preview()."""
     data = request.get_json(force=True)
     scenario_key = data.get("key", "")
@@ -2587,6 +2622,9 @@ def api_init_defaults_get(scenario_key):
 
 @app.route("/api/init-defaults/save", methods=["POST"])
 def api_init_defaults_save():
+    denied = _require_template_admin()
+    if denied:
+        return denied
     """Save init default values for a scenario to user_init_placeholders.json."""
     data = request.get_json(force=True)
     scenario_key = data.get("key", "")
@@ -2629,6 +2667,9 @@ def api_init_defaults_save():
 
 @app.route("/api/init-defaults/reset", methods=["POST"])
 def api_init_defaults_reset():
+    denied = _require_template_admin()
+    if denied:
+        return denied
     """Reset init defaults to factory values for a scenario."""
     data = request.get_json(force=True)
     scenario_key = data.get("key", "")

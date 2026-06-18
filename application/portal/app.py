@@ -66,7 +66,13 @@ def _local_version():
         return None
 if str(_APP_DIR) not in sys.path:
     sys.path.insert(0, str(_APP_DIR))
-from common.auth_db import create_user, get_user_by_id, verify_user  # noqa: E402
+from common.auth_db import (  # noqa: E402
+    create_user,
+    get_user_by_id,
+    get_user_by_username,
+    update_user_password,
+    verify_user,
+)
 
 # ── Process manager ──────────────────────────────────────────────────────────
 from process_manager import APPS, get_apps_status, start_all  # noqa: E402
@@ -74,7 +80,7 @@ from process_manager import APPS, get_apps_status, start_all  # noqa: E402
 # ── Proxy ────────────────────────────────────────────────────────────────────
 from proxy import proxy_to  # noqa: E402
 
-_AUTH_WHITELIST = {"/login", "/register", "/api/health"}
+_AUTH_WHITELIST = {"/login", "/register", "/reset-password", "/api/health"}
 _AUTH_WHITELIST_PREFIXES = ("/static/",)
 
 
@@ -139,6 +145,27 @@ def register():
 def logout():
     session.clear()
     return redirect("/")
+
+
+@app.route("/reset-password", methods=["POST"])
+def reset_password():
+    """重置密码：验证旧密码后更新为新密码（JSON API）。
+    请求 {username, old_password, new_password} → {ok: true} 或 {ok: false, error}。"""
+    data = request.get_json(force=True, silent=True) or {}
+    username = str(data.get("username", "")).strip()
+    old_password = data.get("old_password", "")
+    new_password = data.get("new_password", "")
+    if not username or not old_password or not new_password:
+        return jsonify({"ok": False, "error": "请填写用户名、旧密码和新密码"})
+    # 验证旧密码
+    result = verify_user(username, old_password)
+    if not result.get("ok"):
+        return jsonify({"ok": False, "error": "旧密码错误"})
+    # 更新密码
+    upd = update_user_password(result["user_id"], new_password)
+    if not upd.get("ok"):
+        return jsonify(upd)
+    return jsonify({"ok": True})
 
 
 # ── Portal pages ─────────────────────────────────────────────────────────────

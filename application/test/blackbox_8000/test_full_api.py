@@ -33,10 +33,12 @@ BASE = os.environ.get("BLACKBOX_BASE", "http://127.0.0.1:8000").rstrip("/")
 AIO = f"{BASE}/app/all_in_one"
 
 
-def _req(method: str, url: str, *, body=None, timeout: float = 15.0):
+def _req(method: str, url: str, *, body=None, timeout: float = 15.0, extra_headers: dict | None = None):
     """发起一次 HTTP 请求，返回 (status, json_or_text)。"""
     data = None
     headers = {"User-Agent": "blackbox-8000/1.0"}
+    if extra_headers:
+        headers.update(extra_headers)
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -54,6 +56,58 @@ def _req(method: str, url: str, *, body=None, timeout: float = 15.0):
             return e.code, json.loads(raw)
         except json.JSONDecodeError:
             return e.code, raw
+
+
+def _login_as_admin() -> dict:
+    """Login as yucs (template admin) and return Cookie header dict.
+    密码通过环境变量 YUCS_PASSWORD 或默认值。
+    """
+    password = os.environ.get("YUCS_PASSWORD", "yucs123")
+    st, body = _req("POST", f"{BASE}/login", body={"username": "yucs", "password": password})
+    if st != 200 or not body.get("ok"):
+        raise RuntimeError(f"Login as yucs failed: {body}")
+    # Extract session cookie from response headers
+    # The portal sets a session cookie; we need to capture it
+    # Re-implement with http.cookiejar to capture cookies properly
+    import http.cookiejar
+    cj = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    data = json.dumps({"username": "yucs", "password": password}).encode("utf-8")
+    req = urllib.request.Request(f"{BASE}/login", data=data,
+                                 headers={"Content-Type": "application/json",
+                                          "User-Agent": "blackbox-8000/1.0"})
+    with opener.open(req, timeout=15.0) as r:
+        r.read()
+    # Extract cookie header from cookie jar
+    cookie_header = ""
+    for cookie in cj:
+        if cookie.name == "session":
+            cookie_header = f"session={cookie.value}"
+            break
+    if not cookie_header:
+        raise RuntimeError("Could not extract session cookie from login response")
+    return {"Cookie": cookie_header}
+
+
+# Module-level admin cookie (lazy init)
+_admin_cookie: dict | None = None
+
+
+def _get_admin_cookie() -> dict:
+    global _admin_cookie
+    if _admin_cookie is None:
+        _admin_cookie = _login_as_admin()
+    return _admin_cookie
+
+
+def _admin_post(url, body, **kw):
+    """POST as yucs (template admin)."""
+    return _req("POST", url, body=body, extra_headers=_get_admin_cookie(), **kw)
+
+
+def _admin_get(url, **kw):
+    """GET as yucs (template admin)."""
+    return _req("GET", url, extra_headers=_get_admin_cookie(), **kw)
 
 
 def _get(url, **kw):
@@ -286,43 +340,43 @@ def test_template_load_all_scenarios(catalog):
 
 
 # 场景 key → (route, variant, header, out_key) 用于自定义模板生成验证
+# 注意：AR SD-WAN 不在此列，因其 generate 直接从模块 ns 读模板，不走磁盘模板系统
 TPL_VERIFY = {
     "Epoch FastIP · HK 香港出口": ("epoch_fastip", "hk", H.ER_HK, "output"),
     "USG FastIP · 非香港出口": ("usg_fastip", "us", H.USG_US, "output"),
     "Epoch MPLS · 国内配置": ("epoch_mpls", "domestic", H.MPLS_CN, "output"),
-    "AR SD-WAN · 单机单WAN · OPS": ("ar_sdwan", "single_ops", H.AR_SDWAN, "ops_output"),
     "AR 传统组网 · 双线": ("ar_traditional", "dual", H.AR_TRADITIONAL, "output"),
 }
 
 
 @pytest.mark.parametrize("key,gen", list(TPL_VERIFY.items()))
 def test_template_lifecycle(key, gen):
-    """save 自定义模板 → 生成含标记 → reset → 生成不含标记。"""
+    """save 自定义模板 → 生成含标记 → reset → 生成不含标记。需要 yucs 权限。"""
     route, variant, header, out_key = gen
     custom = f"# {MARKER}\nset system host-name {MARKER}\n"
 
-    # save
-    st, body = _post(
+    # save (as admin)
+    st, body = _admin_post(
         f"{AIO}/api/template/save",
         {"key": key, "header": header, "mapping": "", "template": custom},
     )
     assert st == 200 and body.get("ok"), f"save {key} 失败: {body}"
 
-    # generate with custom
-    st, body = _post(
+    # generate with custom (must use same user who saved — yucs)
+    st, body = _admin_post(
         f"{AIO}/api/generate/{route}",
         {"variant": variant, "header_text": header, "network": {}},
     )
     out = body.get(out_key, "") or body.get("output", "")
     assert MARKER in out, f"save 后生成 {key} 不含自定义标记"
 
-    # reset
-    st, body = _post(f"{AIO}/api/template/reset", {"key": key})
+    # reset (as admin)
+    st, body = _admin_post(f"{AIO}/api/template/reset", {"key": key})
     assert st == 200 and body.get("ok"), f"reset {key} 失败: {body}"
     assert len(body.get("template", "")) > 50, f"reset {key} 返回的模板过短"
 
-    # generate after reset
-    st, body = _post(
+    # generate after reset (must use same user)
+    st, body = _admin_post(
         f"{AIO}/api/generate/{route}",
         {"variant": variant, "header_text": header, "network": {}},
     )
@@ -331,10 +385,10 @@ def test_template_lifecycle(key, gen):
 
 
 def test_template_preview():
-    """preview 不落盘，但能渲染出自定义标记。"""
+    """preview 不落盘，但能渲染出自定义标记。需要 yucs 权限。"""
     key = "Epoch FastIP · HK 香港出口"
     custom = f"# PREVIEW_{MARKER}\nset system host-name PREVIEW\n"
-    st, body = _post(
+    st, body = _admin_post(
         f"{AIO}/api/template/preview",
         {"key": key, "header": H.ER_HK, "template": custom},
     )
@@ -431,15 +485,15 @@ def test_init_defaults_get():
 
 
 def test_init_defaults_lifecycle():
-    """save → get → reset，验证 init-defaults 链路工作。"""
+    """save → get → reset，验证 init-defaults 链路工作。需要 yucs 权限。"""
     key = "Epoch FastIP · HK 香港出口"
-    st, body = _post(
+    st, body = _admin_post(
         f"{AIO}/api/init-defaults/save",
         {"key": key, "values": {"DEFAULT_WAN_DHCP": True, "DEFAULT_LAN_DHCP": True}},
     )
     assert st == 200 and body.get("ok"), f"init-defaults save 失败: {body}"
 
-    st, body = _post(f"{AIO}/api/init-defaults/reset", {"key": key})
+    st, body = _admin_post(f"{AIO}/api/init-defaults/reset", {"key": key})
     assert st == 200 and body.get("ok"), f"init-defaults reset 失败: {body}"
 
 

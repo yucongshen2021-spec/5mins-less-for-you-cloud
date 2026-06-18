@@ -365,9 +365,8 @@ def _connect_read(db_path: str) -> sqlite3.Connection:
     return conn
 
 
-def query_records(db_path: str, filters: dict,
-                  page: int = 1, page_size: int = 50) -> list:
-    """Return a page of access_log rows as dicts, newest first."""
+def _build_where(filters: dict) -> tuple:
+    """Build WHERE clause + params from filters dict. Shared by query/count/csv."""
     where_clauses = []
     params = []
 
@@ -380,6 +379,9 @@ def query_records(db_path: str, filters: dict,
     if filters.get("function"):
         where_clauses.append("function LIKE ?")
         params.append(f"%{filters['function']}%")
+    if filters.get("username"):
+        where_clauses.append("username LIKE ?")
+        params.append(f"%{filters['username']}%")
     if filters.get("start"):
         where_clauses.append("ts >= ?")
         params.append(filters["start"])
@@ -392,6 +394,13 @@ def query_records(db_path: str, filters: dict,
         params.extend([q, q, q])
 
     where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+    return where, params
+
+
+def query_records(db_path: str, filters: dict,
+                  page: int = 1, page_size: int = 50) -> list:
+    """Return a page of access_log rows as dicts, newest first."""
+    where, params = _build_where(filters)
     offset = max(0, (page - 1)) * page_size
 
     conn = _connect_read(db_path)
@@ -407,30 +416,7 @@ def query_records(db_path: str, filters: dict,
 
 def count_records(db_path: str, filters: dict) -> int:
     """Return total record count for the given filters."""
-    where_clauses = []
-    params = []
-
-    if filters.get("ip"):
-        where_clauses.append("ip LIKE ?")
-        params.append(f"%{filters['ip']}%")
-    if filters.get("app_id"):
-        where_clauses.append("app_id = ?")
-        params.append(filters["app_id"])
-    if filters.get("function"):
-        where_clauses.append("function LIKE ?")
-        params.append(f"%{filters['function']}%")
-    if filters.get("start"):
-        where_clauses.append("ts >= ?")
-        params.append(filters["start"])
-    if filters.get("end"):
-        where_clauses.append("ts <= ?")
-        params.append(filters["end"])
-    if filters.get("q"):
-        where_clauses.append("(path LIKE ? OR data_header LIKE ? OR response_body LIKE ?)")
-        q = f"%{filters['q']}%"
-        params.extend([q, q, q])
-
-    where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+    where, params = _build_where(filters)
     conn = _connect_read(db_path)
     try:
         return conn.execute(f"SELECT COUNT(*) FROM access_log {where}", params).fetchone()[0]
@@ -481,6 +467,15 @@ def query_summary(db_path: str) -> dict:
             ).fetchall()
         ]
 
+        # Top 10 users (exclude empty username = guest)
+        top_users = [
+            dict(r) for r in conn.execute(
+                "SELECT username, COUNT(*) as cnt FROM access_log "
+                "WHERE username IS NOT NULL AND username != '' AND username != '访客' "
+                "GROUP BY username ORDER BY cnt DESC LIMIT 10"
+            ).fetchall()
+        ]
+
         # Daily trend (last 14 days)
         daily = [
             dict(r) for r in conn.execute(
@@ -499,6 +494,7 @@ def query_summary(db_path: str) -> dict:
             "error_count": error_count,
             "top_ips": top_ips,
             "top_functions": top_funcs,
+            "top_users": top_users,
             "daily_trend": daily,
         }
     finally:
@@ -510,34 +506,11 @@ def iter_records_csv(db_path: str, filters: dict):
     import csv
     import io
 
-    where_clauses = []
-    params = []
-
-    if filters.get("ip"):
-        where_clauses.append("ip LIKE ?")
-        params.append(f"%{filters['ip']}%")
-    if filters.get("app_id"):
-        where_clauses.append("app_id = ?")
-        params.append(filters["app_id"])
-    if filters.get("function"):
-        where_clauses.append("function LIKE ?")
-        params.append(f"%{filters['function']}%")
-    if filters.get("start"):
-        where_clauses.append("ts >= ?")
-        params.append(filters["start"])
-    if filters.get("end"):
-        where_clauses.append("ts <= ?")
-        params.append(filters["end"])
-    if filters.get("q"):
-        where_clauses.append("(path LIKE ? OR data_header LIKE ? OR response_body LIKE ?)")
-        q = f"%{filters['q']}%"
-        params.extend([q, q, q])
-
-    where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+    where, params = _build_where(filters)
 
     header = ["id", "时间", "IP", "应用", "方法", "路径", "查询",
               "状态码", "耗时(ms)", "请求大小", "响应大小",
-              "功能", "variant", "数据头长度", "生成内容长度",
+              "功能", "variant", "用户", "数据头长度", "生成内容长度",
               "User-Agent", "Referer", "错误"]
 
     conn = _connect_read(db_path)
@@ -545,7 +518,7 @@ def iter_records_csv(db_path: str, filters: dict):
         rows = conn.execute(
             f"SELECT id, ts, ip, app_id, method, path, query, status, "
             f"duration_ms, req_size, resp_size, function, variant, "
-            f"length(data_header), length(response_body), "
+            f"username, length(data_header), length(response_body), "
             f"user_agent, referer, error "
             f"FROM access_log {where} ORDER BY id DESC",
             params,
@@ -565,6 +538,7 @@ def iter_records_csv(db_path: str, filters: dict):
                 "id", "ts", "ip", "app_id", "method", "path", "query",
                 "status", "duration_ms", "req_size", "resp_size",
                 "function", "variant",
+                "username",
                 "length(data_header)", "length(response_body)",
                 "user_agent", "referer", "error",
             ]])
