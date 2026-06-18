@@ -20,7 +20,9 @@
 - **实际启动服务**：portal(:5000) + all_in_one(:5003, gunicorn 16w) + stats(:9000)。其余子应用（域名抓取/测试报告/配置梳理）已停用，代码保留。
 - **多用户并发安全**：generate 从磁盘读模板（`_get_effective_template`），save/reset 只操作磁盘不改 ns。不要在 save/reset 里调 `_apply_template_to_runtime` 或 `del _EMBEDDED_NS`。
 - **登录系统**：注册/登录/重置密码（旧密码验证）。首次部署 `init_auth_db()` 自动创建 yucs 管理员（密码 `ADMIN_PASSWORD` 环境变量，默认 `yucs123`）。访客自动 session（user_id="" → 共享 workspace）。
-- **模板编辑器权限**：只有 `yucs` 可 save/reset/preview 模板和 init-defaults。后端 `_require_template_admin()` 返回 403，前端 `TEMPLATE_ADMIN` 置灰按钮 + 只读提示横幅。
+- **模板编辑器权限**：登录用户可编辑自己的模板，访客（未登录）不可编辑。后端 `_require_login()` 检查 `X-User-Id` 非空，访客返回 403。前端 `TEMPLATE_EDITABLE` 置灰按钮 + 只读提示横幅。`yucs` 是管理员（`IS_ADMIN`）。
+- **模板专属注释**：保存模板时自动在 `.tpl` 顶部加注释行 `# xxx专属yyy场景模板-yymmdd`（xxx=用户名，yyy=场景名，yymmdd=日期）。重复保存自动更新注释，不累积。
+- **并发 vs 用户数**：16 = gunicorn worker 数 = 最大同时并发请求数，不是用户数上限。用户数和 workspace 走磁盘（每用户约 10-50KB），与内存无关。16 worker ≈ 2.6GB 内存。
 - **按用户工作区隔离**：`_get_user_data_dir()` 按 `X-User-Id` header 路由到 `data/users/<uid>/`，proxy 防伪造（剥离客户端 X-User-Id）。
 
 ## 高频踩坑速查（详细版本在 log/mistake.txt）

@@ -474,7 +474,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <!-- ═══ 我来定模板 ═══ -->
 <section class="tool-panel" id="panel-templates">
 <div class="panel-header"><h1 class="panel-title">我来定模板</h1><p class="panel-subtitle">可视化编辑：数据头 · 变量映射 · 生成模板 · 预览效果</p></div>
-<div id="tpl-admin-banner" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;background:var(--cvs);border:1px solid var(--bd);font-size:13px;color:var(--mu);line-height:1.6">🔒 当前为只读模式。登录 <b>yucs</b> 账号后可编辑专属脚本模板。</div>
+<div id="tpl-admin-banner" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;background:var(--cvs);border:1px solid var(--bd);font-size:13px;color:var(--mu);line-height:1.6">🔒 请登录后编辑专属脚本模板。</div>
 <div class="tpl-scene-bar" id="tpl-scene-bar">
   <span class="cascade-label">已选场景</span>
   <span class="tpl-trigger-wrap">
@@ -520,7 +520,8 @@ all_in_one<span style="margin:0 6px;color:#4a4038">·</span>Config Generator<spa
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════ all_in_one web ═══════════════════════════════════════════════════════════════════ */
-const TEMPLATE_ADMIN = {{ template_admin|tojson }};
+const TEMPLATE_EDITABLE = {{ template_editable|tojson }};
+const IS_ADMIN = {{ is_admin|tojson }};
 const USERNAME = {{ username|tojson }};
 const TM={'epoch-fastip':'epoch_fastip','epoch-fastip5':'epoch_fastip5','usg-fastip':'usg_fastip','epoch-mpls':'epoch_mpls','ar-sdwan':'ar_sdwan','ar-traditional':'ar_traditional'};
 let erVersion='4';
@@ -832,22 +833,22 @@ function exportOut(tp){
 function toast(m){let t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
 
 function updateTemplateAdminUI(){
-  /* 非 yucs 用户：禁用所有模板编辑操作 */
-  let admin=TEMPLATE_ADMIN===true;
+  /* 非登录用户：禁用所有模板编辑操作 */
+  let editable=TEMPLATE_EDITABLE===true;
   // 提示横幅：非 admin 显示只读提示
-  let banner=$('tpl-admin-banner');if(banner){banner.style.display=admin?'none':'block'}
+  let banner=$('tpl-admin-banner');if(banner){banner.style.display=editable?'none':'block'}
   // 三个主按钮
   ['btn-save-tpl','btn-prev-tpl','btn-rst-tpl'].forEach(id=>{
-    let el=$(id);if(el){el.disabled=!admin;el.style.opacity=admin?'':'0.4';el.style.cursor=admin?'':'not-allowed'}
+    let el=$(id);if(el){el.disabled=!editable;el.style.opacity=editable?'':'0.4';el.style.cursor=editable?'':'not-allowed'}
   });
   // 四个编辑区置为只读（非 admin 时）
   ['tpl-header','tpl-template','tpl-mapping'].forEach(id=>{
-    let el=$(id);if(el){el.readOnly=!admin;el.style.background=admin?'':'var(--hls)'}
+    let el=$(id);if(el){el.readOnly=!editable;el.style.background=editable?'':'var(--hls)'}
   });
   // 预览区始终只读（本来就是 readonly），但也调暗
   let prev=$('tpl-preview');if(prev){prev.style.background=admin?'':'var(--hls)'}
   // 场景选择 chips 中的 × 按钮：非 admin 隐藏
-  if(!admin){
+  if(!editable){
     document.querySelectorAll('#tpl-chips .chip-x').forEach(x=>x.style.display='none');
   }
   // 动态生成的 init-defaults 按钮在 loadInitDefaults 里处理
@@ -954,13 +955,13 @@ async function loadInitDefaults(key){try{let r=await fetch('/api/init-defaults/'
     'DEFAULT_LAN_ETH':'LAN 接口号','DEFAULT_LAN_IP':'LAN IP / CIDR',
     'DEFAULT_LAN_GW':'LAN 网关',
     'DEFAULT_INNER_NETS':'内网段',
-    'DEFAULT_GEN_RETURN_ROUTE':'生成回程路由','DEFAULT_BYPASS':'旁挂模式'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else if(k==='DEFAULT_INNER_NETS'){h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><textarea class=\"ft ft-sm\" id=ti_'+k+'>'+val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</textarea></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults() '+(TEMPLATE_ADMIN?'':'disabled style=opacity:0.4;cursor:not-allowed')+'>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults() '+(TEMPLATE_ADMIN?'':'disabled style=opacity:0.4;cursor:not-allowed')+'>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
-async function saveInitDefaults(){if(!TEMPLATE_ADMIN){toast('权限不足：仅 yucs 可操作模板编辑器');return}let vs={};document.querySelectorAll('#tpl-init-body input, #tpl-init-body textarea').forEach(el=>{let k=el.id.replace('ti_','');if(el.type==='checkbox')vs[k]=el.checked;else vs[k]=el.value});try{let r=await fetch('/api/init-defaults/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,values:vs})});let d=await r.json();toast(d.ok?'已保存':'保存失败: '+d.error)}catch(e){toast('保存失败')}}
-async function resetInitDefaults(){if(!TEMPLATE_ADMIN){toast('权限不足：仅 yucs 可操作模板编辑器');return}if(!confirm('恢复出厂初始化默认值？'))return;try{let r=await fetch('/api/init-defaults/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok&&d.values){let vs=d.values;for(let[k,v]of Object.entries(vs)){let el=document.getElementById('ti_'+k);if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else el.value=typeof v==='boolean'?(v?'true':'false'):String(v)}
+    'DEFAULT_GEN_RETURN_ROUTE':'生成回程路由','DEFAULT_BYPASS':'旁挂模式'};let label=labelMap[k]||k.replace(/_/g,' ');let isBool=typeof v==='boolean';if(isBool){h+='<div class=cb style=margin-bottom:6px><input type=checkbox id=ti_'+k+' '+(v?'checked':'')+'><label for=ti_'+k+'>'+label+'</label></div>'}else if(k==='DEFAULT_INNER_NETS'){h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><textarea class=\"ft ft-sm\" id=ti_'+k+'>'+val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</textarea></div>'}else{h+='<div class=fg><label class=fl for=ti_'+k+'>'+label+'</label><input class=fi id=ti_'+k+' value=\"'+val.replace(/\"/g,'&quot;')+'\"></div>'}i++}h+='</div><div class=btn-row style=margin-top:10px;margin-bottom:0><button class=\"btn btn-sm btn-s\" onclick=saveInitDefaults() '+(TEMPLATE_EDITABLE?'':'disabled style=opacity:0.4;cursor:not-allowed')+'>保存初始化</button><button class=\"btn btn-sm btn-w\" onclick=resetInitDefaults() '+(TEMPLATE_EDITABLE?'':'disabled style=opacity:0.4;cursor:not-allowed')+'>恢复出厂</button></div>';$('tpl-init-body').innerHTML=h}else{$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>该场景无初始化参数</span>'}}catch(e){$('tpl-init-body').innerHTML='<span style=color:var(--mu);font-size:12px>加载失败</span>'}}
+async function saveInitDefaults(){if(!TEMPLATE_EDITABLE){toast('请登录后操作模板编辑器');return}let vs={};document.querySelectorAll('#tpl-init-body input, #tpl-init-body textarea').forEach(el=>{let k=el.id.replace('ti_','');if(el.type==='checkbox')vs[k]=el.checked;else vs[k]=el.value});try{let r=await fetch('/api/init-defaults/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,values:vs})});let d=await r.json();toast(d.ok?'已保存':'保存失败: '+d.error)}catch(e){toast('保存失败')}}
+async function resetInitDefaults(){if(!TEMPLATE_EDITABLE){toast('请登录后操作模板编辑器');return}if(!confirm('恢复出厂初始化默认值？'))return;try{let r=await fetch('/api/init-defaults/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok&&d.values){let vs=d.values;for(let[k,v]of Object.entries(vs)){let el=document.getElementById('ti_'+k);if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else el.value=typeof v==='boolean'?(v?'true':'false'):String(v)}
       toast('已恢复出厂')}}catch(e){toast('恢复失败')}}
-async function prevTpl(){if(!TEMPLATE_ADMIN){toast('权限不足：仅 yucs 可操作模板编辑器');return}if(!_ck){toast('请先选择场景');return}let tpl=$('tpl-template').value,hdr=$('tpl-header').value,prev=$('tpl-preview'),st=$('template-status');st.textContent='预览中…';st.className='status';try{let r=await fetch('/api/template/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,header:hdr,template:tpl})});let d=await r.json();if(d.ok){let out=d.output||'';if(d.total>0){prev.value='# 预览  ──  已填入 '+d.filled+'/'+d.total+' 个变量\n'+out}else{prev.value=out}st.textContent='预览已刷新'+(d.total?' · '+d.filled+'/'+d.total:'');st.className='status status-ok'}else{prev.value='# 预览失败: '+d.error;st.textContent='错误: '+d.error;st.className='status status-err'}}catch(e){prev.value='# 预览失败: '+e.message;st.textContent='网络错误';st.className='status status-err'}}
-async function saveTpl(){if(!TEMPLATE_ADMIN){toast('权限不足：仅 yucs 可操作模板编辑器');return}if(!_ck){toast('请先选择场景');return}let hdr=$('tpl-header').value,mp=$('tpl-mapping').value,tpl=$('tpl-template').value;try{let r=await fetch('/api/template/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,header:hdr,mapping:mp,template:tpl})});let d=await r.json();if(d.ok){toast('已保存并应用');$('template-status').textContent='已保存';$('template-status').className='status status-ok'}else{toast('保存失败: '+d.error)}}catch(e){toast('保存失败')}}
-async function rstTpl(){if(!TEMPLATE_ADMIN){toast('权限不足：仅 yucs 可操作模板编辑器');return}if(!_ck){toast('请先选择场景');return}if(!confirm('即将恢复为最初模板。\n当前场景未保存的编辑将丢失。是否继续？'))return;try{let r=await fetch('/api/template/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok){$('tpl-header').value=d.header;$('tpl-mapping').value=d.mapping;$('tpl-template').value=d.template;$('tpl-preview').value='# 已恢复最初模板\n';$('template-status').textContent='已恢复';$('template-status').className='status status-ok'}}catch(e){toast('恢复失败')}}
+async function prevTpl(){if(!TEMPLATE_EDITABLE){toast('请登录后操作模板编辑器');return}if(!_ck){toast('请先选择场景');return}let tpl=$('tpl-template').value,hdr=$('tpl-header').value,prev=$('tpl-preview'),st=$('template-status');st.textContent='预览中…';st.className='status';try{let r=await fetch('/api/template/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,header:hdr,template:tpl})});let d=await r.json();if(d.ok){let out=d.output||'';if(d.total>0){prev.value='# 预览  ──  已填入 '+d.filled+'/'+d.total+' 个变量\n'+out}else{prev.value=out}st.textContent='预览已刷新'+(d.total?' · '+d.filled+'/'+d.total:'');st.className='status status-ok'}else{prev.value='# 预览失败: '+d.error;st.textContent='错误: '+d.error;st.className='status status-err'}}catch(e){prev.value='# 预览失败: '+e.message;st.textContent='网络错误';st.className='status status-err'}}
+async function saveTpl(){if(!TEMPLATE_EDITABLE){toast('请登录后操作模板编辑器');return}if(!_ck){toast('请先选择场景');return}let hdr=$('tpl-header').value,mp=$('tpl-mapping').value,tpl=$('tpl-template').value;try{let r=await fetch('/api/template/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck,header:hdr,mapping:mp,template:tpl})});let d=await r.json();if(d.ok){toast('已保存并应用');$('template-status').textContent='已保存';$('template-status').className='status status-ok'}else{toast('保存失败: '+d.error)}}catch(e){toast('保存失败')}}
+async function rstTpl(){if(!TEMPLATE_EDITABLE){toast('请登录后操作模板编辑器');return}if(!_ck){toast('请先选择场景');return}if(!confirm('即将恢复为最初模板。\n当前场景未保存的编辑将丢失。是否继续？'))return;try{let r=await fetch('/api/template/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:_ck})});let d=await r.json();if(d.ok){$('tpl-header').value=d.header;$('tpl-mapping').value=d.mapping;$('tpl-template').value=d.template;$('tpl-preview').value='# 已恢复最初模板\n';$('template-status').textContent='已恢复';$('template-status').className='status status-ok'}}catch(e){toast('恢复失败')}}
 // click outside cascade dropdown to close
 document.addEventListener('click',e=>{
   if(!e.target.closest('#tpl-scene-bar')){

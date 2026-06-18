@@ -723,99 +723,68 @@ class TestConcurrency:
 # 测试组 D：权限控制回归
 # ═════════════════════════════════════════════════════════════
 class TestPermissionControl:
-    """验证模板编辑器权限：只有 yucs 能 save/reset/preview，其他用户一律 403。"""
+    """验证模板编辑器权限：登录用户可编辑自己的模板，访客（未登录）不可编辑。"""
 
-    def test_non_admin_cannot_save_template(self, test_users):
-        u = test_users[2]
-        data = json.dumps({
+    def _guest_request(self, path, body):
+        """用无 cookie 的访客 opener 发请求，返回 HTTP status。"""
+        cj = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+        # 先访问首页种 guest session
+        opener.open(urllib.request.Request(f"{BASE}/"), timeout=10).read()
+        data = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(
+            f"{AIO}{path}", data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
+            method="POST",
+        )
+        try:
+            with opener.open(req, timeout=15) as r:
+                return r.status
+        except urllib.error.HTTPError as e:
+            return e.code
+
+    def test_guest_cannot_save_template(self, container_up):
+        """访客（未登录）save 模板 → 403。"""
+        st = self._guest_request("/api/template/save", {
             "key": ER_HK_KEY,
             "header": H.ER_HK, "mapping": "", "template": "# test\n",
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            f"{AIO}/api/template/save", data=data,
-            headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
-            method="POST",
-        )
-        try:
-            with u.opener.open(req, timeout=15) as r:
-                st = r.status
-        except urllib.error.HTTPError as e:
-            st = e.code
-        assert st == 403, f"非管理员 save 模板应返回 403，实际 {st}"
+        })
+        assert st == 403, f"访客 save 模板应返回 403，实际 {st}"
 
-    def test_non_admin_cannot_reset_template(self, test_users):
-        u = test_users[3]
-        data = json.dumps({"key": ER_HK_KEY}).encode("utf-8")
-        req = urllib.request.Request(
-            f"{AIO}/api/template/reset", data=data,
-            headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
-            method="POST",
-        )
-        try:
-            with u.opener.open(req, timeout=15) as r:
-                st = r.status
-        except urllib.error.HTTPError as e:
-            st = e.code
-        assert st == 403, f"非管理员 reset 模板应返回 403，实际 {st}"
+    def test_guest_cannot_reset_template(self, container_up):
+        """访客（未登录）reset 模板 → 403。"""
+        st = self._guest_request("/api/template/reset", {"key": ER_HK_KEY})
+        assert st == 403, f"访客 reset 模板应返回 403，实际 {st}"
 
-    def test_non_admin_cannot_preview_template(self, test_users):
-        u = test_users[4]
-        data = json.dumps({
+    def test_guest_cannot_preview_template(self, container_up):
+        """访客（未登录）preview 模板 → 403。"""
+        st = self._guest_request("/api/template/preview", {
             "key": ER_HK_KEY,
             "header": H.ER_HK, "template": "# test\n",
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            f"{AIO}/api/template/preview", data=data,
-            headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
-            method="POST",
-        )
-        try:
-            with u.opener.open(req, timeout=15) as r:
-                st = r.status
-        except urllib.error.HTTPError as e:
-            st = e.code
-        assert st == 403, f"非管理员 preview 模板应返回 403，实际 {st}"
+        })
+        assert st == 403, f"访客 preview 模板应返回 403，实际 {st}"
 
-    def test_non_admin_cannot_save_init_defaults(self, test_users):
-        u = test_users[5]
-        data = json.dumps({
+    def test_guest_cannot_save_init_defaults(self, container_up):
+        """访客（未登录）init-defaults/save → 403。"""
+        st = self._guest_request("/api/init-defaults/save", {
             "key": ER_HK_KEY,
             "values": {"DEFAULT_WAN_DHCP": True},
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            f"{AIO}/api/init-defaults/save", data=data,
-            headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
-            method="POST",
-        )
-        try:
-            with u.opener.open(req, timeout=15) as r:
-                st = r.status
-        except urllib.error.HTTPError as e:
-            st = e.code
-        assert st == 403, f"非管理员 init-defaults/save 应返回 403，实际 {st}"
+        })
+        assert st == 403, f"访客 init-defaults/save 应返回 403，实际 {st}"
 
-    def test_non_admin_cannot_reset_init_defaults(self, test_users):
-        u = test_users[6]
-        data = json.dumps({"key": ER_HK_KEY}).encode("utf-8")
-        req = urllib.request.Request(
-            f"{AIO}/api/init-defaults/reset", data=data,
-            headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
-            method="POST",
-        )
-        try:
-            with u.opener.open(req, timeout=15) as r:
-                st = r.status
-        except urllib.error.HTTPError as e:
-            st = e.code
-        assert st == 403, f"非管理员 init-defaults/reset 应返回 403，实际 {st}"
+    def test_guest_cannot_reset_init_defaults(self, container_up):
+        """访客（未登录）init-defaults/reset → 403。"""
+        st = self._guest_request("/api/init-defaults/reset", {"key": ER_HK_KEY})
+        assert st == 403, f"访客 init-defaults/reset 应返回 403，实际 {st}"
 
-    def test_admin_can_operate_template(self, admin_session):
-        """yucs save/reset/preview 全部成功（200）。"""
-        key = ER_HK_KEY
-        marker = ISOLATION_MARKER + "_PERM_ADMIN"
+    def test_logged_in_user_can_edit_template(self, test_users):
+        """登录用户（非 yucs）save/preview/reset 全部成功（200）。"""
+        u = test_users[7]  # ctest08
+        marker = ISOLATION_MARKER + "_LOGGED_IN_EDIT"
 
+        # save
         data = json.dumps({
-            "key": key, "header": H.ER_HK, "mapping": "",
+            "key": ER_HK_KEY, "header": H.ER_HK, "mapping": "",
             "template": f"# {marker}\nset system host-name {marker}\n",
         }).encode("utf-8")
         req = urllib.request.Request(
@@ -823,25 +792,70 @@ class TestPermissionControl:
             headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
             method="POST",
         )
-        with admin_session.open(req, timeout=15) as r:
-            assert r.status == 200, f"admin save 应 200，实际 {r.status}"
+        with u.opener.open(req, timeout=15) as r:
+            assert r.status == 200, f"登录用户 save 应 200，实际 {r.status}"
 
+        # preview
         data = json.dumps({
-            "key": key, "header": H.ER_HK, "template": f"# {marker}\n",
+            "key": ER_HK_KEY, "header": H.ER_HK, "template": f"# {marker}\n",
         }).encode("utf-8")
         req = urllib.request.Request(
             f"{AIO}/api/template/preview", data=data,
             headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
             method="POST",
         )
-        with admin_session.open(req, timeout=15) as r:
-            assert r.status == 200, f"admin preview 应 200，实际 {r.status}"
+        with u.opener.open(req, timeout=15) as r:
+            assert r.status == 200, f"登录用户 preview 应 200，实际 {r.status}"
 
-        data = json.dumps({"key": key}).encode("utf-8")
+        # reset（清理）
+        data = json.dumps({"key": ER_HK_KEY}).encode("utf-8")
         req = urllib.request.Request(
             f"{AIO}/api/template/reset", data=data,
             headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
             method="POST",
         )
-        with admin_session.open(req, timeout=15) as r:
-            assert r.status == 200, f"admin reset 应 200，实际 {r.status}"
+        with u.opener.open(req, timeout=15) as r:
+            assert r.status == 200, f"登录用户 reset 应 200，实际 {r.status}"
+
+    def test_template_save_adds_user_comment(self, test_users):
+        """保存模板后，磁盘上的 .tpl 文件顶部应有 'xxx专属yyy场景模板-yymmdd' 注释行。"""
+        import subprocess
+        u = test_users[8]  # ctest09
+        marker = ISOLATION_MARKER + "_COMMENT_CHECK"
+        custom_tpl = f"# {marker}\nset system host-name {marker}\n"
+
+        # save
+        data = json.dumps({
+            "key": ER_HK_KEY, "header": H.ER_HK, "mapping": "", "template": custom_tpl,
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            f"{AIO}/api/template/save", data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
+            method="POST",
+        )
+        with u.opener.open(req, timeout=15) as r:
+            assert r.status == 200, f"save 失败: {r.status}"
+
+        # 检查磁盘上的 .tpl 文件第一行含 "专属" 和 "场景模板"
+        out = _docker_exec("bash", "-c",
+            "find '/app/application/all_in_one - cc/data/users/' "
+            "-path '*/ER_FastIP___HK_*/TEMPLATE_EPOCH_HK.tpl' "
+            "-exec head -1 {} \; 2>/dev/null | tail -1")
+        assert "专属" in out and "场景模板" in out, (
+            f"保存的 .tpl 文件第一行应含专属注释，实际: {out}"
+        )
+        assert u.username in out, (
+            f"保存的 .tpl 注释应含用户名 {u.username}，实际: {out}"
+        )
+
+        # 清理
+        data = json.dumps({"key": ER_HK_KEY}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{AIO}/api/template/reset", data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "perm/1.0"},
+            method="POST",
+        )
+        try:
+            u.opener.open(req, timeout=15).read()
+        except Exception:
+            pass

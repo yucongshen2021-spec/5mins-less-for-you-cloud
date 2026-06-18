@@ -24,7 +24,8 @@
 
 - **自动访客模式**：未登录自动获得访客 session，使用共享默认 workspace。
 - **注册/登录/重置密码**：登录页支持三态切换（登录 ↔ 注册 ↔ 重置密码）。重置密码需输入用户名 + 旧密码 + 新密码。
-- **管理员 yucs**：首次部署时自动创建 `yucs` 账号（密码从 `ADMIN_PASSWORD` 环境变量读取，默认 `yucs123`）。只有 `yucs` 可操作「我来定模板」编辑器，其他用户只读。
+- **管理员 yucs**：首次部署时自动创建 `yucs` 账号（密码从 `ADMIN_PASSWORD` 环境变量读取，默认 `yucs123`）。
+- **模板编辑权限**：登录用户可编辑自己的模板（访客不可编辑）。保存时自动加专属注释 `xxx专属yyy场景模板-yymmdd`。yucs 是管理员。
 - **按用户工作区隔离**：每个用户有独立的 `data/users/<uid>/editor_workspace/`，模板互不串号。
 - **会话有效期**：24 小时（Flask permanent session）。
 
@@ -166,7 +167,7 @@ playwright install chromium
 - **TDD**：先写测试，再写实现
 - **每次有动作记一笔**：`log/` 目录存变动记录
 - **多并发安全**：generate 从磁盘读模板（`_get_effective_template`），save/reset 只操作磁盘不改 ns，避免并发竞态
-- **模板编辑器权限**：只有 `yucs` 账号可 save/reset/preview 模板和 init-defaults，其他用户按钮置灰 + 前端/后端双重 403 拦截
+- **模板编辑器权限**：登录用户可编辑自己的模板（访客不可编辑），保存时自动加专属注释。yucs 是管理员
 - **登录系统**：注册/登录/重置密码（旧密码验证）。首次部署自动创建 yucs 管理员。访客自动 session 用共享 workspace
 - **stats 用户搜索**：9000 看板支持按用户名模糊搜索，表格含用户列，Top 用户图表
 - **tkinter 已移除**：业务模块用 `tkinter_stub.py` 替代，不要恢复 `import tkinter` 或添加 Xvfb 依赖

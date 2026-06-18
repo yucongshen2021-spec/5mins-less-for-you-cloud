@@ -53,14 +53,25 @@ def _get_request_username() -> str:
     return ""
 
 
+def _get_request_user_id() -> str:
+    """返回当前请求的 X-User-Id（由 portal proxy 注入），无请求上下文或访客时返回空串。"""
+    try:
+        from flask import has_request_context
+        if has_request_context():
+            return (request.headers.get("X-User-Id") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
 _TEMPLATE_ADMIN_USER = "yucs"
 
 
-def _require_template_admin() -> tuple | None:
-    """检查当前用户是否为模板管理员（yucs）。非管理员返回 (jsonify(...), 403)，管理员返回 None。"""
-    username = _get_request_username()
-    if username != _TEMPLATE_ADMIN_USER:
-        return jsonify({"ok": False, "error": f"权限不足：仅 {_TEMPLATE_ADMIN_USER} 可操作模板编辑器"}), 403
+def _require_login() -> tuple | None:
+    """检查当前用户是否已登录（X-User-Id 非空）。访客返回 (jsonify(...), 403)，已登录返回 None。"""
+    uid = _get_request_user_id()
+    if not uid:
+        return jsonify({"ok": False, "error": "请登录后操作模板编辑器"}), 403
     return None
 
 
@@ -698,10 +709,13 @@ def _humanize_error(err, variant: str = "") -> str:
 @app.route("/")
 def index():
     username = _get_request_username()
-    template_admin = (username == _TEMPLATE_ADMIN_USER)
+    uid = _get_request_user_id()
+    template_editable = bool(uid)  # 登录用户可编辑自己的模板
+    is_admin = (username == _TEMPLATE_ADMIN_USER)  # yucs 是管理员
     return render_template("index.html",
                            username=username,
-                           template_admin=template_admin)
+                           template_editable=template_editable,
+                           is_admin=is_admin)
 
 
 @app.errorhandler(500)
@@ -2006,7 +2020,7 @@ def api_template_load():
 
 @app.route("/api/template/save", methods=["POST"])
 def api_template_save():
-    denied = _require_template_admin()
+    denied = _require_login()
     if denied:
         return denied
     data = request.get_json(force=True)
@@ -2028,7 +2042,16 @@ def api_template_save():
     try:
         # 原子写入：先写唯一临时文件再 rename，避免并发 save 临时文件冲突
         import tempfile, os
-        for fname, content in [("headers.txt", hdr), ("mapping.txt", mp), (f"{slot}.tpl", tpl)]:
+        from datetime import datetime
+        # 在 .tpl 模板顶部加专属注释行：xxx专属yyy场景模板-yymmdd
+        # 重复保存时先移除旧的注释行，避免累积
+        username = _get_request_username() or "用户"
+        yymmdd = datetime.now().strftime("%y%m%d")
+        comment_line = f"# {username}专属{scenario_key}场景模板-{yymmdd}\n"
+        tpl_lines = tpl.split("\n")
+        tpl_lines = [l for l in tpl_lines if not re.match(r"^# .+专属.+场景模板-\d{6}$", l)]
+        tpl_with_comment = comment_line + "\n".join(tpl_lines)
+        for fname, content in [("headers.txt", hdr), ("mapping.txt", mp), (f"{slot}.tpl", tpl_with_comment)]:
             fp = ws_dir / fname
             tf = ws_dir / f".{fname}.{os.getpid()}.{id(content)}.tmp"
             tf.write_text(content, encoding="utf-8-sig")
@@ -2043,7 +2066,7 @@ def api_template_save():
 
 @app.route("/api/template/reset", methods=["POST"])
 def api_template_reset():
-    denied = _require_template_admin()
+    denied = _require_login()
     if denied:
         return denied
     data = request.get_json(force=True)
@@ -2121,7 +2144,7 @@ def api_template_reset():
 
 @app.route("/api/template/preview", methods=["POST"])
 def api_template_preview():
-    denied = _require_template_admin()
+    denied = _require_login()
     if denied:
         return denied
     """Real preview using parser + builder, same as original VisualEditorTab.preview()."""
@@ -2622,7 +2645,7 @@ def api_init_defaults_get(scenario_key):
 
 @app.route("/api/init-defaults/save", methods=["POST"])
 def api_init_defaults_save():
-    denied = _require_template_admin()
+    denied = _require_login()
     if denied:
         return denied
     """Save init default values for a scenario to user_init_placeholders.json."""
@@ -2667,7 +2690,7 @@ def api_init_defaults_save():
 
 @app.route("/api/init-defaults/reset", methods=["POST"])
 def api_init_defaults_reset():
-    denied = _require_template_admin()
+    denied = _require_login()
     if denied:
         return denied
     """Reset init defaults to factory values for a scenario."""
