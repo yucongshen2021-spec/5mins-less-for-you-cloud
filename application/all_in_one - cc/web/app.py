@@ -376,6 +376,10 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
     # Recompute wan_addr / wan_route_block from web form network values.
     # Builder 读取的 tkinter BooleanVar (wan_dhcp_var) 在 web 模式下状态不可靠，
     # 这里根据表单 wan_dhcp 重算两个分支。
+    # 先用表单 wan_eth 覆盖 wan_if（builder 从 tk 控件读的是旧值）
+    wan_eth = str(network.get("wan_eth", "")).strip()
+    if wan_eth:
+        d["wan_if"] = f"eth{wan_eth}" if not wan_eth.startswith("GE") else wan_eth
     wan_if = d.get("wan_if", "")
     if network.get("wan_dhcp"):
         if not is_usg:
@@ -408,15 +412,15 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
             d["lan_if_block"] = ""
             d["dhcp_server_block"] = ""
         else:
-            # Non-bypass: ensure lan_if_block is populated (builder closure state may be stale)
-            if not d.get("lan_if_block"):
-                lan_eth = d.get("lan_eth_num", "5")
-                lan_if = f"eth{lan_eth}" if not str(lan_eth).startswith("GE") else str(lan_eth)
-                # Prefer DEFAULT_LAN_CIDR over lan_cidr — the latter may be
-                # corrupted to WAN CIDR when bypass BooleanVar is incorrectly set.
-                lan_cidr = d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
-                d["lan_if_block"] = (f"set interfaces ethernet {lan_if} address '{lan_cidr}'\n"
-                                     f"set interfaces ethernet {lan_if} description 'LAN'")
+            # Non-bypass: always regenerate lan_if_block from form lan_eth
+            # (builder closure reads stale tk widget values, must override)
+            lan_eth = str(network.get("lan_eth", "")).strip() or d.get("lan_eth_num", "5")
+            lan_if = f"eth{lan_eth}" if not str(lan_eth).startswith("GE") else str(lan_eth)
+            # Prefer DEFAULT_LAN_CIDR over lan_cidr — the latter may be
+            # corrupted to WAN CIDR when bypass BooleanVar is incorrectly set.
+            lan_cidr = d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
+            d["lan_if_block"] = (f"set interfaces ethernet {lan_if} address '{lan_cidr}'\n"
+                                 f"set interfaces ethernet {lan_if} description 'LAN'")
             # Ensure dhcp_server_block is populated when LAN DHCP is ON
             if network.get("lan_dhcp") and not d.get("dhcp_server_block"):
                 lan_cidr = d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
