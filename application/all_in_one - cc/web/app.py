@@ -304,7 +304,7 @@ def _inject_network_to_module(ns: dict, network: dict, *, is_usg: bool = False, 
         _set("DEFAULT_DNS2", network["dns2"])
 
 
-def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
+def _patch_format_dict(d: dict, network: dict, is_usg: bool = False, ns: dict = None) -> None:
     """Override format dict with web form network values.
 
     ER 2in1 的 builder 通过 tkinter 闭包读取控件值，但在 web exec() 模式下
@@ -416,14 +416,13 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False) -> None:
             # (builder closure reads stale tk widget values, must override)
             lan_eth = str(network.get("lan_eth", "")).strip() or d.get("lan_eth_num", "5")
             lan_if = f"eth{lan_eth}" if not str(lan_eth).startswith("GE") else str(lan_eth)
-            # Prefer DEFAULT_LAN_CIDR over lan_cidr — the latter may be
-            # corrupted to WAN CIDR when bypass BooleanVar is incorrectly set.
-            lan_cidr = d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
+            # Prefer ns DEFAULT_LAN_CIDR (saved init-defaults) over stale d value
+            lan_cidr = (ns or {}).get("DEFAULT_LAN_CIDR") or d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
             d["lan_if_block"] = (f"set interfaces ethernet {lan_if} address '{lan_cidr}'\n"
                                  f"set interfaces ethernet {lan_if} description 'LAN'")
             # Ensure dhcp_server_block is populated when LAN DHCP is ON
             if network.get("lan_dhcp") and not d.get("dhcp_server_block"):
-                lan_cidr = d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
+                lan_cidr = (ns or {}).get("DEFAULT_LAN_CIDR") or d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
                 if "/" in str(lan_cidr):
                     lan_ip = str(lan_cidr).split("/")[0]
                     parts = lan_ip.split(".")
@@ -799,6 +798,7 @@ def generate_epoch_fastip():
     tool_id = "epoch_fastip"
 
     er = _get_er()
+    _load_init_defaults()
     _inject_network_to_module(er, network, is_hk=(variant == "hk"))
 
     try:
@@ -918,7 +918,7 @@ def generate_epoch_fastip():
         else:
             d = result
 
-        _patch_format_dict(d, network, is_usg=False)
+        _patch_format_dict(d, network, is_usg=False, ns=er)
         hostname_override = str(network.get("hostname") or "").strip()
         if hostname_override and isinstance(d, dict):
             d["hostname"] = hostname_override
@@ -940,6 +940,7 @@ def generate_epoch_fastip5():
     tool_id = "epoch_fastip5"
 
     er5 = _get_er5()
+    _load_init_defaults()
     _inject_network_to_module(er5, network, is_hk=(variant == "hk"))
 
     try:
@@ -1117,6 +1118,7 @@ def generate_usg_fastip():
     tool_id = "usg_fastip"
 
     usg = _get_usg()
+    _load_init_defaults()
     _inject_network_to_module(usg, network, is_usg=True, is_hk=(variant == "hk"))
     _apply_network_to_widgets(usg.get("__TAB_FRAME__", usg.get("__WEB_FRAME__")), usg)
 
@@ -1177,7 +1179,7 @@ def generate_usg_fastip():
         else:
             d = result
 
-        _patch_format_dict(d, network, is_usg=True)
+        _patch_format_dict(d, network, is_usg=True, ns=usg)
         output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)
         return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
     except Exception as e:
@@ -1193,6 +1195,7 @@ def generate_epoch_mpls():
     tool_id = "epoch_mpls"
 
     mpls = _get_mpls()
+    _load_init_defaults()
     _inject_network_to_module(mpls, network)
     _apply_network_to_widgets(mpls.get("__TAB_FRAME__", mpls.get("__WEB_FRAME__")), mpls)
 
@@ -1474,6 +1477,7 @@ def generate_ar_traditional():
 
     try:
         mod = _get_ar_traditional()
+        _load_init_defaults()
         parse_fn = mod.get("parse_ar_traditional_headers")
         builder_fn = mod.get("build_ar_traditional_format_dict")
         tpl = _get_effective_template(mod, "TEMPLATE_AR_TRADITIONAL")
@@ -2753,7 +2757,7 @@ def api_init_defaults_reset():
     # Restore factory defaults from snapshot (no del _EMBEDDED_NS — that would
     # break concurrent generate requests using this ns)
     ns = _load_module(source)
-    factory = _FACTORY_INIT_DEFAULTS.get(source, {})
+    factory = _FACTORY_INIT_DEFAULTS.get(scenario_key, {})
     for k, v in factory.items():
         ns[k] = v
 
