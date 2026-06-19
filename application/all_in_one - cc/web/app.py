@@ -1233,6 +1233,19 @@ def generate_epoch_mpls():
                     _cidr_plain = mpls.get("_cidr_plain")
                     if _cidr_plain:
                         d["wan_addr_plain"] = _cidr_plain(str(d.get("wan_addr", "")))
+                    # Override inner_nets from form (builder reads stale tk defaults)
+                    inner_raw_form = str(network.get("inner_nets", "")).strip()
+                    if inner_raw_form:
+                        import re as _re_in_ipsec
+                        form_nets = []
+                        for t in _re_in_ipsec.split(r'[\n,，\s]+', inner_raw_form):
+                            t = t.strip()
+                            if t and "/" in t:
+                                parts = t.split("/")
+                                if len(parts) == 2 and parts[0].count(".") == 3 and parts[1].isdigit():
+                                    form_nets.append(t)
+                        if form_nets:
+                            d["inner_nets"] = form_nets
                     # Recompute return routes: WAN DHCP + bypass → dhcp-interface
                     if bypass and wan_dhcp and network.get("gen_return_route"):
                         inner_nets = d.get("inner_nets") or []
@@ -1277,6 +1290,26 @@ def generate_epoch_mpls():
                         if network.get("bypass"):
                             d["lan_if_block"] = ""
                             d["dhcp_server_block"] = ""
+
+                        # Override inner_nets from form (builder reads stale tk defaults)
+                        inner_raw_form = str(network.get("inner_nets", "")).strip()
+                        if inner_raw_form:
+                            import re as _re_in
+                            form_nets = []
+                            for t in _re_in.split(r'[\n,，\s]+', inner_raw_form):
+                                t = t.strip()
+                                if t and "/" in t:
+                                    parts = t.split("/")
+                                    if len(parts) == 2 and parts[0].count(".") == 3 and parts[1].isdigit():
+                                        form_nets.append(t)
+                            if form_nets:
+                                d["inner_nets"] = form_nets
+                                d["DEFAULT_INNER_NETS"] = inner_raw_form
+                                # Regenerate prefix_list_block with new inner_nets
+                                # (builder already built it with stale tk defaults)
+                                pl_fn = mpls.get("_build_mpls_prefix_list_block")
+                                if pl_fn:
+                                    d["prefix_list_block"] = pl_fn(d)
 
                         # Return routes (closure BooleanVar not set in web mode)
                         d["return_routes_block"] = ""
