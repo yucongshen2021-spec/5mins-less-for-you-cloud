@@ -854,6 +854,25 @@ def parse_epoch_hk(text):
         bu = block.strip()
         if re.match(r'(MAIN|主)', bu, re.IGNORECASE): parse_one(bu, "main")
         elif re.match(r'(BACKUP|备)', bu, re.IGNORECASE): parse_one(bu, "bk")
+
+    # Fallback: 如果没有 MAIN/BACKUP 标记，改用 LineID 奇偶数区分主备线
+    # （和 US 解析器相同的逻辑，LineID 末位奇数=主线，偶数=备线）
+    if not result.get("main_tunnel") and not result.get("bk_tunnel"):
+        lineid_blocks = re.split(r'(?=LineID\s*[:：])', text, flags=re.IGNORECASE)
+        for block in lineid_blocks:
+            if not re.search(r'LineID', block, re.IGNORECASE):
+                continue
+            line_id = _get(r'LineID\s*[:：]\s*(\S+)', block)
+            if not line_id:
+                continue
+            last = line_id[-1]
+            try:
+                is_main = int(last) % 2 == 1
+            except ValueError:
+                is_main = True
+            prefix = "main" if is_main else "bk"
+            parse_one(block, prefix)
+
     return result
 
 def extract_lineid_hk(text):
