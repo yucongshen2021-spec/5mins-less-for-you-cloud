@@ -346,9 +346,12 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False, ns: dict = 
                     # 重新生成 overseas_nat_block（builder 用控件读 inner_nets，
                     # stub 模式下控件返回空，需用表单值重新生成 NAT 规则）
                     overseas_lines = []
-                    main_tun = d.get("main_tunnel", "")
-                    bk_tun = d.get("bk_tunnel", "")
-                    nat_ip = d.get("hkip_nat", "")
+                    # HK 出口用 main_tunnel/bk_tunnel/hkip_nat
+                    # US 出口用 main_us_tun/bk_us_tun/main_us_nat_ip/bk_us_nat_ip
+                    main_tun = d.get("main_tunnel", "") or d.get("main_us_tun", "")
+                    bk_tun = d.get("bk_tunnel", "") or d.get("bk_us_tun", "")
+                    main_nat = d.get("hkip_nat", "") or d.get("main_us_nat_ip", "")
+                    bk_nat = d.get("hkip_nat", "") or d.get("bk_us_nat_ip", "")
                     for i, net in enumerate(nets):
                         r_main = 100 + i
                         r_bk = 200 + i
@@ -357,13 +360,13 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False, ns: dict = 
                         overseas_lines.append(
                             f"set nat source rule {r_main} source address '{net}'")
                         overseas_lines.append(
-                            f"set nat source rule {r_main} translation address '{nat_ip}'")
+                            f"set nat source rule {r_main} translation address '{main_nat}'")
                         overseas_lines.append(
                             f"set nat source rule {r_bk} outbound-interface '{bk_tun}'")
                         overseas_lines.append(
                             f"set nat source rule {r_bk} source address '{net}'")
                         overseas_lines.append(
-                            f"set nat source rule {r_bk} translation address '{nat_ip}'")
+                            f"set nat source rule {r_bk} translation address '{bk_nat}'")
                     d["overseas_nat_block"] = "\n".join(overseas_lines)
     for dhcp_k in ("wan_dhcp", "lan_dhcp", "gen_return_route", "bypass"):
         v = network.get(dhcp_k)
@@ -709,6 +712,11 @@ def _humanize_error(err, variant: str = "") -> str:
 
 
 
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
+
 @app.route("/")
 def index():
     username = _get_request_username()
@@ -1052,7 +1060,7 @@ def generate_epoch_fastip5():
             bk_nat = network.get("ER5_NE_BK_NAT_RULE_DEFAULT") or er5.get("ER5_NE_BK_NAT_RULE_DEFAULT", "2001")
             nat_group = network.get("ER5_NE_NAT_GROUP_DEFAULT") or er5.get("ER5_NE_NAT_GROUP_DEFAULT", "LAN-NET1")
             nat_src = network.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT") or er5.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT", "192.168.0.0/24")
-            fnet_probe = network.get("ER5_NE_FNET_PROBE_DEFAULT") or er5.get("ER5_NE_FNET_PROBE_DEFAULT", "")
+            fnet_probe = network.get("ER5_NE_FNET_PROBE_DEFAULT") or er5.get("ER5_NE_FNET_PROBE_DEFAULT", "") or "100.100.100.1"
             fnet_tunnel = network.get("ER5_NE_FNET_EXIT_TUNNEL_DEFAULT") or er5.get("ER5_NE_FNET_EXIT_TUNNEL_DEFAULT", "tun")
             fnet_nat_rule = network.get("ER5_NE_FNET_NAT_RULE_DEFAULT") or er5.get("ER5_NE_FNET_NAT_RULE_DEFAULT", "")
             init_cfg = {
@@ -1068,6 +1076,10 @@ def generate_epoch_fastip5():
                 "fnet_exit_tunnel": str(fnet_tunnel),
                 "fnet_nat_rule": str(fnet_nat_rule),
             }
+            # 100.100 NAT Rule 号在双线场景下必填，若留空给默认值
+            if has_bk and not fnet_nat_rule:
+                fnet_nat_rule = "3001"
+                init_cfg["fnet_nat_rule"] = "3001"
             span_check = er5.get("epoch5_new_exit_nat_rule_span_error")
             span_err = span_check(parsed, init_cfg) if callable(span_check) else None
             if span_err:

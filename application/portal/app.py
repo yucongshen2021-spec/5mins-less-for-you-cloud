@@ -193,6 +193,11 @@ def api_status():
     return jsonify(get_apps_status())
 
 
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
+
 @app.route("/api/health")
 def health():
     return jsonify({"ok": True, "status": "healthy"})
