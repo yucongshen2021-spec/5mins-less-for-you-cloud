@@ -181,6 +181,10 @@ def _try_log(app_id: str, subpath: str, start_s: float,
     visits we only log metadata (IP, time, function).
     """
     try:
+        # 测试机器人（ctest 开头）不记录访问日志
+        _username = session.get("username", "") or ""
+        if _username.startswith("ctest"):
+            return
         req_body = request.get_data() or b""
         record = {
             "ts": _now_iso(),
@@ -200,7 +204,7 @@ def _try_log(app_id: str, subpath: str, start_s: float,
             "user_agent": request.headers.get("User-Agent", ""),
             "referer": request.headers.get("Referer", ""),
             "user_id": session.get("user_id", "") or "",
-            "username": session.get("username", "") or "",
+            "username": _username,
         }
         _enqueue_log(record)
     except Exception:

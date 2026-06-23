@@ -76,8 +76,34 @@ def _page_from_args() -> int:
 
 @app.route("/")
 def index():
-    """Serve the single-page stats dashboard."""
+    """Serve the stats dashboard. If ?user= is a non-admin user, show their personal dashboard."""
+    user = request.args.get("user", "").strip()
+    if user and user != "yucs":
+        return render_template("user_dashboard.html", username=user)
     return render_template("index.html")
+
+
+@app.route("/api/my-records")
+def api_my_records():
+    """Return paginated records for a specific user."""
+    user = request.args.get("user", "").strip()
+    if not user:
+        return jsonify({"ok": False, "error": "缺少 user 参数"}), 400
+    page = _page_from_args()
+    per_page = min(200, max(1, request.args.get("per_page", 20, type=int)))
+    rows = stats_db.query_user_records(str(_DB_PATH), user, page, per_page)
+    total = stats_db.count_user_records(str(_DB_PATH), user)
+    return jsonify({"ok": True, "rows": rows, "total": total, "page": page, "per_page": per_page})
+
+
+@app.route("/api/my-summary")
+def api_my_summary():
+    """Return summary statistics for a specific user."""
+    user = request.args.get("user", "").strip()
+    if not user:
+        return jsonify({"ok": False, "error": "缺少 user 参数"}), 400
+    summary = stats_db.query_user_summary(str(_DB_PATH), user)
+    return jsonify({"ok": True, "summary": summary})
 
 
 @app.route("/api/records")

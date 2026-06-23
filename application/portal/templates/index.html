@@ -242,6 +242,11 @@
     <span class="live-label">Live</span>
     {% if current_user and current_user != "访客" %}
     <span style="color:#999;font-size:12px;margin:0 8px">{{ current_user }}</span>
+    {% if is_admin %}
+    <a href="http://{{ request.host.split(':')[0] }}:9000/?user={{ current_user }}" class="login-btn" style="background:#e67e22;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;margin-right:6px">管理后台</a>
+    {% else %}
+    <a href="http://{{ request.host.split(':')[0] }}:9000/?user={{ current_user }}" class="login-btn" style="background:#27ae60;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;margin-right:6px">我的数据</a>
+    {% endif %}
     <a href="/logout" class="login-btn" style="background:var(--primary);color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">退出</a>
     {% else %}
     <a href="/login" class="login-btn" style="background:var(--primary);color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">登录</a>

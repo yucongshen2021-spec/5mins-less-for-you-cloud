@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的数据 · {{ username }}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#f0f2f5;--card:#fff;--border:#e0e0e0;--text:#333;--muted:#999;--primary:#4a90d9;--ok:#27ae60;--warn:#e67e22}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .topbar{background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px}
+  .topbar .brand{font-size:16px;font-weight:600}
+  .topbar .spacer{flex:1}
+  .topbar a{color:var(--primary);text-decoration:none;font-size:14px}
+  .container{max-width:960px;margin:24px auto;padding:0 20px}
+  .welcome{font-size:20px;font-weight:600;margin-bottom:20px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+  .card{background:var(--card);border-radius:10px;padding:20px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+  .card .label{font-size:13px;color:var(--muted);margin-bottom:6px}
+  .card .value{font-size:28px;font-weight:700;color:var(--primary)}
+  .card .sub{font-size:12px;color:var(--muted);margin-top:4px}
+  .section-h{font-size:16px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .scenario-list{background:var(--card);border-radius:10px;padding:16px 20px;margin-bottom:28px}
+  .scenario-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:14px}
+  .scenario-item:last-child{border-bottom:none}
+  .scenario-item .cnt{color:var(--primary);font-weight:600}
+  table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden}
+  th{background:#fafafa;padding:10px 14px;text-align:left;font-size:13px;color:#666;border-bottom:1px solid var(--border)}
+  td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px}
+  tr:hover td{background:#f9f9f9}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px}
+  .badge-ok{background:#e8f5e9;color:#2e7d32}
+  .badge-err{background:#fbe9e7;color:#c62828}
+  .pagination{display:flex;justify-content:center;gap:8px;margin-top:16px}
+  .pagination button{padding:6px 14px;border:1px solid var(--border);background:var(--card);border-radius:6px;cursor:pointer;font-size:13px}
+  .pagination button:disabled{opacity:.4;cursor:not-allowed}
+  .pagination button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center}
+  .modal-overlay.show{display:flex}
+  .modal-panel{background:var(--card);border-radius:12px;padding:24px;width:700px;max-width:92vw;max-height:80vh;overflow:auto}
+  .modal-panel h2{font-size:16px;margin-bottom:14px}
+  .modal-panel pre{background:#f5f5f5;padding:12px;border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto}
+  .modal-panel .close{margin-top:12px;text-align:right}
+  .empty{text-align:center;color:var(--muted);padding:40px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="brand">📊 我的数据</span>
+  <span class="spacer"></span>
+  <span style="color:var(--muted);font-size:13px">{{ username }}</span>
+  <a href="/">返回看板</a>
+</div>
+
+<div class="container">
+  <div class="welcome">欢迎，{{ username }}</div>
+
+  <div class="cards" id="summaryCards">
+    <div class="card"><div class="label">总访问次数</div><div class="value" id="sTotal">-</div></div>
+    <div class="card"><div class="label">生成配置次数</div><div class="value" id="sGen">-</div><div class="sub" id="sGenSub"></div></div>
+    <div class="card"><div class="label">最近活跃</div><div class="value" id="sLast" style="font-size:16px">-</div></div>
+    <div class="card"><div class="label">首次访问</div><div class="value" id="sFirst" style="font-size:16px">-</div></div>
+  </div>
+
+  <div class="section-h">📊 常用场景</div>
+  <div class="scenario-list" id="scenarioList">
+    <div class="empty">加载中…</div>
+  </div>
+
+  <div class="section-h">📋 生成记录</div>
+  <table>
+    <thead><tr><th>时间</th><th>场景</th><th>状态</th><th>耗时</th><th>操作</th></tr></thead>
+    <tbody id="recordBody">
+      <tr><td colspan="5" class="empty">加载中…</td></tr>
+    </tbody>
+  </table>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-panel">
+    <h2 id="detailTitle">生成详情</h2>
+    <pre id="detailContent"></pre>
+    <div class="close"><button onclick="closeDetail()" style="padding:6px 18px;border:1px solid var(--border);background:var(--card);border-radius:6px;cursor:pointer">关闭</button></div>
+  </div>
+</div>
+
+<script>
+function $(id){return document.getElementById(id)}
+var USERNAME='{{ username }}';
+var currentPage=1;
+
+function loadSummary(){
+  fetch('/api/my-summary?user='+encodeURIComponent(USERNAME)).then(function(r){return r.json()}).then(function(d){
+    if(!d.ok)return;
+    var s=d.summary;
+    $('sTotal').textContent=s.total||0;
+    $('sGen').textContent=s.generate_count||0;
+    $('sGenSub').textContent=s.total?('占比 '+Math.round((s.generate_count||0)/s.total*100)+'%'):'';
+    $('sLast').textContent=s.last_active?s.last_active.replace('T',' ').substring(0,19):'-';
+    $('sFirst').textContent=s.first_seen?s.first_seen.replace('T',' ').substring(0,19):'-';
+    // Scenario list
+    var sc=s.top_scenarios||[];
+    if(sc.length===0){$('scenarioList').innerHTML='<div class="empty">暂无数据</div>';return}
+    var h='';
+    sc.forEach(function(i){h+='<div class="scenario-item"><span>'+escapeHtml(i.function||'-')+'</span><span class="cnt">'+i.cnt+' 次</span></div>'});
+    $('scenarioList').innerHTML=h;
+  });
+}
+
+function loadRecords(page){
+  currentPage=page;
+  fetch('/api/my-records?user='+encodeURIComponent(USERNAME)+'&page='+page+'&per_page=15').then(function(r){return r.json()}).then(function(d){
+    if(!d.ok)return;
+    var rows=d.rows||[];
+    if(rows.length===0){$('recordBody').innerHTML='<tr><td colspan="5" class="empty">暂无生成记录</td></tr>';$('pagination').innerHTML='';return}
+    var h='';
+    rows.forEach(function(r){
+      var cls=r.status&&r.status<400?'badge-ok':'badge-err';
+      h+='<tr>';
+      h+='<td>'+(r.ts||'-').replace('T',' ').substring(0,19)+'</td>';
+      h+='<td>'+escapeHtml(r.function||r.variant||'-')+'</td>';
+      h+='<td><span class="badge '+cls+'">'+(r.status||'-')+'</span></td>';
+      h+='<td>'+(r.duration_ms||'-')+'ms</td>';
+      h+='<td><a style="color:var(--primary);cursor:pointer" onclick="showDetail('+r.id+')">查看</a></td>';
+      h+='</tr>';
+    });
+    $('recordBody').innerHTML=h;
+    renderPagination(d.total,d.page,d.per_page);
+  });
+}
+
+function renderPagination(total,page,per){
+  var pages=Math.ceil(total/per);
+  if(pages<=1){$('pagination').innerHTML='';return}
+  var h='';
+  h+='<button '+(page<=1?'disabled':'')+' onclick="loadRecords('+(page-1)+')">上一页</button>';
+  h+='<span style="padding:6px 10px;font-size:13px">'+page+' / '+pages+'</span>';
+  h+='<button '+(page>=pages?'disabled':'')+' onclick="loadRecords('+(page+1)+')">下一页</button>';
+  $('pagination').innerHTML=h;
+}
+
+function showDetail(id){
+  fetch('/api/records/'+id).then(function(r){return r.json()}).then(function(d){
+    $('detailTitle').textContent='生成详情 #'+id;
+    var content='';
+    if(d.data_header)content+='=== 数据头 ===\n'+d.data_header+'\n\n';
+    if(d.response_body)content+='=== 生成内容 ===\n'+d.response_body;
+    if(!content)content='无内容';
+    $('detailContent').textContent=content;
+    $('detailModal').classList.add('show');
+  });
+}
+function closeDetail(){$('detailModal').classList.remove('show')}
+
+function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+loadSummary();
+loadRecords(1);
+</script>
+</body>
+</html>

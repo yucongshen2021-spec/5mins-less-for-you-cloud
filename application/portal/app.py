@@ -179,11 +179,12 @@ def reset_password():
 def index():
     user_id = session.get("user_id", "")
     username = session.get("username", "") if user_id else ""
+    is_admin = (username == "yucs")
     apps_status = get_apps_status()
     online = sum(1 for a in apps_status if a.get("reachable"))
     total = len(apps_status)
     return render_template("index.html",
-        apps=apps_status, current_user=username,
+        apps=apps_status, current_user=username, is_admin=is_admin,
         local_version=_local_version(), portal_label=_PORTAL_LABEL,
         online_count=online, total_count=total)
 

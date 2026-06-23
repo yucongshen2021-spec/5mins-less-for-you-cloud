@@ -397,6 +397,78 @@ def _build_where(filters: dict) -> tuple:
     return where, params
 
 
+# ── Per-user query functions ─────────────────────────────────────────────────
+
+def query_user_records(db_path: str, username: str,
+                       page: int = 1, page_size: int = 20) -> list:
+    """Return a page of access_log rows for a specific user, newest first."""
+    offset = max(0, (page - 1)) * page_size
+    conn = _connect_read(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT * FROM access_log WHERE username = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+            [username, page_size, offset],
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def count_user_records(db_path: str, username: str) -> int:
+    """Return total record count for a specific user."""
+    conn = _connect_read(db_path)
+    try:
+        return conn.execute(
+            "SELECT COUNT(*) FROM access_log WHERE username = ?", [username]
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+
+def query_user_summary(db_path: str, username: str) -> dict:
+    """Return per-user statistics: total, generate count, last active, top scenarios."""
+    conn = _connect_read(db_path)
+    try:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM access_log WHERE username = ?", [username]
+        ).fetchone()[0]
+
+        gen_count = conn.execute(
+            "SELECT COUNT(*) FROM access_log WHERE username = ? AND function LIKE '生成%'",
+            [username]
+        ).fetchone()[0]
+
+        last_active = conn.execute(
+            "SELECT ts FROM access_log WHERE username = ? ORDER BY id DESC LIMIT 1",
+            [username]
+        ).fetchone()
+
+        top_scenarios = [
+            dict(r) for r in conn.execute(
+                "SELECT function, COUNT(*) as cnt FROM access_log "
+                "WHERE username = ? AND function IS NOT NULL AND function != '' "
+                "GROUP BY function ORDER BY cnt DESC LIMIT 5",
+                [username]
+            ).fetchall()
+        ]
+
+        first_seen = conn.execute(
+            "SELECT ts FROM access_log WHERE username = ? ORDER BY id ASC LIMIT 1",
+            [username]
+        ).fetchone()
+
+        return {
+            "username": username,
+            "total": total,
+            "generate_count": gen_count,
+            "last_active": last_active[0] if last_active else None,
+            "first_seen": first_seen[0] if first_seen else None,
+            "top_scenarios": top_scenarios,
+        }
+    finally:
+        conn.close()
+
+
 def query_records(db_path: str, filters: dict,
                   page: int = 1, page_size: int = 50) -> list:
     """Return a page of access_log rows as dicts, newest first."""
