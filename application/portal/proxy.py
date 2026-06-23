@@ -165,8 +165,8 @@ def _client_ip() -> str:
 
 
 def _now_iso() -> str:
-    """Beijing time (UTC+8) ISO timestamp."""
-    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() + 8 * 3600))
+    """当前时间 ISO 格式（容器时区 Asia/Shanghai = UTC+8）。"""
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
 
 
 def _try_log(app_id: str, subpath: str, start_s: float,

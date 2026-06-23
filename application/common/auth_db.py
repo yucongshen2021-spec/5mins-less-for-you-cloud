@@ -42,7 +42,7 @@ def init_auth_db() -> None:
                 id      TEXT PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
             )""")
             conn.commit()
         finally:

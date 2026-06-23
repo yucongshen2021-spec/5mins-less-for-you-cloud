@@ -24,6 +24,7 @@ services:
       - PORTAL_LABEL=内测版本
       - BROWSER=echo
       - SECRET_KEY=test-secret-do-not-use-in-prod
+      - TZ=Asia/Shanghai
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]

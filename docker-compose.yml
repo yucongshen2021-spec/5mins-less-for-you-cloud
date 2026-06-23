@@ -12,6 +12,7 @@ services:
       - SUPERVISOR_MODE=1
       - BROWSER=echo
       - SECRET_KEY=change-me-in-production
+      - TZ=Asia/Shanghai
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]

@@ -549,7 +549,7 @@ def query_summary(db_path: str) -> dict:
         daily = [
             dict(r) for r in conn.execute(
                 "SELECT DATE(ts) as day, COUNT(*) as cnt FROM access_log "
-                "WHERE ts >= DATE('now', '-13 days') "
+                "WHERE ts >= DATE('now', '+8 hours', '-13 days') "
                 "GROUP BY day ORDER BY day"
             ).fetchall()
         ]

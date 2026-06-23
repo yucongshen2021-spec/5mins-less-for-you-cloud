@@ -5,17 +5,19 @@ FROM python:3.11-slim-bookworm
 
 # 避免交互式提示
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
 
 # 使用国内镜像源加速（清华源）
 RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && sed -i 's|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources
 
-# 系统依赖：supervisor + curl + Chromium 系统库 + 中文字体
+# 系统依赖：supervisor + curl + Chromium 系统库 + 中文字体 + 时区
 # tkinter 已被 tkinter_stub 替代，不再需要 tk / xvfb / DISPLAY
 RUN apt-get update && apt-get install -y --no-install-recommends \
     supervisor \
     curl \
     wget \
     ca-certificates \
+    tzdata \
     fonts-wqy-zenhei \
     fonts-wqy-microhei \
     fonts-dejavu-core \
@@ -36,6 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libasound2 \
     libatspi2.0-0 \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
 
 # Playwright 已迁移到云端，本地不再需要
