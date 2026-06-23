@@ -56,10 +56,9 @@
   <div class="welcome">欢迎，{{ username }}</div>
 
   <div class="cards" id="summaryCards">
-    <div class="card"><div class="label">总访问次数</div><div class="value" id="sTotal">-</div></div>
-    <div class="card"><div class="label">生成配置次数</div><div class="value" id="sGen">-</div><div class="sub" id="sGenSub"></div></div>
-    <div class="card"><div class="label">最近活跃</div><div class="value" id="sLast" style="font-size:16px">-</div></div>
-    <div class="card"><div class="label">首次访问</div><div class="value" id="sFirst" style="font-size:16px">-</div></div>
+    <div class="card"><div class="label">生成配置次数</div><div class="value" id="sGen">-</div></div>
+    <div class="card"><div class="label">最近生成</div><div class="value" id="sLast" style="font-size:16px">-</div></div>
+    <div class="card"><div class="label">首次生成</div><div class="value" id="sFirst" style="font-size:16px">-</div></div>
   </div>
 
   <div class="section-h">📊 常用场景</div>
@@ -94,9 +93,7 @@ function loadSummary(){
   fetch('/api/my-summary?user='+encodeURIComponent(USERNAME)).then(function(r){return r.json()}).then(function(d){
     if(!d.ok)return;
     var s=d.summary;
-    $('sTotal').textContent=s.total||0;
     $('sGen').textContent=s.generate_count||0;
-    $('sGenSub').textContent=s.total?('占比 '+Math.round((s.generate_count||0)/s.total*100)+'%'):'';
     $('sLast').textContent=s.last_active?s.last_active.replace('T',' ').substring(0,19):'-';
     $('sFirst').textContent=s.first_seen?s.first_seen.replace('T',' ').substring(0,19):'-';
     // Scenario list

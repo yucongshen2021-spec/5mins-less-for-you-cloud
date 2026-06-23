@@ -51,11 +51,16 @@ def _audit(action: str, detail: str = ""):
 
 
 def _filters_from_args() -> dict:
-    """Extract filter params from request.args."""
+    """Extract filter params from request.args.
+    默认只显示生成配置记录（function LIKE '生成%'）。"""
+    func = request.args.get("function", "").strip()
+    # 如果用户没有手动指定 function 过滤，默认只显示生成记录
+    if not func:
+        func = "生成·"
     return {
         "ip": request.args.get("ip", "").strip() or None,
         "app_id": request.args.get("app_id", "").strip() or None,
-        "function": request.args.get("function", "").strip() or None,
+        "function": func,
         "username": request.args.get("username", "").strip() or None,
         "start": request.args.get("start", "").strip() or None,
         "end": request.args.get("end", "").strip() or None,

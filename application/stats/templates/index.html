@@ -279,10 +279,8 @@ function loadRecords(page){
 // ── Render ──
 function renderSummary(s){
   var cards = [
-    {label:'总访问',value:s.total||0,cls:''},
-    {label:'注册用户',value:s.unique_users||0,cls:''},
-    {label:'访客',value:s.guest_count||0,cls:''},
     {label:'生成次数',value:s.generate_count||0,cls:''},
+    {label:'注册用户',value:s.unique_users||0,cls:''},
     {label:'错误',value:s.error_count||0,cls:s.error_count>0?'err':''},
   ];
   var html = '';
