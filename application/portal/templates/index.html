@@ -249,6 +249,7 @@
     {% endif %}
     <a href="/logout" class="login-btn" style="background:var(--primary);color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">退出</a>
     {% else %}
+    <a href="http://{{ request.host.split(':')[0] }}:9000/?user=guest" class="login-btn" style="background:#95a5a6;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;margin-right:6px">后台</a>
     <a href="/login" class="login-btn" style="background:var(--primary);color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">登录</a>
     {% endif %}
   </div>

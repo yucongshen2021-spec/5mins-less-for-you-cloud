@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>请登录</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f2f5;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:48px 40px;width:400px;max-width:90vw;text-align:center}
+  .icon{font-size:48px;margin-bottom:16px}
+  .card h1{font-size:20px;margin-bottom:8px;color:#333}
+  .card p{font-size:14px;color:#999;margin-bottom:28px;line-height:1.6}
+  .btn{display:inline-block;padding:12px 36px;border-radius:8px;font-size:15px;font-weight:600;text-decoration:none;transition:background .2s}
+  .btn-primary{background:#4a90d9;color:#fff}
+  .btn-primary:hover{background:#3a7bc8}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">🔒</div>
+  <h1>请登录后查看</h1>
+  <p>登录后可查看您的生成记录、使用统计等数据<br>访客模式下无法查看个人数据</p>
+  <a href="/" class="btn btn-primary">前往登录</a>
+</div>
+<script>
+// 检测 portal 端口（5000），如果当前在 9000 则跳转到 5000 登录
+var host = location.hostname;
+var portalUrl = 'http://' + host + ':5000/login';
+document.querySelector('.btn').href = portalUrl;
+</script>
+</body>
+</html>

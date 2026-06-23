@@ -76,8 +76,11 @@ def _page_from_args() -> int:
 
 @app.route("/")
 def index():
-    """Serve the stats dashboard. If ?user= is a non-admin user, show their personal dashboard."""
+    """Serve the stats dashboard. If ?user= is a non-admin user, show their personal dashboard.
+    ?user=guest → login prompt page."""
     user = request.args.get("user", "").strip()
+    if user == "guest":
+        return render_template("guest_login.html")
     if user and user != "yucs":
         return render_template("user_dashboard.html", username=user)
     return render_template("index.html")
