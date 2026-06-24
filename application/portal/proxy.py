@@ -184,9 +184,9 @@ def _try_log(app_id: str, subpath: str, start_s: float,
         # 只记录生成配置的请求，其他按钮点击/页面访问不记录
         if not is_generate:
             return
-        # 测试机器人（ctest 开头）不记录访问日志
+        # 测试账号（test/ctest 开头）不记录访问日志
         _username = session.get("username", "") or ""
-        if _username.startswith("ctest"):
+        if _username.lower().startswith(("test", "ctest")):
             return
         req_body = request.get_data() or b""
         record = {
