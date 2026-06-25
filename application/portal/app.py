@@ -50,7 +50,7 @@ else:
         _secret_file.parent.mkdir(parents=True, exist_ok=True)
         _secret_file.write_text(app.secret_key)
 
-app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=24)
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 
 # ── Auth DB ──────────────────────────────────────────────────────────────────
 _APP_DIR = Path(__file__).resolve().parent.parent  # .../application
