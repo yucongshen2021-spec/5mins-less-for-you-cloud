@@ -49,7 +49,7 @@
   <span class="brand">📊 我的数据</span>
   <span class="spacer"></span>
   <span style="color:var(--muted);font-size:13px">{{ username }}</span>
-  <a href="/">返回看板</a>
+  <a href="javascript:goBack()" id="backBtn">返回首页</a>
 </div>
 
 <div class="container">
@@ -88,6 +88,12 @@
 function $(id){return document.getElementById(id)}
 var USERNAME='{{ username }}';
 var currentPage=1;
+
+// 返回 5000 端口首页（动态获取 hostname + 5000 端口）
+function goBack(){
+  var host=location.hostname;
+  window.location.href='http://'+host+':5000/';
+}
 
 function loadSummary(){
   fetch('/api/my-summary?user='+encodeURIComponent(USERNAME)).then(function(r){return r.json()}).then(function(d){

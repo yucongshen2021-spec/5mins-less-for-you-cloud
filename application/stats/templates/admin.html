@@ -75,7 +75,7 @@
 <div class="topbar">
   <span class="brand">⚙ 管理后台</span>
   <span class="spacer"></span>
-  <a href="/">📊 返回看板</a>
+  <a href="javascript:goBack()">📊 返回看板</a>
   {% if logged_in %}
   <a href="#" onclick="doLogout(); return false;">退出管理</a>
   {% endif %}
@@ -145,6 +145,8 @@
 <script>
 function $(id){return document.getElementById(id)}
 function toast(msg){var t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2000)}
+// 返回 5000 端口首页
+function goBack(){window.location.href='http://'+location.hostname+':5000/';}
 
 {% if not logged_in %}
 async function doLogin(e){
