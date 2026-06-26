@@ -1,193 +1,166 @@
-# 帮你节省 5 分钟 · 网络配置工具套件（Demo 版）
+# 帮你节省5分钟 — ECS 配置生成工具
 
-一组本地工具，把日常重复的网络运维工作从「敲 5 分钟」压成「点 1 下」。
+> 基于 Docker 的 Web 应用，通过浏览器粘贴数据头一键生成网络设备配置脚本。
+> 支持 ER/USG/MPLS/AR 多厂商多场景，可视化模板编辑，多用户隔离，16 并发。
 
-[![tests](https://github.com/yucongshen2021-spec/5mins-less-for-you/actions/workflows/test.yml/badge.svg)](https://github.com/yucongshen2021-spec/5mins-less-for-you/actions/workflows/test.yml)
+## 快速开始
 
----
+```bash
+git clone https://github.com/yucongshen2021-spec/5mins-less-for-you-cloud.git
+cd 5mins-less-for-you-cloud
+docker compose up -d --build
 
-## 版本说明
+# 配置生成: http://localhost:5000
+# 统计后台: http://localhost:9000
+```
 
-项目为 **纯 Demo 版本**，端口统一使用 5000 系列。不再区分 Demo/Release 双版本。
+管理员 `yucs` / `yucs123`（首次部署自动创建）。
 
-当前实际启动的服务（supervisord 管理）：
+## 服务架构
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
-| **Portal** | 5000 | 统一入口，反向代理，登录鉴权，状态监控 |
+| **Portal** | 5000 | 统一入口，反向代理，登录鉴权，分权后台入口 |
 | **配置生成（all_in_one）** | 5003 | gunicorn 16 worker 多进程并发 |
-| **stats 访问看板** | 9000 | 访问日志统计仪表盘（含用户搜索）+ 管理后台（`/admin`） |
+| **stats 看板** | 9000 | 统计仪表盘 + 用户管理后台 + 用户个人数据看板 |
 
-域名抓取（5001）、测试报告（5002）、配置梳理（5004）当前已停用（代码保留，supervisord 注释），恢复时取消 `docker/supervisord.conf` 对应段注释即可。
+域名抓取（5001）、测试报告（5002）、配置梳理（5004）已停用（代码保留）。
 
-### 登录系统
+## 登录与权限系统
 
-- **自动访客模式**：未登录自动获得访客 session，使用共享默认 workspace。
-- **注册/登录/重置密码**：登录页支持三态切换（登录 ↔ 注册 ↔ 重置密码）。重置密码需输入用户名 + 旧密码 + 新密码。
-- **管理员 yucs**：首次部署时自动创建 `yucs` 账号（密码从 `ADMIN_PASSWORD` 环境变量读取，默认 `yucs123`）。
-- **模板编辑权限**：登录用户可编辑自己的模板（访客不可编辑）。保存时自动加专属注释 `xxx专属yyy场景模板-yymmdd`。yucs 是管理员。
-- **按用户工作区隔离**：每个用户有独立的 `data/users/<uid>/editor_workspace/`，模板互不串号。
-- **会话有效期**：24 小时（Flask permanent session）。
+- **自动访客模式**：未登录自动访客 session，可使用配置生成（模板只读）。
+- **注册/登录/重置密码**：登录页三态切换，注册后自动登录，Session 30 天。
+- **管理员 yucs**：首次部署自动创建（`ADMIN_PASSWORD`，默认 `yucs123`）。
+- **模板编辑权限**：登录用户可编辑自己的模板（访客只读+键盘拦截）。保存加专属注释 `# xxx专属yyy场景模板-yymmdd`。
+- **工作区隔离**：每用户独立 `data/users/<uid>/editor_workspace/`，模板互不串号。
+- **测试账号**：`test`/`ctest` 开头不记录访问日志。
 
----
+### 分权后台（9000）
 
-## 核心应用：配置生成（all_in_one）
+| 角色 | 5000 按钮 | 9000 页面 |
+|------|----------|----------|
+| yucs | 🟠 管理后台 | 全局统计 + 用户管理（重置密码/删除用户） |
+| 普通用户 | 🟢 我的数据 | 个人生成记录 + 统计 + 常用场景 |
+| 访客 | 🔘 后台（灰色） | "请登录后查看" → 跳转登录 |
 
-Epoch FastIP / USG FastIP / Epoch MPLS / AR SD-WAN / AR 传统组网 一键生成；可视化模板编辑器。
+后台只记录**生成配置**请求，其他操作不记录。时间统一北京时间 UTC+8。
 
-**多并发架构**：gunicorn 16 worker 进程隔离，每个 worker 独立加载业务模块，worker 间天然并发。tkinter 已被 `tkinter_stub.py` 完全替代，**无需 Xvfb / DISPLAY**，无线程安全约束。
+管理后台（`/admin`）独立密码登录（`ADMIN_PASSWORD`），可列出/删除用户、重置密码，yucs 不可删。操作写入审计日志。
 
-打开 portal 统一入口即可访问全部子应用。点击右上角 **"?"** 查看使用教程。
+## 配置生成（5 工具 × 29 场景）
 
----
+| 工具 | 变体 | 接口格式 |
+|------|------|---------|
+| ER FastIP 4.0 | HK/非香港/飞连/新增出口/域名分流 | eth{N} |
+| ER FastIP 5.0 | HK/非香港/IPSec/飞连/新增出口/域名分流 | eth{N} |
+| USG FastIP | HK/非香港/飞连/新增出口 | GE0/0/{N} |
+| Epoch MPLS | 国内/海外/IPSec | eth{N} |
+| AR SD-WAN | 单机/双机 × OPS/Factory | — |
+| AR 传统组网 | 双线 | — |
 
-## 启动
+通用功能：Ctrl+Enter 快捷生成、清除数据头、复制输出、导出脚本、备注说明、填写示例。
 
-```bash
-docker compose up -d        # 一键启动，打开 http://localhost:5000
-```
+### 参数同步
 
-停止：`docker compose down`。容器内由 supervisord 统一拉起 portal + all_in_one（gunicorn）+ stats，停止容器即全部清理。
+所有场景的 WAN/LAN 接口号、IP/CIDR、网关、内网段、DNS、DHCP、旁挂模式、回程路由等参数均同步到输出。HK 解析器支持 MAIN/BACKUP 和 LineID 两种数据头格式。US 出口的 overseas NAT block 支持 US 字段回退。
 
-### 测试环境（8000 端口）
+## 多并发架构
 
-所有改动先在 8000 端口测试，通过后再重建正式 5000 容器：
+- **gunicorn 16 worker**：进程隔离，每 worker 独立 `_EMBEDDED_NS`。
+- **tkinter_stub.py**：替代真实 tkinter，无需 Xvfb/DISPLAY。
+- **generate 从磁盘读模板**（`_get_effective_template`），save/reset 只写磁盘不改 ns。
+- **16 = 最大并发请求数**（不是用户数上限）。用户数走磁盘，每用户 ~10-50KB。
 
-```bash
-sudo docker-compose -f docker-compose.test.yml up -d --build   # 构建+启动
-# 访问 http://localhost:8000（Portal）、http://localhost:8001（stats）
-sudo docker-compose -f docker-compose.test.yml down            # 停止
-```
+## 模板编辑器（我来定模板）
 
----
-
-## 运行环境
-
-- **部署环境**：Linux 云服务器（4C4G）+ Docker Compose 单容器部署，Python 3.11
-  ```bash
-  docker build -t fivemins .
-  docker compose up -d
-  ```
-- **裸机开发**：Linux / Windows 10/11，Python 3.11+
-  ```bash
-  pip install -r requirements.txt
-  # 无需 tkinter / Xvfb / DISPLAY（已用 tkinter_stub 替代）
-  playwright install chromium          # 仅 domain_capture + E2E 测试需要
-  ```
-
----
+- 级联菜单 29 场景，可多选 chip 切换
+- 数据头/变量映射/生成模板三个文本框
+- 初始化默认参数（保存后影响 generate 输出）
+- 保存自动加专属注释，预览不落盘，恢复 confirm 弹窗（iframe allow-modals）
+- 热更新：save→generate 即时生效；用户间隔离
 
 ## 目录结构
 
 ```
-.
+5mins-less-for-you-cloud/
+├── Dockerfile                          Debian + Python3 + tzdata + 中文字体
+├── docker-compose.yml                  正式版（5000+9000）
+├── docker-compose.test.yml             测试版（8000+8001）
+├── docker/supervisord.conf             进程管理（portal + all_in_one + stats）
 ├── application/
-│   ├── portal/                      统一入口 + 反向代理 :5000
-│   ├── all_in_one - cc/             配置生成 :5003（gunicorn 16 worker）
+│   ├── portal/                         Portal 入口 :5000
+│   │   ├── app.py                      登录/注册/重置密码/session/自动访客
+│   │   ├── proxy.py                    反向代理 + header 注入 + 日志记录
+│   │   └── templates/
+│   │       ├── index.html              首页（顶栏+侧栏+iframe）
+│   │       └── login.html              登录页（三态切换）
+│   ├── all_in_one - cc/                配置生成 :5003
 │   │   ├── web/
-│   │   │   ├── app.py               Flask 后端
-│   │   │   ├── wsgi.py              gunicorn 入口
-│   │   │   ├── gunicorn_conf.py     gunicorn 配置（8 worker）
-│   │   │   └── tkinter_stub.py      tkinter 替代模块（纯 Python mock）
-│   │   ├── src/                     业务模块（6 个厂商配置生成器）
-│   │   └── data/                    模板数据 + 用户配置
-│   ├── stats/                       访问日志看板 :9000
-│   ├── 自动做测试报告 - cc/          测试报告（停用）
-│   ├── 自动抓域名发2/                域名抓取（停用）
-│   ├── 自动梳理配置 - cc/            配置梳理（停用）
-│   ├── common/                      共享模块（stats_db）
-│   └── test/                        全部测试（含 blackbox_8000 黑箱）
-├── docker/
-│   └── supervisord.conf             进程编排（portal + all_in_one + stats）
-├── docker-compose.yml               正式编排（5000 + 9000）
-├── docker-compose.test.yml          测试编排（8000→5000, 8001→9000）
-├── Dockerfile
-├── .github/workflows/test.yml       CI 测试（main 分支）
-├── log/                             变动记录
-├── plan/                            设计文档
-└── README.md
+│   │   │   ├── app.py                  Flask（generate+template+init-defaults API）
+│   │   │   ├── gunicorn_conf.py        16 worker
+│   │   │   ├── tkinter_stub.py         tkinter 替代
+│   │   │   └── templates/index.html    前端 SPA（7 页签）
+│   │   ├── src/                        业务模块源码（6 个生成器）
+│   │   ├── data/                       运行时数据（per-user workspace）
+│   │   └── editor_defaults/            出厂模板
+│   ├── common/
+│   │   ├── auth_db.py                  用户认证 DB（SQLite）
+│   │   └── stats_db.py                 访问日志 DB（SQLite，per-user 查询）
+│   ├── stats/                          统计看板 :9000
+│   │   ├── app.py                      看板+管理后台+用户数据看板
+│   │   └── templates/
+│   │       ├── index.html              管理员看板
+│   │       ├── user_dashboard.html     用户个人看板
+│   │       ├── admin.html              用户管理后台
+│   │       └── guest_login.html        访客登录提示
+│   └── test/                           测试套件
+│       ├── blackbox_8000/              黑箱测试（86 个）
+│       └── all_in_one/                 单元测试
+├── docs/AGENTS.md                      架构/运维/坑点（给 AI agent 看）
+├── log/                                变更日志
+└── test_features.md                    完整功能测试清单
 ```
-
----
 
 ## 测试
 
-### 全量后端测试（test_client，无需容器）
-
 ```bash
+# 黑箱测试（需测试容器）
+sudo docker compose -f docker-compose.test.yml up -d --build
+sleep 12
 cd application/test
-python -m pytest --deselect all_in_one/test_e2e_playwright.py
+YUCS_PASSWORD=yucs123 python -m pytest blackbox_8000/ -q           # 86 个
+python -m pytest all_in_one/test_apis.py test_generation.py -q     # 单元测试
 ```
 
-预期：**170+ passed**（无 tkinter / 无 DISPLAY / 无 Xvfb）
-
-### 8000 端口黑箱测试（需启动测试容器）
+## 部署到新服务器
 
 ```bash
-cd application/test
-python -m pytest blackbox_8000/ -q
+git clone https://github.com/yucongshen2021-spec/5mins-less-for-you-cloud.git
+cd 5mins-less-for-you-cloud
+docker compose up -d --build
+curl http://localhost:5000/api/health  # {"ok":true,"status":"healthy"}
 ```
 
-### 多用户并发测试（16 用户 + 工作区隔离 + 权限控制）
+### 环境变量
 
-```bash
-cd application/test
-YUCS_PASSWORD=yucs123 python -m pytest blackbox_8000/test_multiuser_concurrency.py -v
-```
-
-覆盖：16 用户登录、session 隔离、工作区目录独立、模板不串号、16 并发生成无 5xx、yucs 权限控制。
-
-### 并发验证（16 worker，无串号）
-
-```bash
-# 启动测试容器后，并发发 8 个不同参数的 generate 请求
-python -c "
-import urllib.request, json, concurrent.futures
-# ... 见 log/2026-06-17.md 中的测试脚本
-"
-```
-
-### Playwright 浏览器 E2E
-
-```bash
-cd application/test/all_in_one
-python test_e2e_playwright.py --quick
-```
-
-```bash
-pip install pytest-playwright psutil
-playwright install chromium
-```
-
----
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `SECRET_KEY` | 随机 | Portal session 密钥 |
+| `STATS_SECRET_KEY` | 同 SECRET_KEY | Stats session 密钥 |
+| `ADMIN_PASSWORD` | yucs123 | 管理员密码 + stats 后台密码 |
+| `GUNICORN_WORKERS` | 16 | gunicorn worker 数 |
+| `TZ` | Asia/Shanghai | 容器时区 |
+| `PORTAL_LABEL` | DEMO | 门户标签 |
 
 ## 开发须知
 
-- **永远不要用兜底逻辑**：输出必须可重现，不允许猜测
-- **TDD**：先写测试，再写实现
-- **每次有动作记一笔**：`log/` 目录存变动记录
-- **多并发安全**：generate 从磁盘读模板（`_get_effective_template`），save/reset 只操作磁盘不改 ns，避免并发竞态
-- **模板编辑器权限**：登录用户可编辑自己的模板（访客不可编辑），保存时自动加专属注释。yucs 是管理员
-- **登录系统**：注册/登录/重置密码（旧密码验证）。首次部署自动创建 yucs 管理员。访客自动 session 用共享 workspace
-- **stats 用户搜索**：9000 看板支持按用户名模糊搜索，表格含用户列，Top 用户图表
-- **tkinter 已移除**：业务模块用 `tkinter_stub.py` 替代，不要恢复 `import tkinter` 或添加 Xvfb 依赖
-
----
+- **多并发安全**：generate 从磁盘读模板，save/reset 只操作磁盘不改 ns
+- **模板编辑器权限**：登录用户可编辑（访客只读+键盘拦截），保存加专属注释
+- **init-defaults**：`_load_init_defaults()` 在所有 generate 路由调用，保存的参数影响输出
+- **tkinter 已移除**：用 `tkinter_stub.py`，不要恢复 `import tkinter` 或 Xvfb
+- **时间统一 UTC+8**：容器 TZ=Asia/Shanghai，SQLite 用 `datetime('now','+8 hours')`
+- **日志只记录生成请求**：proxy.py `is_generate` 过滤，test/ctest 用户不记录
 
 ## License
 
 私有项目。未授权请勿外传。
-
-
----
-
-## 管理后台（9000 端口 `/admin`）
-
-访问 `http://localhost:9000/admin`（测试环境 `http://localhost:8001/admin`），输入管理密码登录（`ADMIN_PASSWORD` 环境变量，默认 `yucs123`）。
-
-功能：
-- **用户列表**：查看所有注册用户（用户名、创建时间）
-- **重置密码**：管理员重置任意用户密码（不需旧密码）
-- **删除用户**：删除用户（yucs 管理员不可删除）
-
-管理后台使用独立 session（stats app 的 `secret_key`），与 portal 登录系统互不依赖。

@@ -16,7 +16,7 @@ cd web && python app.py
 | **USG FastIP** | 非HK / HK / 飞连 / 新增出口 |
 | **Epoch MPLS** | 国内 / 海外 / IPSec |
 | **AR SD-WAN** | 单机 / 双机 · OPS 脚本 + Factory 配置 |
-| **我来定模板** | 22 场景可视化模板编辑（仅 yucs 可编辑，其他用户只读） |
+| **我来定模板** | 29 场景可视化模板编辑（登录用户可编辑，访客只读） |
 
 ## 操作
 
@@ -41,5 +41,7 @@ cd web && python app.py
 ## 测试
 
 ```bash
-python test/run_all.py
+cd application/test
+python -m pytest blackbox_8000/test_full_api.py -q          # 58 API 测试
+python -m pytest all_in_one/test_apis.py test_generation.py -q  # 单元测试
 ```
