@@ -86,3 +86,5 @@ log/mistake/
 # ---- 用户活动记录（仅本机维护，不进 git）----
 user_activity/
 **/user_activity/
+data/users/test*
+data/users/ctest*
