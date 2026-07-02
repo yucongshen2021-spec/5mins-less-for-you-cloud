@@ -10,7 +10,7 @@ def test():
             "TEMPLATE_USG_FLINK_VISUAL":USG_FL,"TEMPLATE_USG_NEW_EXIT_VISUAL":usg_ne_data,
             "TEMPLATE_MPLS_DOMESTIC":MPLS_CN,"TEMPLATE_MPLS_OVERSEAS":MPLS_OV,
             "TEMPLATE_MPLS_IPSEC":mpls_ips_data}
-    with app.test_client() as c:
+    with logged_client() as c:
         for info in _SCENARIO_LIST:
             key = info["key"]; short = key[:48]; slot = info["tpl_slot"]
 

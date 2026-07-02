@@ -9,7 +9,7 @@ from app import app, _SCENARIO_LIST, _load_module
 # Re-export for test files
 __all__ = ["app","_SCENARIO_LIST","_load_module","t","ok","out","lines","check_output","save_sample","save_report",
            "ER_HK","ER_US","ER_FLINK","USG_US","USG_HK","USG_FL","MPLS_CN","MPLS_OV","AR_DATA",
-           "er_ne_data","usg_ne_data","mpls_ips_data","PASS","FAIL","RESULTS","LOG_DIR"]
+           "er_ne_data","usg_ne_data","mpls_ips_data","PASS","FAIL","RESULTS","LOG_DIR","logged_client"]
 
 LOG_DIR = Path(__file__).resolve().parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
@@ -33,6 +33,15 @@ def t(name, fn):
 def ok(r): return r.get("ok", False)
 def out(r): return r.get("output", "")
 def lines(r): return len(out(r).splitlines())
+
+# 已登录测试 client：注入 X-User-Id（模拟 portal proxy 转发的已登录用户）。
+# template/load、init-defaults 等接口对访客(user_id 为空)返回 403，测试需登录态。
+_TEST_UID = "test-user-1"
+def logged_client():
+    c = app.test_client()
+    c.environ_base["HTTP_X_USER_ID"] = _TEST_UID
+    c.environ_base["HTTP_X_USERNAME"] = "tester"
+    return c
 
 def save_sample(name, output):
     fname = name.replace(" ", "_").replace("/", "-").replace("·", "-") + ".txt"

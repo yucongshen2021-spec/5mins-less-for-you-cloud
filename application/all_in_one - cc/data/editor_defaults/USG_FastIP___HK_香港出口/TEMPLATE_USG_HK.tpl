@@ -1,4 +1,4 @@
-
+﻿
 主 IPSEC_PE: {main_dial_pe}
 拨号IP：{main_dial_ip}
 loIP：{main_loopback}
@@ -740,4 +740,5 @@ assistant ipsec1_nqa_log
 assistant ipsec2_nqa_log
   execute 1 command reset firewall session table destination global {backup_dial_ip}
   condition event feature nqa name nqaResultsProbeFailed TestName eq ipsec2_nqa
+
 

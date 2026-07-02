@@ -2,9 +2,15 @@
 import json
 import _bootstrap  # noqa: F401
 import app as app_mod
-from app import app, _load_module
+from app import app, _load_module, init_worker
+
+# test_client 环境手动初始化：预加载模块 + 快照 factory defaults
+init_worker()
 
 client = app.test_client()
+# template/load、init-defaults 等接口对访客返回 403，测试需模拟已登录用户
+client.environ_base["HTTP_X_USER_ID"] = "test-user-1"
+client.environ_base["HTTP_X_USERNAME"] = "tester"
 SCENARIO_KEY = "AR 传统组网 · 双线"
 
 SAMPLE_HEADER = """\

@@ -3,7 +3,10 @@
 import sys, os, json
 os.environ["TEST_MODE"] = "1"
 import _bootstrap  # noqa: F401
-from app import app, _load_module, _SCENARIO_LIST
+from app import app, _load_module, _SCENARIO_LIST, init_worker
+
+# test_client 环境手动初始化：预加载模块 + 快照 factory defaults
+init_worker()
 
 PASS = FAIL = 0
 def t(name, ok):
@@ -12,6 +15,9 @@ def t(name, ok):
     else: FAIL += 1; print(f"  [FAIL] {name}")
 
 c = app.test_client()
+# template/load、init-defaults 等接口对访客返回 403，测试需模拟已登录用户
+c.environ_base["HTTP_X_USER_ID"] = "test-user-1"
+c.environ_base["HTTP_X_USERNAME"] = "tester"
 er_hk_hdr = "hostname:TEST-CE\nLineID:609157A1\nPE:szd-ape2\ntunnel:vtun1213\nwanip:10.22.98.40/30\n对接IP:10.255.110.6\nLineID:609157A2\nPE:szd-ape3\ntunnel:vtun1214\nwanip:10.22.98.44/30\n对接IP:10.255.110.10"
 
 # ═══ 1. 脚本生成 — 所有变体 ═══

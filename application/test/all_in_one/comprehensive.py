@@ -11,7 +11,11 @@ test/blackbox_8000/test_full_api.py（打 8000 容器，覆盖更全：
 import sys, os, json, uuid
 os.environ["TEST_MODE"] = "1"
 import _bootstrap  # noqa: F401
-from app import app, _load_module, _SCENARIO_LIST, _EMBEDDED_NS, _load_workspace_templates
+from app import app, _load_module, _SCENARIO_LIST, _EMBEDDED_NS, _load_workspace_templates, init_worker
+
+# test_client 环境不会触发 gunicorn post_fork → 手动初始化：
+# 预加载模块 + 快照 factory defaults，使 init-defaults/reset 能真正恢复出厂值
+init_worker()
 
 PASS = FAIL = 0
 MARKER = f"CMP_{uuid.uuid4().hex[:6]}"
@@ -21,7 +25,14 @@ def t(name, ok):
     if ok: PASS += 1; print(f"  [PASS] {name}")
     else: FAIL += 1; print(f"  [FAIL] {name}")
 
-c = app.test_client()
+# 已登录 client：template/load、init-defaults 等接口对访客返回 403，测试需登录态
+def _logged():
+    cl = app.test_client()
+    cl.environ_base["HTTP_X_USER_ID"] = "test-user-1"
+    cl.environ_base["HTTP_X_USERNAME"] = "tester"
+    return cl
+
+c = _logged()
 
 # ═════════════════════════════════════════════════════════════
 # 测试数据
@@ -177,14 +188,14 @@ t("持久化-当前会话含标记", f"PERSIST_{MARKER}" in r.get("output",""))
 # Simulate restart
 _EMBEDDED_NS.clear()
 _load_workspace_templates()
-c2 = app.test_client()
+c2 = _logged()
 r = c2.post("/api/generate/epoch_mpls", json={"variant":"domestic","header_text":HDR["mpls_cn"],"network":{}}).get_json()
 t("持久化-重启后含标记", f"PERSIST_{MARKER}" in r.get("output",""))
 # Reset
 c2.post('/api/template/reset', json={'key':PKEY})
 _EMBEDDED_NS.clear()
 _load_workspace_templates()
-c3 = app.test_client()
+c3 = _logged()
 r = c3.post("/api/generate/epoch_mpls", json={"variant":"domestic","header_text":HDR["mpls_cn"],"network":{}}).get_json()
 t("持久化-重置重启后不含标记", f"PERSIST_{MARKER}" not in r.get("output",""))
 

@@ -1,4 +1,4 @@
-# ER 域名分流 · 完整模板（占位符与「我来定模板」初始化一致；{ER_DS_DOMAINLIST_COMPUTED}、{ER_DS_POLICY_ROUTE_COMPUTED} 等由预览根据 address-group 推导；domainlist=/opt 文件名均为 A+组名）
+﻿# ER 域名分流 · 完整模板（占位符与「我来定模板」初始化一致；{ER_DS_DOMAINLIST_COMPUTED}、{ER_DS_POLICY_ROUTE_COMPUTED} 等由预览根据 address-group 推导；domainlist=/opt 文件名均为 A+组名）
 # --- 写入域名列表（shell）---
 sudo tee /opt/{ER_DS_DOMAINLIST_COMPUTED}.txt >/dev/null <<'EOF'
 {ER_DS_DOMAINS_DEFAULT}

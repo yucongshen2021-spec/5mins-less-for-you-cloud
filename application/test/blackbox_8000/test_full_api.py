@@ -332,7 +332,7 @@ MARKER = "BLACKBOX_MARKER_8k_6a3f"
 def test_template_load_all_scenarios(catalog):
     """每个场景都能 load 出非空 header + template（检测数据目录文件误删）。"""
     for s in catalog["scenarios"]:
-        st, body = _post(f"{AIO}/api/template/load", {"key": s["key"]})
+        st, body = _admin_post(f"{AIO}/api/template/load", {"key": s["key"]})
         assert st == 200, f"load {s['key']} 返回 {st}"
         assert body.get("ok"), f"load {s['key']} ok=False"
         assert body.get("header", "").strip(), f"load {s['key']} header 为空"
@@ -459,7 +459,7 @@ class TestErrorHandling:
         assert not body.get("ok"), "无效 variant 应返回 ok=False"
 
     def test_unknown_template_key_returns_error(self):
-        st, body = _post(f"{AIO}/api/template/load", {"key": "不存在的场景__xxx"})
+        st, body = _admin_post(f"{AIO}/api/template/load", {"key": "不存在的场景__xxx"})
         assert st in (200, 404)
         assert not body.get("ok"), "未知场景 key 应返回 ok=False"
 
@@ -478,7 +478,7 @@ class TestErrorHandling:
 # 8. 初始化默认值持久化
 # ═════════════════════════════════════════════════════════════
 def test_init_defaults_get():
-    st, body = _get(f"{AIO}/api/init-defaults")
+    st, body = _admin_get(f"{AIO}/api/init-defaults")
     assert st == 200
     assert body.get("ok")
     assert body.get("defaults"), "/api/init-defaults 返回空 defaults"

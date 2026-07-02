@@ -4,6 +4,9 @@ import _bootstrap  # noqa: F401
 from app import app
 
 client = app.test_client()
+# template/load 等接口对访客返回 403，测试需模拟已登录用户
+client.environ_base["HTTP_X_USER_ID"] = "test-user-1"
+client.environ_base["HTTP_X_USERNAME"] = "tester"
 SCENARIO_KEY = "AR 传统组网 · 双线"
 
 

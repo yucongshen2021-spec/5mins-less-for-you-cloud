@@ -1,4 +1,4 @@
-interface Tunnel{USG_FL_MAIN_TUN_DEFAULT}
+﻿interface Tunnel{USG_FL_MAIN_TUN_DEFAULT}
  description Main-{main_pe}-{main_line_id}
  ip address {main_wanip2} 255.255.255.252
  mtu 1300

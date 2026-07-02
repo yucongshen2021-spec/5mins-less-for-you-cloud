@@ -1980,6 +1980,10 @@ def api_scenarios():
 
 @app.route("/api/template/load", methods=["POST"])
 def api_template_load():
+    # 默认数据头含真实示例配置（信息暴露风险），访客禁止读取
+    denied = _require_login()
+    if denied:
+        return denied
     data = request.get_json(force=True)
     scenario_key = data.get("key", "")
     info = next((s for s in _SCENARIO_LIST if s["key"] == scenario_key), None)
@@ -2179,9 +2183,8 @@ def api_template_reset():
     if not hdr.strip() and vars_found:
         hdr = "\n".join(f"{v} = " for v in vars_found[:40])
 
-    # Restore factory template to runtime namespace
-    if tpl.strip():
-        ns[slot] = tpl
+    # 不写回 ns：template/load 是只读接口，不应修改全局 _EMBEDDED_NS。
+    # 生成时从磁盘读模板（_get_effective_template），无需 load 预写 ns。
 
     mp_lines = []
     for v in vars_found[:60]:
@@ -2660,6 +2663,10 @@ def _load_init_defaults():
 def api_init_defaults():
     """Return init defaults for all scenarios.
     Uses _FACTORY_INIT_DEFAULTS to avoid request-polluted globals."""
+    # 出厂初始化默认值含内部网络参数约定，访客禁止读取（信息暴露）
+    denied = _require_login()
+    if denied:
+        return denied
     return jsonify({"ok": True, "defaults": _FACTORY_INIT_DEFAULTS})
 
 
@@ -2673,6 +2680,10 @@ def api_init_defaults_get(scenario_key):
     request-polluted values from the live module globals (which _inject_network_to_module
     modifies on every generate request).
     """
+    # 出厂初始化默认值含内部网络参数约定，访客禁止读取（信息暴露）
+    denied = _require_login()
+    if denied:
+        return denied
     info = next((s for s in _SCENARIO_LIST if s["key"] == scenario_key), None)
     if not info:
         return jsonify({"ok": False, "error": _humanize_error("Scenario not found")}), 404
@@ -2764,64 +2775,31 @@ def api_init_defaults_reset():
     except Exception:
         pass
 
-    # Reload module from source to get true factory globals
-    source = info["source"]
-    # Restore factory defaults from snapshot (no del _EMBEDDED_NS — that would
-    # break concurrent generate requests using this ns)
-    ns = _load_module(source)
-    factory = _FACTORY_INIT_DEFAULTS.get(scenario_key, {})
-    for k, v in factory.items():
-        ns[k] = v
+    # 不修改全局 ns：reset 只清用户的 JSON 文件，不改 _EMBEDDED_NS。
+    # generate 路由每次调用 _load_init_defaults() 从磁盘 JSON 读取，
+    # 删除 JSON 条目后自然回退到 _FACTORY_INIT_DEFAULTS 快照值。
+    # 修改 ns 会污染并发请求（Bug 3 修复）。
 
     # Re-apply saved init defaults for OTHER scenarios sharing this module
-    try:
-        if json_path.exists():
-            remaining = json.loads(json_path.read_text(encoding="utf-8-sig"))
-            if isinstance(remaining, dict):
-                for sk, sv in remaining.items():
-                    si = next((s for s in _SCENARIO_LIST if s["key"] == sk), None)
-                    if si and si["source"] == source and sk != scenario_key:
-                        for mk, mv in sv.items():
-                            if mv is not None:
-                                ns[mk] = str(mv) if not isinstance(mv, bool) else mv
-    except Exception:
-        pass
+    # — 这部分也不再需要，因为 _load_init_defaults 每次从磁盘全量加载
 
-    # Also re-apply workspace templates for this module
-    try:
-        import re as _re_reset
-        ws = _get_user_data_dir() / "editor_workspace"
-        if ws.is_dir():
-            for si in _SCENARIO_LIST:
-                if si["source"] != source:
-                    continue
-                dk = _DISK_ALIASES.get(si["key"], si["key"])
-                sk_dir = _re_reset.sub(r"[^\w一-鿿]", "_", dk)
-                tp = ws / sk_dir / f"{si['tpl_slot']}.tpl"
-                if tp.exists():
-                    try:
-                        txt = tp.read_text(encoding="utf-8-sig").strip()
-                        if txt:
-                            ns[si["tpl_slot"]] = txt
-                    except Exception:
-                        pass
-    except Exception:
-        pass
+    factory = _FACTORY_INIT_DEFAULTS.get(scenario_key, {})
+
+    # 不重新加载 workspace templates 到 ns：generate 从磁盘读（_get_effective_template），
+    # 无需 reset 预写 ns。原代码引用了已删除的 ns 变量导致 500（Bug 3 修复遗留）。
 
     slot = info["tpl_slot"]
     keys = _get_init_keys(slot)
     values = {}
     _BOOL_KEYS = {"DEFAULT_WAN_DHCP", "DEFAULT_LAN_DHCP", "DEFAULT_GEN_RETURN_ROUTE", "DEFAULT_BYPASS"}
     for k in keys:
-        v = ns.get(k)
+        v = factory.get(k)
         if v is not None:
             values[k] = str(v) if not isinstance(v, bool) else v
         elif k in _BOOL_KEYS:
             values[k] = False
-            ns[k] = False
         else:
             values[k] = ""
-            ns[k] = ""
 
     return jsonify({"ok": True, "values": values})
 
@@ -2987,6 +2965,12 @@ def init_worker() -> None:
     # Record current sentinel mtime so we don't immediately re-reload.
     global _runtime_mtime
     _runtime_mtime = _stamp_mtime()
+
+
+# Bug 4 修复：import 时自动 snapshot factory defaults，
+# 确保 test_client / pytest 环境（不走 init_worker）也有 _FACTORY_INIT_DEFAULTS。
+# _snapshot_factory_defaults 是幂等的（已有数据时直接 return）。
+_snapshot_factory_defaults()
 
 
 if __name__ == "__main__":

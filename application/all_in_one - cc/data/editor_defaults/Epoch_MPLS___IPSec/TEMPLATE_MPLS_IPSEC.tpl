@@ -1,4 +1,4 @@
-# ==========================================================
+﻿# ==========================================================
 # Epoch MPLS IPSec 配置  Hostname: {hostname}
 # 主线 Tunnel:{main_gre_tun}  PE:{main_gre_pe}  Public:{main_public_ip}
 # 备线 Tunnel:{bk_gre_tun}  PE:{bk_gre_pe}  Public:{bk_public_ip}

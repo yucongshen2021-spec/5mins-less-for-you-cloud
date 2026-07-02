@@ -1,4 +1,4 @@
-# coding=utf-8
+﻿# coding=utf-8
 import ops
 import sys
 import os
@@ -11,7 +11,8 @@ def ops_condition(ops):
  
 def ops_execute(ops):
     handle, err_desp = ops.cli.open()
-    print("\r\n err_desp:%s" % (err_desp))
+    print("
+ err_desp:%s" % (err_desp))
     choice={"Continue?":"Y"}
     result, n11, n21 = ops.cli.execute(handle, "system-view")
     result, n11, n21 = ops.cli.execute(handle, "ip vpn-instance underlay_internetB")
