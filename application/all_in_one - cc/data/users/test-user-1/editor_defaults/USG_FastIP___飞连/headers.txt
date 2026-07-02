@@ -1,0 +1,17 @@
+ShenZhen1-FAST预留IP:100.93.4.192/27
+ShangHai1-FAST预留IP:100.92.4.192/27
+BeiJing1-FAST预留IP:100.91.4.192/27
+
+LineID:609204A4
+PE: hza-upe1
+Tunnel: 3000
+PE对接: 10.255.110.35
+CE对接: 10.40.147.238
+wanip: 10.40.147.236/30
+
+LineID:609204A5
+PE: wha-upebk3
+Tunnel: 4000
+PE对接: 10.255.111.152
+CE对接: 10.40.223.6
+wanip: 10.40.223.4/30

@@ -403,7 +403,7 @@ def test_examples_all_tools(catalog):
     """每个 tool 的每个 variant 都能加载非空示例（检测 _EXAMPLE_MAP 缺失）。"""
     for t in catalog["tools"]:
         for v in t["variants"]:
-            st, body = _get(f"{AIO}/api/examples/{t['id']}/{v['id']}")
+            st, body = _admin_get(f"{AIO}/api/examples/{t['id']}/{v['id']}")
             assert st == 200, f"/api/examples/{t['id']}/{v['id']} 返回 {st}"
             assert body.get("ok"), \
                 f"/api/examples/{t['id']}/{v['id']} ok=False: {body.get('error')}"
@@ -415,7 +415,7 @@ def test_notes_all_tools(catalog):
     """每个 tool 都能加载备注。"""
     for t in catalog["tools"]:
         v = t["variants"][0]["id"]
-        st, body = _get(f"{AIO}/api/notes/{t['id']}?variant={v}")
+        st, body = _admin_get(f"{AIO}/api/notes/{t['id']}?variant={v}")
         assert st == 200, f"/api/notes/{t['id']} 返回 {st}"
         assert body.get("ok"), f"/api/notes/{t['id']} ok=False"
         assert len(body.get("notes", "")) > 20, f"/api/notes/{t['id']} notes 过短"
@@ -428,7 +428,7 @@ def test_notes_all_tools(catalog):
     ["hk", "us", "us_ipsec", "flink", "new_exit", "domain_split"],
 )
 def test_examples_epoch_fastip5(variant):
-    st, body = _get(f"{AIO}/api/examples/epoch_fastip5/{variant}")
+    st, body = _admin_get(f"{AIO}/api/examples/epoch_fastip5/{variant}")
     assert st == 200, f"/api/examples/epoch_fastip5/{variant} 返回 {st}"
     assert body.get("ok"), f"epoch_fastip5/{variant} 示例 ok=False: {body.get('error')}"
     assert len(body.get("example", "")) > 20, f"epoch_fastip5/{variant} 示例为空（数据丢失）"

@@ -1557,6 +1557,10 @@ _EXAMPLE_MAP = {
 
 @app.route("/api/examples/<tool>/<variant>")
 def api_examples(tool, variant):
+    # 填写示例含真实业务数据（敏感信息），访客禁止读取
+    denied = _require_login()
+    if denied:
+        return denied
     key = (tool, variant)
     if key not in _EXAMPLE_MAP:
         return jsonify({"ok": False, "error": _humanize_error(f"No example for {tool}/{variant}")}), 404
@@ -1740,6 +1744,10 @@ _NOTES = {
 
 @app.route("/api/notes/<tool>")
 def api_notes(tool):
+    # 备注说明含内部网络参数约定，访客禁止读取
+    denied = _require_login()
+    if denied:
+        return denied
     variant = request.args.get("variant", "")
     notes_map = _NOTES.get(tool, {})
     text = notes_map.get(variant) or notes_map.get("default", "")
