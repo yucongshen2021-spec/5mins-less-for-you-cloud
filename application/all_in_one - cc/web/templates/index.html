@@ -475,11 +475,11 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <!-- ═══ 我来定模板 ═══ -->
 <section class="tool-panel" id="panel-templates">
 <div class="panel-header"><h1 class="panel-title">我来定模板</h1><p class="panel-subtitle">可视化编辑：数据头 · 变量映射 · 生成模板 · 预览效果</p></div>
-<div id="tpl-admin-banner" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;background:var(--cvs);border:1px solid var(--bd);font-size:13px;color:var(--mu);line-height:1.6">🔒 安全起见，请先<a href="/login" style="color:var(--primary);font-weight:600">登录</a>使用完整功能。</div>
+<div id="tpl-admin-banner" style="{% if template_editable %}display:none;{% else %}display:block;{% endif %}margin-bottom:12px;padding:10px 14px;border-radius:8px;background:var(--cvs);border:1px solid var(--bd);font-size:13px;color:var(--mu);line-height:1.6">🔒 安全起见，请先<a href="/login" style="color:var(--primary);font-weight:600">登录</a>使用完整功能。</div>
 <div class="tpl-scene-bar" id="tpl-scene-bar">
   <span class="cascade-label">已选场景</span>
   <span class="tpl-trigger-wrap">
-    <button class="btn btn-sm btn-s" id="tpl-cascade-trigger" onclick="toggleCascade()">+ 选择场景</button>
+    <button class="btn btn-sm btn-s" id="tpl-cascade-trigger" onclick="toggleCascade()"{% if not template_editable %} disabled style="opacity:0.4;cursor:not-allowed"{% endif %}>+ 选择场景</button>
     <div class="cascade-dropdown" id="tpl-cascade-dropdown">
       <ul id="tpl-col1"></ul>
     </div>
@@ -494,7 +494,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <div class="tpane"><div class="card"><div class="card-h"><span>③ 生成模板</span><button class="fs-btn" onclick="fsToggle(this,'tpl-template')">⛶</button></div><div class="card-b"><textarea class="ft" id="tpl-template" readonly placeholder="template.tpl"></textarea></div></div></div>
 <div class="tpane"><div class="card"><div class="card-h"><span>④ 预览效果</span><button class="fs-btn" onclick="fsToggle(this,'tpl-preview')">⛶</button></div><div class="card-b"><textarea class="ft code-out" id="tpl-preview" readonly placeholder="选择场景 → 编辑模板 → 预览…"></textarea></div></div></div>
 </div>
-<div class="btn-row" style="margin-top:12px"><button class="btn btn-w" id="btn-rst-tpl" onclick="rstTpl()">恢复最初模板</button><button class="btn btn-s" id="btn-prev-tpl" onclick="prevTpl()">预览模板</button><button class="btn btn-p" id="btn-save-tpl" onclick="saveTpl()">保存模板</button><span class="status" id="template-status"></span></div>
+<div class="btn-row" style="margin-top:12px"><button class="btn btn-w" id="btn-rst-tpl" onclick="rstTpl()"{% if not template_editable %} disabled style="opacity:0.4;cursor:not-allowed"{% endif %}>恢复最初模板</button><button class="btn btn-s" id="btn-prev-tpl" onclick="prevTpl()"{% if not template_editable %} disabled style="opacity:0.4;cursor:not-allowed"{% endif %}>预览模板</button><button class="btn btn-p" id="btn-save-tpl" onclick="saveTpl()"{% if not template_editable %} disabled style="opacity:0.4;cursor:not-allowed"{% endif %}>保存模板</button><span class="status" id="template-status"></span></div>
 </section>
 
 

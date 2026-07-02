@@ -1,0 +1,33 @@
+main_pe  主线PE设备名
+main_tunnel  主线Tunnel接口名（自动标准化）
+main_tunnel_port  主线Tunnel端口号（自动提取）
+main_wanip  主线WANIP（/30）
+main_wanip_remote  主线WANIP PE侧（自动计算）
+main_wanip_local  主线WANIP CE侧（自动计算）
+main_docking  主线PE对接IP（Docking）
+ce_loip  CE Loopback IP（主备共用）
+hkip_nat  HK NAT IP（HKIP字段首个IP）
+main_bgp1  主线BGP Server IP 1
+main_bgp2  主线BGP Server IP 2
+bk_pe  备线PE设备名
+bk_tunnel  备线Tunnel接口名
+bk_tunnel_port  备线Tunnel端口号
+bk_wanip  备线WANIP（/30）
+bk_wanip_remote  备线WANIP PE侧
+bk_wanip_local  备线WANIP CE侧
+bk_docking  备线PE对接IP
+bk_bgp1  备线BGP Server IP 1
+bk_bgp2  备线BGP Server IP 2
+
+DEFAULT_WAN_ETH  初始化默认：WAN口
+DEFAULT_WAN_CIDR  初始化默认：WAN IP
+DEFAULT_WAN_IP_PLAIN  初始化默认：WAN 主机地址（无掩码，由 DEFAULT_WAN_CIDR 推导）
+DEFAULT_WAN_GW  初始化默认：WAN网关
+DEFAULT_WAN_DHCP  初始化默认：DHCP
+DEFAULT_LAN_ETH  初始化默认：LAN口
+DEFAULT_LAN_CIDR  初始化默认：LAN IP
+DEFAULT_LAN_IP_PLAIN  初始化默认：LAN 主机地址（无掩码，由 DEFAULT_LAN_CIDR 推导）
+DEFAULT_LAN_GW  初始化默认：LAN网关
+DEFAULT_LAN_DHCP  初始化默认：DHCP
+DEFAULT_INNER_NETS  初始化默认：内网段
+DEFAULT_GEN_RETURN_ROUTE  初始化默认：回程路由
