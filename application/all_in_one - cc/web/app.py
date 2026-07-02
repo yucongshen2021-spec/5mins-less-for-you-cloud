@@ -1270,7 +1270,15 @@ def generate_epoch_mpls():
                                 rr_lines = [f"set protocols static route {n} dhcp-interface {wan_if}" for n in inner_nets]
                                 d["return_routes_block"] = "\n".join(rr_lines)
                 _inject_network_to_parsed(mpls, d)
-                output = gen_fn(d)
+                # 使用磁盘模板（支持用户自定义），而非 gen_fn 内部的硬编码模板
+                ipsec_tpl = _get_effective_template(mpls, "TEMPLATE_MPLS_IPSEC")
+                if ipsec_tpl and isinstance(d, dict):
+                    try:
+                        output = ipsec_tpl.format(**d)
+                    except Exception:
+                        output = gen_fn(d)  # fallback to gen_fn
+                else:
+                    output = gen_fn(d)
             elif gen_fn:
                 output = "# IPSec 配置生成暂不可用\n"
         else:
@@ -1430,7 +1438,7 @@ def generate_ar_sdwan():
         factory_output = ""
 
         if tpl_slot and builder_name:
-            tpl = ar.get(tpl_slot, "")
+            tpl = _get_effective_template(ar, tpl_slot)
             build_fn = ar.get(builder_name)
             if build_fn and tpl:
                 d, _ = build_fn(hdr_text)
@@ -2737,16 +2745,9 @@ def api_init_defaults_save():
     except Exception as e:
         return jsonify({"ok": False, "error": _humanize_error(e)}), 500
 
-    # Apply to module globals
-    info = next((s for s in _SCENARIO_LIST if s["key"] == scenario_key), None)
-    if info:
-        ns = _load_module(info["source"])
-        for k, v in values.items():
-            if v is not None:
-                sv = str(v) if not isinstance(v, bool) else v
-                if isinstance(sv, str) and sv.strip().lower() == 'dhcp' and k in _LAN_KEYS:
-                    continue
-                ns[k] = sv
+    # 不修改全局 ns：save 只写 JSON 文件。
+    # generate 路由每次调用 _load_init_defaults() 从 JSON 全量加载到 ns。
+    # 修改 ns 会污染并发请求（Bug 3 修复）。
 
     _touch_reload_stamp()
     return jsonify({"ok": True, "message": "Saved"})

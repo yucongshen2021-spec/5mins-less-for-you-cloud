@@ -44,6 +44,7 @@ HDR = {
     "er_ne": "LineID:609353B7\nPE： tyo2-natpe4\nWANIP: 10.22.86.196/30\nTUNNEL: tun1083\nPE Docking：192.168.205.67\nCE Docking：: 10.22.242.21\nBGPSERVER IP：103.252.19.25,43.229.117.226\n海外出口ip：\n10.60.21.185-103.57.50.44\n\nLineID:609353B8\nPE： tyo4-natpe2\nWANIP: 10.22.100.120/30\nTUNNEL: tun1033\nPE Docking：10.33.54.78\nCE Docking：: 10.22.242.21\nBGPSERVER IP：103.252.19.99,43.229.119.251\n海外出口ip：\n10.60.21.186-103.57.50.45",
     "er_ds": "google.com\nyoutube.com",
     "usg_us": "main IPSEC_PE: szd-ape2\nmain dial_ip: 121.14.82.235\nmain loopback: 10.18.12.57\nmain auth_id: 609157A1\nLineID:609157A1\nPE:lax1-fgpe1\nWANIP:10.22.98.40/30\nTUNNEL:tun1213\nPE对接:10.255.110.6\n出口ip:64.81.158.21\n\nbackup IPSEC_PE: szc-apebk2\nbackup dial_ip: 120.133.138.20\nbackup loopback: 10.18.14.21\nbackup auth_id: 609157A2\nLineID:609157A2\nPE:sjc1-fgpe1\nWANIP:10.22.32.60/30\nTUNNEL:tun2305\nPE对接:10.255.111.128\n出口ip:172.16.14.118",
+    "usg_fl": "LineID:609526A3\nPE:szd-upe3\nTunnel:Tunnel0/0/2017\nwanip:10.40.99.44/30\nPE 对接:10.255.110.13\nCE 对接:10.18.16.58\n\nLineID:609526A4\nPE:szc-upe2\nTunnel:Tunnel0/0/1601\nwanip:10.40.194.24/30\nPE 对接:10.255.111.139\nCE 对接:10.18.14.165\n\n账号：60952601@fnetlink.com  密码：BLEIOYxT\n账号：60952602@fnetlink.com  密码：uYC3zALF\nPE：szd-vupe6  FPE：F-ShenZhen4  预留IP：100.94.11.144/29\nPE：bja-vupe6  FPE：F-BeiJing4  预留IP：100.93.11.144/29\nPE：sha-vupe6  FPE：F-ShangHai4  预留IP：100.92.11.144/29",
     "usg_ne": "LineID:609424A1\nPE： lax1-fgpe1\nWANIP: 10.22.110.24/30\nTUNNEL: tun1248\nPE对接：10.255.110.6\nCE对接：10.18.16.20\n出口ip：\n10.61.10.78-64.81.20.174\n10.61.10.106-64.81.20.178\nLineID:609424A2\nPE： sjc1-fgpe2\nWANIP: 10.22.106.20/30\nTUNNEL: tun1229\nPE对接：10.255.111.158\nCE对接：10.18.14.127\n出口ip：\n10.60.76.6-172.16.23.8\n10.60.76.14-172.16.23.9",
     "mpls_cn": "LineID:609291A1\nPE:nna-upe1\nTunnel:Tunnel0/0/1030\nwanip:10.40.79.92/30\nPE 对接:192.168.204.1\nCE 对接:10.40.91.42\nPE AS号:65512\nPE:nna-ipsecgw1\nTunnel:vtun10013\nwanip:10.40.91.40/30\nPE 对接:180.142.110.241\n\nLineID:609291A2\nPE:szd-upebk2\nTunnel:Tunnel10447\nwanip:10.40.195.188/30\nPE 对接:192.168.253.80\nPE AS号:65531",
     "ar": "LineID:604604Hw1\nPE:gzd-upe5\nTunnel:Tunnel0/0/1147\nwanip:10.40.232.248/30\nPE 对接:10.200.200.76\nCE 对接:10.50.131.16\n拨号PE:gzd-upe5\n对接IP:10.200.200.76\nLoopIP:10.50.131.16\n拨号ip:183.63.68.174\n秘钥:both-win\n\nLineID:604604Hw2\nPE:szd-upebk1\nTunnel:Tunnel0/0/1605\nwanip:10.30.115.252/30\nPE 对接:10.200.200.22\nCE 对接:10.120.47.20\n拨号PE:szd-upebk1\n对接IP:10.200.200.22\nLoopIP:10.120.47.20\n拨号ip:183.56.163.24\n秘钥:both-win",
@@ -59,7 +60,7 @@ ALL_SCENARIOS = [
     ("ER Domain Split", "epoch_fastip", "domain_split", HDR["er_ds"], "output", ["set protocols static"], 5),
     ("USG US", "usg_fastip", "us", HDR["usg_us"], "output", ["set firewall","ip address"], 100),
     ("USG HK", "usg_fastip", "hk", HDR["usg_us"], "output", ["set firewall","ip address"], 100),
-    ("USG Flink", "usg_fastip", "flink", HDR["usg_us"], "output", ["interface Tunnel"], 20),
+    ("USG Flink", "usg_fastip", "flink", HDR["usg_fl"], "output", ["interface Tunnel"], 20),
     ("USG New Exit", "usg_fastip", "new_exit", HDR["usg_ne"], "output", ["interface Tunnel"], 10),
     ("MPLS CN", "epoch_mpls", "domestic", HDR["mpls_cn"], "output", ["set firewall","set protocols bgp"], 60),
     ("MPLS OV", "epoch_mpls", "overseas", HDR["mpls_cn"], "output", ["set firewall","set protocols bgp"], 60),
@@ -144,7 +145,7 @@ TPL_SCENARIOS = [
     ("Epoch FastIP · ER 域名分流", "epoch_fastip", "domain_split", HDR["er_ds"], "output"),
     ("USG FastIP · 非香港出口", "usg_fastip", "us", HDR["usg_us"], "output"),
     ("USG FastIP · HK 香港出口", "usg_fastip", "hk", HDR["usg_us"], "output"),
-    ("USG FastIP · 飞连", "usg_fastip", "flink", HDR["usg_us"], "output"),
+    ("USG FastIP · 飞连", "usg_fastip", "flink", HDR["usg_fl"], "output"),
     ("USG FastIP · 新增出口", "usg_fastip", "new_exit", HDR["usg_ne"], "output"),
     ("Epoch MPLS · 国内配置", "epoch_mpls", "domestic", HDR["mpls_cn"], "output"),
     ("Epoch MPLS · 海外配置", "epoch_mpls", "overseas", HDR["mpls_cn"], "output"),
@@ -225,14 +226,18 @@ print("=" * 60)
 
 r = c.post('/api/init-defaults/save', json={'key':'Epoch FastIP · HK 香港出口','values':{'DEFAULT_WAN_DHCP':True,'DEFAULT_LAN_DHCP':True}}).get_json()
 t("初始值-保存DHCP=True", r.get("ok"))
-er = _load_module('er_fastip_2in1_v8.py')
-t("初始值-模块globals WAN_DHCP=True", er.get('DEFAULT_WAN_DHCP')==True)
+# save 不再修改全局 ns（Bug 3 修复），改为验证 generate 输出应用了保存的值
+r = c.post('/api/generate/epoch_fastip', json={"variant":"hk","header_text":HDR["er_hk"],"network":{"wan_eth":"0","lan_eth":"1"}}).get_json()
+gen_out = r.get("output","")
+t("初始值-保存后generate应用DHCP", "dhcp" in gen_out)
 # Reset and verify the JSON file is cleaned
 r = c.post('/api/init-defaults/reset', json={'key':'Epoch FastIP · HK 香港出口'}).get_json()
 t("初始值-重置成功", r.get("ok"))
-# Verify module global is reset (factory is False for WAN_DHCP)
-er2 = _load_module('er_fastip_2in1_v8.py')
-t("初始值-重置后WAN_DHCP=False", er2.get('DEFAULT_WAN_DHCP')==False)
+# reset 不再修改全局 ns（Bug 3 修复），改为验证 generate 输出不应用已删除的 init-defaults
+r = c.post('/api/generate/epoch_fastip', json={"variant":"hk","header_text":HDR["er_hk"],"network":{"wan_eth":"0","lan_eth":"1"}}).get_json()
+# factory default for WAN_DHCP is False → output should NOT contain dhcp for WAN
+gen_out = r.get("output","")
+t("初始值-重置后WAN非DHCP", "dhcp" not in gen_out.split("\n")[0] if gen_out else True)
 
 # ═════════════════════════════════════════════════════════════
 # SECTION 7: 脚本逻辑 — 备注和示例加载

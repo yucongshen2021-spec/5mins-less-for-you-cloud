@@ -1,0 +1,39 @@
+lineid  线路编号（奇数=主线，偶数=备线）
+pe  PE设备名
+tunnel  Tunnel接口名
+wanip  WAN IP/掩码（/30）
+pe_peer_ip  PE侧对接IP（GRE目标）
+ce_peer_ip  CE侧对接IP（LoopBack绑定）
+pe_as  PE的BGP AS号
+customer_inner_route  自环内网网段（/30）
+dial_ip  拨号IP（IKE remote-address）
+ike_psk  IKE预共享秘钥（PSK）
+wan1_port  主设备WAN1接口号（初始化）
+wan1_ip  主设备WAN1 IP/掩码（初始化）
+wan1_gw  主设备WAN1网关（初始化）
+wan2_port  备设备WAN2接口号（初始化）
+wan2_ip  备设备WAN2 IP/掩码（初始化）
+wan2_gw  备设备WAN2网关（初始化）
+zihuan1_port  主设备自环接口（初始化）
+ipsec1_port  主设备IPSec接口（初始化）
+zihuan2_port  备设备自环接口（初始化）
+ipsec2_port  备设备IPSec接口（初始化）
+south_label  南向接入类型（初始化）
+
+DJ_HDR_MAIN  初始化默认：【主设备】
+DJ_HDR_BAK  初始化默认：【备设备】
+DJ_WAN1_PORT  初始化默认：WAN1
+DJ_WAN2_PORT  初始化默认：WAN2
+DJ_WAN1_IP  初始化默认：WAN1 IP
+DJ_WAN1_IP_PLAIN  初始化默认：WAN1 主机地址（无掩码，由 DJ_WAN1_IP 推导）
+DJ_WAN2_IP  初始化默认：WAN2 IP
+DJ_WAN2_IP_PLAIN  初始化默认：WAN2 主机地址（无掩码，由 DJ_WAN2_IP 推导）
+DJ_WAN1_GW  初始化默认：WAN1网关
+DJ_WAN2_GW  初始化默认：WAN2网关
+DJ_ZIHUAN1_PORT  初始化默认：自环网关
+DJ_ZIHUAN2_PORT  初始化默认：自环网关
+DJ_IPSEC1_PORT  初始化默认：自环(IPSec)
+DJ_IPSEC2_PORT  初始化默认：自环(IPSec)
+DJ_SOUTH_LABEL  初始化默认：南向服务
+DJ_IKE_VERSION  初始化默认：IKE版本
+DEFAULT_FTP_SERVER  初始化默认：FTP服务器
