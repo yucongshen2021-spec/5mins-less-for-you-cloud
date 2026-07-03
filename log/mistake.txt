@@ -891,3 +891,113 @@ fallback 到带时间戳的新目录名，绝不因 stale 目录而放弃整跑�
   1. 优先写黑盒 HTTP 测试（打真实部署端口），少写 in-process 测试（环境依赖多）。
   2. 计数断言用「动态拉取 + 一致性比对」替代硬编码数字。
   3. 黑盒测试动态遍历 API 返回的清单，场景增删自动覆盖，无需手改测试。
+
+---
+
+## 2026-07-03 本次会话新增坑点
+
+### 坑1: editor_defaults tpl 与源码不同步
+
+**现象**: `test_ar_traditional_gen.py` 在 `test_templates.py` 之后跑时失败，
+AR Traditional 备线 Tunnel0/0/2000（磁盘旧版）vs Tunnel0/0/1001（源码新版）。
+
+**根因**: 磁盘 `editor_defaults/` 下的 .tpl 文件是旧版，源码里的
+`TEMPLATE_AR_TRADITIONAL` 已更新但没同步到磁盘。13 个场景有差异。
+
+**修复**: 从源码重新导出覆盖所有 27 个磁盘 tpl。
+
+**避免**: 修改业务模块模板变量后，必须同步更新 `editor_defaults/` 下的 .tpl 文件。
+建议写一个同步脚本。
+
+---
+
+### 坑2: template/load 接口污染全局 _EMBEDDED_NS
+
+**现象**: 一个用户 load 模板后，其他用户的生成结果被污染（用了旧模板）。
+
+**根因**: `api_template_load` 把读到的磁盘 tpl 写回 `ns[slot]`（只读接口有副作用）。
+磁盘 tpl 是旧版 → 一次 load 就把全局 ns 的新版模板覆盖成旧版。
+
+**修复**: 去掉 `ns[slot] = tpl`。load 是只读接口，不应改全局状态。
+
+**避免**: 只读 API（load/get）绝不修改全局可变状态。generate 从磁盘读模板
+（`_get_effective_template`），不需要 load 预写 ns。
+
+---
+
+### 坑3: template/reset 和 init-defaults save/reset 修改全局 ns
+
+**现象**: A 用户 reset 模板后，B 用户生成结果受影响（多用户共享 ns 被污染）。
+
+**根因**: `api_template_reset` 和 `api_init_defaults_save/reset` 直接在共享的
+`_EMBEDDED_NS` 上写 `ns[k] = v`。多用户共享同一 ns → A 的操作影响 B。
+
+**修复**: save/reset 只写用户 JSON 文件，不改 ns。generate 路由每次调用
+`_load_init_defaults()` 从 JSON 全量加载到 ns。
+
+**避免**: 任何修改 `_EMBEDDED_NS` 的操作都是并发隐患。只有 `_load_init_defaults()`
+在 generate 请求内从磁盘加载是安全的（每个请求独立加载，不跨请求残留）。
+
+---
+
+### 坑4: _FACTORY_INIT_DEFAULTS 在 pytest 环境为空
+
+**现象**: test_client 环境下 template/reset 无法恢复出厂值。
+
+**根因**: `_snapshot_factory_defaults()` 只在 `init_worker()` 中调用，
+而 `init_worker()` 只在 gunicorn post_fork 或 `__main__` 时执行。
+pytest/test_client 从不走这个路径。
+
+**修复**: 在 app.py 模块末尾添加 `_snapshot_factory_defaults()` 自动调用（幂等）。
+
+**避免**: 模块级初始化不要只依赖外部调用（gunicorn hook），要在 import 时也执行。
+`_snapshot_factory_defaults()` 是幂等的，重复调用无副作用。
+
+---
+
+### 坑5: AR SD-WAN 和 MPLS IPSec 不读磁盘模板
+
+**现象**: 保存自定义模板后生成配置不含自定义内容（热更新不生效）。
+
+**根因**: AR SD-WAN 用 `ar.get(tpl_slot, "")` 直接读模块 ns（出厂模板），
+不经过 `_get_effective_template()`（不读磁盘）。MPLS IPSec 用 `gen_fn(d)` 内部
+硬编码 `TEMPLATE_MPLS_IPSEC.format(**d)`，也不读磁盘。
+
+**修复**: AR SD-WAN 改为 `_get_effective_template(ar, tpl_slot)`。
+MPLS IPSec 改为 `_get_effective_template(mpls, "TEMPLATE_MPLS_IPSEC")` + `tpl.format(**d)`。
+
+**避免**: 所有场景的模板读取必须通过 `_get_effective_template()`，不能直接从
+模块 ns 读或用 gen_fn 内部硬编码模板。
+
+---
+
+### 坑6: 访客按钮 disabled 依赖 JS 执行
+
+**现象**: 访客模式下模板编辑器按钮没有变灰（JS 没执行或执行中断）。
+
+**根因**: 按钮的 `disabled` 状态完全依赖 `updateTemplateAdminUI()` 在
+`DOMContentLoaded` 时设置。如果 JS 因 iframe 时序/报错没执行，按钮保持可用。
+
+**修复**: 用 Jinja2 条件渲染在 HTML 层面直接加 `disabled` + `style="opacity:0.4"`。
+共 24 个按钮（20 配置生成 + 4 模板编辑器）。
+
+**避免**: 安全相关的 UI 状态（disabled/readonly）必须在 HTML 层面设置，
+不能只依赖 JS 运行时设置。JS 只用于「移除 disabled」（登录用户恢复可用）。
+
+---
+
+### 坑7: auth DB created_at 时区不一致
+
+**现象**: 9000/admin 用户列表的创建时间比实际早 8 小时。
+
+**根因**: 老用户的 `created_at` 是用 SQLite `datetime('now')` 写入的（UTC）。
+即使改了 DEFAULT 为 `datetime('now', '+8 hours')`，老数据不变。
+新用户的 DEFAULT 也没生效（表是旧 schema 创建的，ALTER 不更新 DEFAULT）。
+
+**修复**: 
+1. `list_all_users()` 和 `get_user_by_id()` 读取时将老 UTC 数据加 8 小时。
+2. `create_user()` INSERT 显式写 `datetime('now', '+8 hours')`，不依赖 DEFAULT。
+
+**避免**: SQLite 的 `ALTER TABLE ... DEFAULT` 不更新已有行的 DEFAULT 值，
+也不更新表级 DEFAULT（只对新 INSERT 生效，且前提是表用新 schema 创建）。
+时间字段写入时必须显式指定时区偏移，不能依赖 DEFAULT。
