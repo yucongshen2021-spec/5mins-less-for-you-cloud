@@ -28,12 +28,26 @@ docker compose up -d --build
 
 ## 登录与权限系统
 
-- **自动访客模式**：未登录自动访客 session，可使用配置生成（模板只读）。
+- **自动访客模式**：未登录自动访客 session，**所有敏感功能禁用**（见下表）。
 - **注册/登录/重置密码**：登录页三态切换，注册后自动登录，Session 30 天。
 - **管理员 yucs**：首次部署自动创建（`ADMIN_PASSWORD`，默认 `yucs123`）。
-- **模板编辑权限**：登录用户可编辑自己的模板（访客只读+键盘拦截）。保存加专属注释 `# xxx专属yyy场景模板-yymmdd`。
 - **工作区隔离**：每用户独立 `data/users/<uid>/editor_workspace/`，模板互不串号。
 - **测试账号**：`test`/`ctest` 开头不记录访问日志。
+
+### 访客 vs 登录用户权限对比
+
+| 功能 | 访客（未登录） | 登录用户 | yucs 管理员 |
+|------|--------------|---------|------------|
+| 生成配置 | ❌ 按钮置灰 | ✅ | ✅ |
+| 复制/导出/清除 | ❌ 按钮置灰 | ✅ | ✅ |
+| 填写示例 | ❌ "登录后查看" | ✅ | ✅ |
+| 备注说明 | ❌ "登录后查看" | ✅ | ✅ |
+| 模板编辑器 | ❌ 只读+键盘拦截 | ✅ 可编辑 | ✅ 可编辑 |
+| 初始化参数 | ❌ disabled | ✅ 可修改 | ✅ 可修改 |
+| 9000 后台 | ❌ "请登录" | 🟢 我的数据 | 🟠 管理后台 |
+| 用户管理 | — | — | ✅ 重置/删除用户 |
+
+按钮在 **HTML 层面** disabled（Jinja2 条件渲染），不依赖 JS 执行。
 
 ### 分权后台（9000）
 
@@ -43,7 +57,7 @@ docker compose up -d --build
 | 普通用户 | 🟢 我的数据 | 个人生成记录 + 统计 + 常用场景 |
 | 访客 | 🔘 后台（灰色） | "请登录后查看" → 跳转登录 |
 
-后台只记录**生成配置**请求，其他操作不记录。时间统一北京时间 UTC+8。
+后台只记录**生成配置**请求，其他操作不记录。所有时间统一北京时间 UTC+8。
 
 管理后台（`/admin`）独立密码登录（`ADMIN_PASSWORD`），可列出/删除用户、重置密码，yucs 不可删。操作写入审计日志。
 
@@ -58,17 +72,17 @@ docker compose up -d --build
 | AR SD-WAN | 单机/双机 × OPS/Factory | — |
 | AR 传统组网 | 双线 | — |
 
-通用功能：Ctrl+Enter 快捷生成、清除数据头、复制输出、导出脚本、备注说明、填写示例。
-
 ### 参数同步
 
-所有场景的 WAN/LAN 接口号、IP/CIDR、网关、内网段、DNS、DHCP、旁挂模式、回程路由等参数均同步到输出。HK 解析器支持 MAIN/BACKUP 和 LineID 两种数据头格式。US 出口的 overseas NAT block 支持 US 字段回退。
+所有场景的 WAN/LAN 接口号、IP/CIDR、网关、内网段、DNS、DHCP、旁挂模式、回程路由等参数均同步到输出。HK 解析器支持 MAIN/BACKUP 和 LineID 两种数据头格式。US 出口的 overseas NAT block 支持 US 字段回退。所有场景的模板均通过 `_get_effective_template()` 从磁盘读取（支持用户自定义热更新）。
 
 ## 多并发架构
 
 - **gunicorn 16 worker**：进程隔离，每 worker 独立 `_EMBEDDED_NS`。
 - **tkinter_stub.py**：替代真实 tkinter，无需 Xvfb/DISPLAY。
-- **generate 从磁盘读模板**（`_get_effective_template`），save/reset 只写磁盘不改 ns。
+- **generate 从磁盘读模板**（`_get_effective_template`），save/reset/load 只操作磁盘不改 ns。
+- **`_load_init_defaults()`** 在所有 generate 路由调用，从 JSON 加载用户保存的参数。
+- **`_FACTORY_INIT_DEFAULTS`** 在 import 时自动 snapshot（test_client 环境也有效）。
 - **16 = 最大并发请求数**（不是用户数上限）。用户数走磁盘，每用户 ~10-50KB。
 
 ## 模板编辑器（我来定模板）
@@ -76,8 +90,18 @@ docker compose up -d --build
 - 级联菜单 29 场景，可多选 chip 切换
 - 数据头/变量映射/生成模板三个文本框
 - 初始化默认参数（保存后影响 generate 输出）
-- 保存自动加专属注释，预览不落盘，恢复 confirm 弹窗（iframe allow-modals）
+- 保存自动加专属注释 `# xxx专属yyy场景模板-yymmdd`，重复保存不累积
+- 预览不落盘，恢复 confirm 弹窗（iframe allow-modals）
 - 热更新：save→generate 即时生效；用户间隔离
+
+## 时间统一
+
+所有时间统一北京时间（UTC+8）：
+- 容器 `TZ=Asia/Shanghai`
+- proxy.py `time.localtime()`
+- auth DB `create_user()` 显式写 `datetime('now', '+8 hours')`
+- `list_all_users()` / `get_user_by_id()` 读取时将老 UTC 数据加 8 小时转换
+- stats DB 每日趋势 `DATE('now', '+8 hours')`
 
 ## 目录结构
 
@@ -104,7 +128,7 @@ docker compose up -d --build
 │   │   ├── data/                       运行时数据（per-user workspace）
 │   │   └── editor_defaults/            出厂模板
 │   ├── common/
-│   │   ├── auth_db.py                  用户认证 DB（SQLite）
+│   │   ├── auth_db.py                  用户认证 DB（SQLite，created_at UTC+8 转换）
 │   │   └── stats_db.py                 访问日志 DB（SQLite，per-user 查询）
 │   ├── stats/                          统计看板 :9000
 │   │   ├── app.py                      看板+管理后台+用户数据看板
@@ -115,7 +139,7 @@ docker compose up -d --build
 │   │       └── guest_login.html        访客登录提示
 │   └── test/                           测试套件
 │       ├── blackbox_8000/              黑箱测试（86 个）
-│       └── all_in_one/                 单元测试
+│       └── all_in_one/                 单元测试 + comprehensive.py（185 个）
 ├── docs/AGENTS.md                      架构/运维/坑点（给 AI agent 看）
 ├── log/                                变更日志
 └── test_features.md                    完整功能测试清单
@@ -130,6 +154,7 @@ sleep 12
 cd application/test
 YUCS_PASSWORD=yucs123 python -m pytest blackbox_8000/ -q           # 86 个
 python -m pytest all_in_one/test_apis.py test_generation.py -q     # 单元测试
+cd all_in_one && python3 comprehensive.py                          # 185 个综合测试
 ```
 
 ## 部署到新服务器
@@ -148,18 +173,19 @@ curl http://localhost:5000/api/health  # {"ok":true,"status":"healthy"}
 | `SECRET_KEY` | 随机 | Portal session 密钥 |
 | `STATS_SECRET_KEY` | 同 SECRET_KEY | Stats session 密钥 |
 | `ADMIN_PASSWORD` | yucs123 | 管理员密码 + stats 后台密码 |
-| `GUNICORN_WORKERS` | 16 | gunicorn worker 数 |
+| `GUNICORN_WORKERS` | 16 | gunicorn worker 数（4G 内存建议 8） |
 | `TZ` | Asia/Shanghai | 容器时区 |
 | `PORTAL_LABEL` | DEMO | 门户标签 |
 
 ## 开发须知
 
-- **多并发安全**：generate 从磁盘读模板，save/reset 只操作磁盘不改 ns
-- **模板编辑器权限**：登录用户可编辑（访客只读+键盘拦截），保存加专属注释
-- **init-defaults**：`_load_init_defaults()` 在所有 generate 路由调用，保存的参数影响输出
+- **多并发安全**：generate 从磁盘读模板，save/reset/load 只操作磁盘不改 ns
+- **访客权限**：HTML 层面 Jinja2 条件 disabled（24 个按钮），不依赖 JS。API 层面 `_require_login()` 拦截 examples/notes/template load/save/reset/preview/init-defaults
+- **init-defaults**：`_load_init_defaults()` 在所有 generate 路由调用；save/reset 只写 JSON 不改 ns
 - **tkinter 已移除**：用 `tkinter_stub.py`，不要恢复 `import tkinter` 或 Xvfb
-- **时间统一 UTC+8**：容器 TZ=Asia/Shanghai，SQLite 用 `datetime('now','+8 hours')`
+- **时间统一 UTC+8**：容器 TZ，SQLite `+8 hours`，proxy `localtime()`，auth DB 老数据读取时转换
 - **日志只记录生成请求**：proxy.py `is_generate` 过滤，test/ctest 用户不记录
+- **模板热更新**：所有场景（含 AR SD-WAN、MPLS IPSec）均通过 `_get_effective_template` 读磁盘
 
 ## License
 
