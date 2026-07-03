@@ -1001,3 +1001,22 @@ MPLS IPSec 改为 `_get_effective_template(mpls, "TEMPLATE_MPLS_IPSEC")` + `tpl.
 **避免**: SQLite 的 `ALTER TABLE ... DEFAULT` 不更新已有行的 DEFAULT 值，
 也不更新表级 DEFAULT（只对新 INSERT 生效，且前提是表用新 schema 创建）。
 时间字段写入时必须显式指定时区偏移，不能依赖 DEFAULT。
+
+---
+
+### 坑8: AI Agent 不读 mistake.txt 和 AGENTS.md 就开始改代码
+
+**现象**: Agent 在本次会话中多次踩了已有记录的坑（ns 污染、del _EMBEDDED_NS 等），
+这些坑在 `log/mistake.txt` 中早有记录，但 Agent 没有先读就动手。
+
+**根因**: Agent 没有在任务开始前执行 `docs/AGENTS.md` 第一步要求的
+"先读 `log/mistake.txt`"，直接跳到代码修改。
+
+**修复**: 在 `docs/AGENTS.md` 中已明确要求"任何任务开始前先读 mistake.txt"。
+Agent 必须严格执行。
+
+**避免**: 
+1. **每次会话第一步**：读 `docs/AGENTS.md` + `log/mistake.txt`，再动手。
+2. **每次改代码前**：检查 mistake.txt 中是否有相关坑点。
+3. **每次犯新错**：立刻追加到 mistake.txt（不能只在聊天里说）。
+4. 这条规则是硬规则，不可跳过。
