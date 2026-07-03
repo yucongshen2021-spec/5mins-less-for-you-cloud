@@ -1,0 +1,28 @@
+##广西##
+LineID:609291A1
+PE:nna-upe1
+Tunnel:Tunnel0/0/1030
+wanip:10.40.79.92/30
+PE 对接:192.168.204.1
+CE 对接:10.40.91.42
+PE AS号:65512
+CE AS号:65201
+
+PE:nna-ipsecgw1
+Tunnel:vtun10013
+wanip:10.40.91.40/30
+PE 对接:180.142.110.241
+
+LineID:609291A2
+PE:szd-upebk2
+Tunnel:Tunnel10447
+wanip:10.40.195.188/30
+PE 对接:192.168.253.80
+CE 对接:10.120.52.30
+PE AS号:65531
+CE AS号:65201
+
+PE:szd-acvpnpe2
+Tunnel:vtun10209
+wanip:10.120.52.28/30
+PE 对接:202.46.225.106

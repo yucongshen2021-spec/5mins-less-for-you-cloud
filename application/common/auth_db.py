@@ -76,7 +76,7 @@ def create_user(username: str, password: str) -> dict:
         try:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
-                "INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)",
+                "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, datetime('now', '+8 hours'))",
                 (user_id, username, pw_hash),
             )
             conn.commit()
@@ -114,7 +114,16 @@ def get_user_by_id(user_id: str) -> dict | None:
             (user_id,),
         ).fetchone()
         if row:
-            return {"user_id": row[0], "username": row[1], "created_at": row[2]}
+            ts = row[2] or ""
+            if ts and "T" not in ts and " " in ts:
+                from datetime import datetime, timedelta
+                try:
+                    dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+                    dt_bj = dt + timedelta(hours=8)
+                    ts = dt_bj.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
+            return {"user_id": row[0], "username": row[1], "created_at": ts}
         return None
     finally:
         conn.close()
@@ -159,14 +168,28 @@ def update_user_password(user_id: str, new_password: str) -> dict:
 
 
 def list_all_users() -> list:
-    """返回所有用户列表，按创建时间排序。每项含 user_id, username, created_at。"""
+    """返回所有用户列表，按创建时间排序。每项含 user_id, username, created_at。
+    created_at 统一转换为北京时间 (UTC+8) 显示。"""
     conn = sqlite3.connect(str(_db_path))
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         rows = conn.execute(
             "SELECT id, username, created_at FROM users ORDER BY created_at"
         ).fetchall()
-        return [{"user_id": r[0], "username": r[1], "created_at": r[2]} for r in rows]
+        result = []
+        for r in rows:
+            ts = r[2] or ""
+            # 如果时间不含 'T' 且看起来是 UTC（老数据），加 8 小时转换
+            if ts and "T" not in ts and " " in ts:
+                from datetime import datetime, timedelta
+                try:
+                    dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+                    dt_bj = dt + timedelta(hours=8)
+                    ts = dt_bj.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
+            result.append({"user_id": r[0], "username": r[1], "created_at": ts})
+        return result
     finally:
         conn.close()
 

@@ -1,0 +1,44 @@
+main_gre_pe  主线GRE PE设备名
+main_gre_tun  主线GRE Tunnel接口
+main_gre_wanip  主线GRE WAN IP/掩码
+main_gre_pe_ip  主线GRE PE侧IP（自动计算）
+main_gre_ce_ip  主线GRE CE侧IP（自动计算）
+main_gre_remote  主线GRE remote目标IP（PE对接）
+main_vtun_pe  主线vtun PE设备名
+main_vtun_id  主线vtun Tunnel名（标准化）
+main_vtun_port  主线vtun端口号（自动提取）
+main_vtun_local  主线vtun本地IP（CE对接）
+main_vtun_remote  主线vtun远端IP（PE对接）
+main_vtun_docking  主线vtun对接IP（CE对接）
+main_vtun_wanip  主线vtun WAN IP
+main_pe_as  主线PE AS号
+main_line_type  主线线路类型
+bk_gre_pe  备线GRE PE设备名
+bk_gre_tun  备线GRE Tunnel接口
+bk_gre_wanip  备线GRE WAN IP/掩码
+bk_gre_pe_ip  备线GRE PE侧IP
+bk_gre_ce_ip  备线GRE CE侧IP
+bk_gre_remote  备线GRE remote目标IP
+bk_vtun_pe  备线vtun PE设备名
+bk_vtun_id  备线vtun Tunnel名
+bk_vtun_port  备线vtun端口号
+bk_vtun_local  备线vtun本地IP
+bk_vtun_remote  备线vtun远端IP
+bk_vtun_docking  备线vtun对接IP
+bk_vtun_wanip  备线vtun WAN IP
+bk_pe_as  备线PE AS号
+bk_line_type  备线线路类型
+ce_as  CE的BGP AS号
+
+DEFAULT_WAN_ETH  初始化默认：WAN口
+DEFAULT_WAN_CIDR  初始化默认：WAN IP
+DEFAULT_WAN_IP_PLAIN  初始化默认：WAN 主机地址（无掩码，由 DEFAULT_WAN_CIDR 推导）
+DEFAULT_WAN_GW  初始化默认：WAN网关
+DEFAULT_WAN_DHCP  初始化默认：DHCP
+DEFAULT_LAN_ETH  初始化默认：LAN口
+DEFAULT_LAN_CIDR  初始化默认：LAN IP
+DEFAULT_LAN_IP_PLAIN  初始化默认：LAN 主机地址（无掩码，由 DEFAULT_LAN_CIDR 推导）
+DEFAULT_LAN_GW  初始化默认：LAN网关
+DEFAULT_LAN_DHCP  初始化默认：DHCP
+DEFAULT_INNER_NETS  初始化默认：内网段
+DEFAULT_GEN_RETURN_ROUTE  初始化默认：回程路由

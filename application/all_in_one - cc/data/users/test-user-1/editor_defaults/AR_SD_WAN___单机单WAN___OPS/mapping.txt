@@ -1,0 +1,31 @@
+lineid  线路编号（奇数=主线，偶数=备线）
+pe  PE设备名
+tunnel  Tunnel接口名
+wanip  WAN IP/掩码（/30）
+pe_peer_ip  PE侧对接IP（GRE目标）
+ce_peer_ip  CE侧对接IP（LoopBack绑定）
+pe_as  PE的BGP AS号
+customer_inner_route  自环内网网段（/30）
+dial_ip  拨号IP（IKE remote-address）
+ike_psk  IKE预共享秘钥（PSK）
+wan1_port  WAN1接口号（初始化）
+wan1_ip  WAN1 IP/掩码（初始化）
+wan1_gw  WAN1网关（初始化）
+zihuan_port  自环接口号（初始化）
+ipsec_port  IPSec接口号（初始化）
+south_label  南向接入类型（初始化）
+
+ZH_DUAL_WAN  初始化默认：WAN模式
+DEFAULT_WAN1_PORT  初始化默认：WAN1
+DEFAULT_WAN2_PORT  初始化默认：WAN2
+DEFAULT_WAN1_IP  初始化默认：WAN1 IP
+DEFAULT_WAN1_IP_PLAIN  初始化默认：WAN1 主机地址（无掩码，由 DEFAULT_WAN1_IP 推导）
+DEFAULT_WAN2_IP  初始化默认：WAN2 IP
+DEFAULT_WAN2_IP_PLAIN  初始化默认：WAN2 主机地址（无掩码，由 DEFAULT_WAN2_IP 推导）
+DEFAULT_WAN1_GW  初始化默认：WAN1网关
+DEFAULT_WAN2_GW  初始化默认：WAN2网关
+ZH_SOUTH_LABEL  初始化默认：南向服务
+ZH_IKE_VERSION  初始化默认：IKE版本
+DEFAULT_ZIHUAN_PORT  初始化默认：自环网关
+DEFAULT_IPSEC_PORT  初始化默认：自环(IPSec)
+DEFAULT_FTP_SERVER  初始化默认：FTP服务器
