@@ -1,5 +1,0 @@
-route1  飞连网段1（CIDR，兼容旧模板）
-route2  飞连网段2（CIDR，兼容旧模板）
-route3  飞连网段3（CIDR，兼容旧模板）
-ER_FL_MAIN_NH_DEFAULT  初始化默认：主回程下一跳
-ER_FL_BACKUP_NH_DEFAULT  初始化默认：备回程下一跳
