@@ -1,0 +1,30 @@
+﻿hostname  设备主机名（默认取 LineID）
+hostname  设备主机名
+acl_2707_block  ACL 2707规则块
+main_loop_ip  主线LoopBack IP
+main_pe_docking  主线PE对接IP
+backup_loop_ip  备线LoopBack IP
+backup_pe_docking  备线PE对接IP
+main_psk  主线预共享密钥
+main_dial_ip  主线拨号IP(IPSec远端)
+backup_psk  备线预共享密钥
+backup_dial_ip  备线拨号IP(IPSec远端)
+main_pe  主线PE
+main_tunnel  主线Tunnel(数据头)
+main_tunnel_local_ip  主线Tunnel本地IP
+backup_pe  备线PE
+backup_tunnel  备线Tunnel
+backup_tunnel_local_ip  备线Tunnel本地IP
+wan_if_block  WAN接口块
+main_tunnel_remote_ip  主线Tunnel远端IP
+backup_tunnel_remote_ip  备线Tunnel远端IP
+static_routes_block  静态路由块
+return_routes_block  回程路由块
+bgp_filter_prefix_block  BGP Filter Prefix块
+ce_as  CE AS号
+bgp_router_id  BGP Router ID
+peer_main_ip  BGP主Peer IP
+peer_main_as  BGP主Peer AS
+peer_backup_ip  BGP备Peer IP
+peer_backup_as  BGP备Peer AS
+main_wan_ip_plain  主线WAN IP(纯)

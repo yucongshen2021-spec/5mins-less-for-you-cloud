@@ -2803,16 +2803,17 @@ def build_er_new_exit_nat_header_block(parsed: dict, init_cfg: dict) -> str:
     b = parsed.get("bk") or {}
     m_pairs = list(m.get("oversea_pairs") or [])
     b_pairs = list(b.get("oversea_pairs") or [])
-    if not m_pairs or not b_pairs:
+    if not m_pairs:
         return ""
     mr = str(init_cfg.get("main_nat_rule", "")).strip()
     br = str(init_cfg.get("bk_nat_rule", "")).strip()
-    if not mr.isdigit() or not br.isdigit():
+    if not mr.isdigit():
         return ""
     nm, nb = len(m_pairs), len(b_pairs)
+    b_info = f"；备线自 {br} 起共 {nb} 条" if b_pairs and br.isdigit() else ""
     lines = [
         f"# SNAT 源网段(初始化 ER_NE_NAT_SOURCE_CIDR_DEFAULT): {src}",
-        f"# NAT rule: 主线自 {mr} 起共 {nm} 条；备线自 {br} 起共 {nb} 条（每条海外「本端-对端」一条，translation=本端(dum)IP）",
+        f"# NAT rule: 主线自 {mr} 起共 {nm} 条{b_info}（每条海外「本端-对端」一条，translation=本端(dum)IP）",
         "",
     ]
     return "\n".join(lines)
@@ -2825,21 +2826,21 @@ def build_er_new_exit_nat_block(parsed: dict, init_cfg: dict) -> str:
         return ""
     mr = str(init_cfg.get("main_nat_rule", "")).strip()
     br = str(init_cfg.get("bk_nat_rule", "")).strip()
-    if not mr.isdigit() or not br.isdigit():
+    if not mr.isdigit():
         return ""
     im = int(mr)
-    ib = int(br)
-    if not (1 <= im <= 999999 and 1 <= ib <= 999999):
+    ib = int(br) if br.isdigit() else 0
+    if not (1 <= im <= 999999):
         return ""
     m = parsed.get("main") or {}
     b = parsed.get("bk") or {}
     m_pairs = list(m.get("oversea_pairs") or [])
     b_pairs = list(b.get("oversea_pairs") or [])
-    if not m_pairs or not b_pairs:
+    if not m_pairs:
         return ""
     mt = (m.get("tun") or "").strip()
-    bt = (b.get("tun") or "").strip()
-    if not mt or not bt:
+    bt = (b.get("tun") or "").strip() if b_pairs else ""
+    if not mt:
         return ""
     lines: list[str] = []
     for i, (left, _right) in enumerate(m_pairs):
@@ -2976,12 +2977,12 @@ def build_er_new_exit_config(parsed, init_cfg):
             )
             dum_id += 1
         lines.append("")
-    if has_bk:
-        nat_hdr = build_er_new_exit_nat_header_block(parsed, init_cfg)
-        nat_blk = build_er_new_exit_nat_block(parsed, init_cfg)
-        nat_parts = [p for p in (nat_hdr.rstrip(), nat_blk.rstrip()) if p]
-        if nat_parts:
-            lines.append("\n".join(nat_parts))
+    # NAT blocks - 单线时也生成主线的出口NAT规则
+    nat_hdr = build_er_new_exit_nat_header_block(parsed, init_cfg)
+    nat_blk = build_er_new_exit_nat_block(parsed, init_cfg)
+    nat_parts = [p for p in (nat_hdr.rstrip(), nat_blk.rstrip()) if p]
+    if nat_parts:
+        lines.append("\n".join(nat_parts))
     fnet_blk = _build_er_ne_fnet_block(parsed, init_cfg)
     if fnet_blk.strip():
         lines.append(fnet_blk.rstrip())
@@ -3025,9 +3026,10 @@ def _build_er_new_exit_format_dict(parsed, init_cfg) -> dict:
         ]
         bk_block = "\n".join(bk_lines)
 
-    # NAT blocks — 仅双线时调用（单线时 NAT 函数内部会返回空，直接传空字符串）
-    nat_hdr = build_er_new_exit_nat_header_block(parsed, init_cfg) if b else ""
-    nat_blk = build_er_new_exit_nat_block(parsed, init_cfg) if b else ""
+    # NAT blocks - 单线时也生成主线的出口NAT规则
+    nat_hdr = build_er_new_exit_nat_header_block(parsed, init_cfg)
+    nat_blk = build_er_new_exit_nat_block(parsed, init_cfg)
+
 
     return {
         "main_tun": m.get("tun", ""),
