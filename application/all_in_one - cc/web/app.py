@@ -857,14 +857,19 @@ def generate_epoch_fastip():
             main_nat = network.get("ER_NE_MAIN_NAT_RULE_DEFAULT") or er.get("ER_NE_MAIN_NAT_RULE_DEFAULT", "300")
             bk_nat = network.get("ER_NE_BK_NAT_RULE_DEFAULT") or er.get("ER_NE_BK_NAT_RULE_DEFAULT", "400")
             nat_src = network.get("ER_NE_NAT_SOURCE_CIDR_DEFAULT") or er.get("ER_NE_NAT_SOURCE_CIDR_DEFAULT", "")
-            # FNET whitelist 参数
-            fnet_probe = network.get("ER_NE_FNET_PROBE_DEFAULT") or er.get("ER_NE_FNET_PROBE_DEFAULT", "100.100.100.1")
-            fnet_tunnel = network.get("ER_NE_FNET_EXIT_TUNNEL_DEFAULT") or er.get("ER_NE_FNET_EXIT_TUNNEL_DEFAULT", "")
+            # 100.100 参数：双线时从数据头自动提取探测IP和出口Tunnel，单线时不需要
             fnet_nat_rule = network.get("ER_NE_FNET_NAT_RULE_DEFAULT") or er.get("ER_NE_FNET_NAT_RULE_DEFAULT", "")
-            # 三元组校验（仅双线时）
-            f_filled = (bool(str(fnet_tunnel).strip()), bool(str(fnet_nat_rule).strip()))
-            if has_bk and any(f_filled) and not all(f_filled):
-                return jsonify({"ok": False, "error": _humanize_error("NAT rule 号、NAT 出口 tunnel 须同时填写或全部留空", variant)}), 400
+            # 从数据头提取主线隧道号和第一个出口IP作为100.100参数
+            fnet_probe = ""
+            fnet_tunnel = ""
+            if has_bk:
+                m_data = parsed.get("main", {})
+                # 出口Tunnel = 主线TUNNEL
+                fnet_tunnel = str(m_data.get("tun", ""))
+                # 探测IP = 第一个海外出口IP（oversea_pairs[0][0]）
+                pairs = m_data.get("oversea_pairs") or []
+                if pairs:
+                    fnet_probe = str(pairs[0][0])
             init_cfg = {
                 "main_pe_next_hop": str(main_nh),
                 "main_dum_start": int(main_dum) if str(main_dum).isdigit() else 300,
@@ -1060,9 +1065,16 @@ def generate_epoch_fastip5():
             bk_nat = network.get("ER5_NE_BK_NAT_RULE_DEFAULT") or er5.get("ER5_NE_BK_NAT_RULE_DEFAULT", "2001")
             nat_group = network.get("ER5_NE_NAT_GROUP_DEFAULT") or er5.get("ER5_NE_NAT_GROUP_DEFAULT", "LAN-NET1")
             nat_src = network.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT") or er5.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT", "192.168.0.0/24")
-            fnet_probe = network.get("ER5_NE_FNET_PROBE_DEFAULT") or er5.get("ER5_NE_FNET_PROBE_DEFAULT", "") or "100.100.100.1"
-            fnet_tunnel = network.get("ER5_NE_FNET_EXIT_TUNNEL_DEFAULT") or er5.get("ER5_NE_FNET_EXIT_TUNNEL_DEFAULT", "tun")
+            # 100.100 参数：双线时从数据头自动提取，单线时不需要
             fnet_nat_rule = network.get("ER5_NE_FNET_NAT_RULE_DEFAULT") or er5.get("ER5_NE_FNET_NAT_RULE_DEFAULT", "")
+            fnet_probe = ""
+            fnet_tunnel = ""
+            if has_bk:
+                m_data = parsed.get("main", {})
+                fnet_tunnel = str(m_data.get("tun", ""))
+                pairs = m_data.get("oversea_pairs") or []
+                if pairs:
+                    fnet_probe = str(pairs[0][0])
             init_cfg = {
                 "main_pe_next_hop": str(main_nh),
                 "main_dum_start": int(main_dum) if str(main_dum).isdigit() else 300,

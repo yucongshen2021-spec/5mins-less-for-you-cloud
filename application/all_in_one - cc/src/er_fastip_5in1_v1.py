@@ -1553,8 +1553,8 @@ ER5_NE_MAIN_NAT_RULE_DEFAULT = "1001"
 ER5_NE_BK_NAT_RULE_DEFAULT = "2001"
 ER5_NE_NAT_GROUP_DEFAULT = "LAN-NET1"
 ER5_NE_NAT_SOURCE_CIDR_DEFAULT = "192.168.0.0/24"
-ER5_NE_FNET_PROBE_DEFAULT = "100.100.100.1"
-ER5_NE_FNET_EXIT_TUNNEL_DEFAULT = "tun"
+ER5_NE_FNET_PROBE_DEFAULT = ""
+ER5_NE_FNET_EXIT_TUNNEL_DEFAULT = ""
 ER5_NE_FNET_NAT_RULE_DEFAULT = ""
 
 # 5.0 飞连 初始化参数默认值
@@ -2378,7 +2378,7 @@ def build_epoch5_domain_split_format_dict(hdr_text):
     if trn:
         lines.append(f"set protocols failover2 route {nh_pri}/32 next-hop {s32_pri} track {trn}")
         if s32_bak:
-            lines.append(f"set protocols failover2 route {nh_pri}/32 next-hop {s32_bak} distance '20'")
+            lines.append(f"set protocols static route {nh_pri}/32 next-hop {s32_bak} distance '20'")
     else:
         lines.append(f"set protocols static route {nh_pri}/32 next-hop {s32_pri}")
         if s32_bak:
@@ -2388,7 +2388,7 @@ def build_epoch5_domain_split_format_dict(hdr_text):
     if emit_fnet:
         lines.append("")
         lines.append(f"set nat source rule {nr_raw} destination address {fnet_probe}/32")
-        lines.append(f"set nat source rule {nr_raw} outbound-interface '{tun_raw}'")
+        lines.append(f"set nat source rule {nr_raw} outbound-interface name '{tun_raw}'")
         lines.append(f"set nat source rule {nr_raw} translation address '{sn_raw}'")
         lines.append("")
         lines.append(f"set protocols static route {fnet_probe}/32 next-hop {s32_pri}")
