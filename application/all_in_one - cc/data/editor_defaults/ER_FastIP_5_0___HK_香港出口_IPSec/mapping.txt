@@ -1,0 +1,43 @@
+hostname  设备主机名
+hkip  HK出口IP
+bgp_neighbor  建BGP邻居IP
+wan_if  WAN接口
+wan_ip  WAN IP
+wan_cidr_prefix  WAN掩码
+lan_if  LAN接口
+lan_ip  LAN IP
+lan_cidr_prefix  LAN掩码
+main_loop_ip  主线LoopIP
+bk_loop_ip  备线LoopIP
+bk_tun_id  备线Tunnel
+bk_tun_ce_ip  备线Tunnel CE IP
+bk_pe  备线PE
+bk_pe_docking  备线PE对接
+main_tun_id  主线Tunnel
+main_tun_ce_ip  主线Tunnel CE IP
+main_pe  主线PE
+main_pe_docking  主线PE对接
+lan_net_block  LAN-NET块
+bk_tun_pe_ip  备线Tunnel PE IP
+main_tun_pe_ip  主线Tunnel PE IP
+main_bgp1  主线BGP1
+bk_bgp1  备线BGP1
+main_bgp2  主线BGP2
+bk_bgp2  备线BGP2
+bgp_server_routes_block  BGP服务器路由块
+default_route_block  默认路由块
+ipsec_routes_block  IPSec上游路由块
+bypass_block  内网防泄漏块
+pbr_tables_block  PBR分表块
+main_secret  主线秘钥
+esp_lifetime  ESP生存时间
+esp_encryption  ESP加密
+esp_hash  ESP哈希
+ike_key_exchange  IKE密钥交换
+ike_lifetime  IKE生存时间
+ike_dh_group  IKE DH组
+ike_encryption  IKE加密
+ike_hash  IKE哈希
+bk_ike_dpd_block  备线IKE DPD块
+main_dial_ip  主线拨号IP
+bk_dial_ip  备线拨号IP

@@ -534,7 +534,9 @@ function onER5TunnelTypeChange(){
   ldEx('epoch-fastip');
 }
 function isER5UsIPSecAvailable(){return erVersion==='5'&&gv('epoch-fastip')==='us'}
-function getER5TunnelType(){if(!isER5UsIPSecAvailable())return 'openvpn';let v=document.querySelector('input[name="er5-tunnel-type"]:checked');return v?v.value:'openvpn'}
+function isER5HkIPSecAvailable(){return erVersion==='5'&&gv('epoch-fastip')==='hk'}
+function isER5IPSecAvailable(){return isER5UsIPSecAvailable()||isER5HkIPSecAvailable()}
+function getER5TunnelType(){if(!isER5IPSecAvailable())return 'openvpn';let v=document.querySelector('input[name="er5-tunnel-type"]:checked');return v?v.value:'openvpn'}
 function switchERVersion(ver){
   erVersion=ver;
   $('er-ver-4').classList.toggle('active',ver==='4');
@@ -573,10 +575,10 @@ function showNetPanel(tp,v){
   }else{
     let active=(map[tp]||{})[v];if(active){let el=$(active);if(el){el.style.display='block';el.classList.add('active')}}
   }
-  // IPSec 隧道类型按钮：仅在 ER 5.0 + 非香港出口（us）时可见，其他情况强制 OpenVPN
+  // IPSec 隧道类型按钮：ER 5.0 的 us / hk 可见，其他情况强制 OpenVPN
   let ttBox=document.querySelector('.er5-tunnel-type');
   if(ttBox){
-    let canIpsec=tp==='epoch-fastip'&&isV5&&v==='us';
+    let canIpsec=tp==='epoch-fastip'&&isV5&&(v==='us'||v==='hk');
     ttBox.style.display=canIpsec?'':'none';
     if(!canIpsec){
       let ov=document.querySelector('input[name="er5-tunnel-type"][value="openvpn"]');
@@ -765,6 +767,8 @@ async function ldInitForm(tp){
       'epoch-mpls+domestic':'Epoch MPLS · 国内配置','epoch-mpls+overseas':'Epoch MPLS · 海外配置','epoch-mpls+ipsec':'Epoch MPLS · IPSec',
       'epoch-fastip5+hk':'Epoch FastIP 5.0 · HK 香港出口',
       'epoch-fastip5+us':'Epoch FastIP 5.0 · 非香港出口',
+      'epoch-fastip5+us_ipsec':'Epoch FastIP 5.0 · 非香港出口 · IPSec',
+      'epoch-fastip5+hk_ipsec':'Epoch FastIP 5.0 · HK 香港出口 · IPSec',
       'epoch-fastip5+flink':'Epoch FastIP 5.0 · ER 飞连',
       'epoch-fastip5+new_exit':'Epoch FastIP 5.0 · ER 新增出口',
       'epoch-fastip5+domain_split':'Epoch FastIP 5.0 · ER 域名分流'};
@@ -812,11 +816,11 @@ async function ldInitForm(tp){
       _applyToggles(lookupTp)
   }catch(e){}
 }
-async function ldNotes(tp){if(!TEMPLATE_EDITABLE){let el=$(tp+'-notes');if(el)el.value='登录后查看备注说明';return}let el=$(tp+'-notes');if(!el)return;let v=tp==='ar-sdwan'?'default':gv(tp);if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/notes/'+tm+'?variant='+v+'&_='+Date.now());let d=await r.json();el.value=d.ok?d.notes:''}catch(e){}}
-async function ldEx(tp){if(!TEMPLATE_EDITABLE){let el=$(tp+'-example');if(el)el.value='登录后查看填写示例';return}let el=$(tp+'-example');if(!el)return;let v=tp==='ar-sdwan'?'single_ops':gv(tp);if(tp==='epoch-fastip'&&erVersion==='5'&&v==='us'&&getER5TunnelType()==='ipsec')v='us_ipsec';if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/examples/'+tm+'/'+v+'?_='+Date.now());let d=await r.json();el.value=d.ok?d.example:''}catch(e){}}
+async function ldNotes(tp){if(!TEMPLATE_EDITABLE){let el=$(tp+'-notes');if(el)el.value='登录后查看备注说明';return}let el=$(tp+'-notes');if(!el)return;let v=tp==='ar-sdwan'?'default':gv(tp);if(tp==='epoch-fastip'&&erVersion==='5'&&getER5TunnelType()==='ipsec'){if(v==='us')v='us_ipsec';else if(v==='hk')v='hk_ipsec'}if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/notes/'+tm+'?variant='+v+'&_='+Date.now());let d=await r.json();el.value=d.ok?d.notes:''}catch(e){}}
+async function ldEx(tp){if(!TEMPLATE_EDITABLE){let el=$(tp+'-example');if(el)el.value='登录后查看填写示例';return}let el=$(tp+'-example');if(!el)return;let v=tp==='ar-sdwan'?'single_ops':gv(tp);if(tp==='epoch-fastip'&&erVersion==='5'&&getER5TunnelType()==='ipsec'){if(v==='us')v='us_ipsec';else if(v==='hk')v='hk_ipsec'}if(!v)return;let tm=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp];try{let r=await fetch('/api/examples/'+tm+'/'+v+'?_='+Date.now());let d=await r.json();el.value=d.ok?d.example:''}catch(e){}}
 
 function fsToggle(btn,taId){let card=btn.closest('.card');card.classList.toggle('fs-panel');let ta=$(taId);if(ta)ta.focus();let t=card.classList.contains('fs-panel')?'[−]':'[⛶]';btn.textContent=t}
-async function gen(tp){if(!TEMPLATE_EDITABLE){toast('请登录后生成配置');return}let api=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp],v=tp==='ar-sdwan'?arVariant():gv(tp),ht=$(tp+'-header')?.value||'',net=tp==='ar-sdwan'?arNet():(tp==='epoch-fastip'&&erVersion==='5'?gn5(tp):gn(tp)),se=$(tp+'-status');se.textContent='生成中…';se.className='status';if(!api)return;try{let r=await fetch('/api/generate/'+api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({variant:v,header_text:ht,network:net})});let d=await r.json();if(tp==='ar-sdwan'){let oe=$('ar-sdwan-ops-output'),fe=$('ar-sdwan-factory-output');if(d.ok){oe.value=d.ops_output||d.output||'';fe.value=d.factory_output||'# Factory 暂无'}else{oe.value='// '+d.error;fe.value='// '+d.error}se.textContent=d.ok?'成功 · '+(d.ops_output||d.output||'').split('\n').length+' 行':('错误: '+d.error);se.className=d.ok?'status status-ok':'status status-err'}else{let oe=$(tp+'-output');if(!oe)return;if(d.ok){oe.value=d.output;se.textContent='成功 · '+d.output.split('\n').length+' 行';se.className='status status-ok'}else{oe.value='// '+d.error;se.textContent='错误: '+d.error;se.className='status status-err'}}}catch(e){['ar-sdwan-ops-output','ar-sdwan-factory-output',tp+'-output'].forEach(id=>{let el=$(id);if(el)el.value='// Error: '+e.message});se.textContent='网络错误';se.className='status status-err'}}
+async function gen(tp){if(!TEMPLATE_EDITABLE){toast('请登录后生成配置');return}let api=tp==='epoch-fastip'&&erVersion==='5'?'epoch_fastip5':TM[tp],v=tp==='ar-sdwan'?arVariant():gv(tp),ht=$(tp+'-header')?.value||'',net=tp==='ar-sdwan'?arNet():(tp==='epoch-fastip'&&erVersion==='5'?gn5(tp):gn(tp)),se=$(tp+'-status');if(tp==='epoch-fastip'&&erVersion==='5'&&getER5TunnelType()==='ipsec'){if(v==='us')v='us_ipsec';else if(v==='hk')v='hk_ipsec'}se.textContent='生成中…';se.className='status';if(!api)return;try{let r=await fetch('/api/generate/'+api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({variant:v,header_text:ht,network:net})});let d=await r.json();if(tp==='ar-sdwan'){let oe=$('ar-sdwan-ops-output'),fe=$('ar-sdwan-factory-output');if(d.ok){oe.value=d.ops_output||d.output||'';fe.value=d.factory_output||'# Factory 暂无'}else{oe.value='// '+d.error;fe.value='// '+d.error}se.textContent=d.ok?'成功 · '+(d.ops_output||d.output||'').split('\n').length+' 行':('错误: '+d.error);se.className=d.ok?'status status-ok':'status status-err'}else{let oe=$(tp+'-output');if(!oe)return;if(d.ok){oe.value=d.output;se.textContent='成功 · '+d.output.split('\n').length+' 行';se.className='status status-ok'}else{oe.value='// '+d.error;se.textContent='错误: '+d.error;se.className='status status-err'}}}catch(e){['ar-sdwan-ops-output','ar-sdwan-factory-output',tp+'-output'].forEach(id=>{let el=$(id);if(el)el.value='// Error: '+e.message});se.textContent='网络错误';se.className='status status-err'}}
 function clearAll(tp){if(!TEMPLATE_EDITABLE){toast('请登录后操作');return}let el=$(tp+'-header');if(el)el.value='';let out=$(tp+'-output');if(out)out.value='';if(tp==='ar-sdwan'){let o=$(tp+'-ops-output');if(o)o.value='';let f=$(tp+'-factory-output');if(f)f.value=''}toast('已清除')}
 async function copy(id){if(!TEMPLATE_EDITABLE){toast('请登录后操作');return}let el=$(id);if(!el?.value)return;try{await navigator.clipboard.writeText(el.value);toast('已复制')}catch(e){el.select();document.execCommand('copy');toast('已复制')}}
 function exportOut(tp){if(!TEMPLATE_EDITABLE){toast('请登录后操作');return}

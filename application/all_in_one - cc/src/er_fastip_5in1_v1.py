@@ -1593,6 +1593,44 @@ ER5_FLINK_EXAMPLE = (
     "PE：sha-vupe6  FPE：F-ShangHai4  预留IP：100.92.10.216/29\n"
 )
 
+
+# 5.0 香港出口 · IPSec 示例数据
+# 数据头格式：MAIN/BACKUP 两块，每块同时含 NAT/GRE 字段（主PE/WANIP/TUNNEL/PE 对接/
+# CE 对接/HKIP/建BGP邻居/BGPSERVER IP）与 IPSec 拨号字段（拨号PE/Docking/LoopIP/拨号IP/秘钥）。
+# 驱动 _parse_ipsec_hk + build_epoch5_hk_ipsec_format_dict 完整渲染。
+HK5_IPSEC_EXAMPLE = (
+    "MAIN\n"
+    "LineID: 609884A1\n"
+    "主PE: szd-flr3\n"
+    "WANIP: 10.40.146.88/30\n"
+    "TUNNEL: tun42451\n"
+    "PE 对接: 10.20.247.227\n"
+    "CE 对接: 10.50.49.6\n"
+    "HKIP: 61.244.14.63;\n"
+    "建BGP邻居: 10.20.180.193\n"
+    "BGPSERVER IP: 10.10.99.168,10.10.99.169\n\n"
+    "拨号PE: szd-upe2\n"
+    "Docking: 10.20.247.227\n"
+    "LoopIP: 10.50.49.6\n"
+    "拨号IP: 116.31.80.174\n"
+    "秘钥: both-win\n\n"
+    "BACKUP\n"
+    "PE: szc-bk2\n"
+    "WANIP: 10.41.146.88/30\n"
+    "TUNNEL: tun52451\n"
+    "PE 对接: 10.30.43.229\n"
+    "CE 对接: 10.50.150.28\n"
+    "HKIP: 61.244.14.63;\n"
+    "建BGP邻居: 10.20.180.193\n"
+    "BGPSERVER IP: 10.10.99.168,10.10.99.199\n\n"
+    "拨号PE: szc-upe2\n"
+    "Docking: 10.30.43.229\n"
+    "LoopIP: 10.50.150.28\n"
+    "拨号IP: 120.133.134.66\n"
+    "秘钥: both-win\n"
+)
+
+
 # 5.0 非香港出口 · IPSec 示例数据
 # 含 4 条 LineID（B1/B2 IPSec + B5/B6 NAT），其中 B1/B2 带 IKE/IPSec proposal 块，
 # 驱动 build_epoch5_us_ipsec_format_dict 完整渲染。
@@ -2626,7 +2664,331 @@ def _require_fields(block: dict, fields: list[tuple[str, str]], label: str):
     return ""
 
 
-TEMPLATE_EPOCH5_HK_IPSEC = ""
+TEMPLATE_EPOCH5_HK_IPSEC = (
+    "# Epoch 5.0 香港出口配置 (IPSec)  Hostname: {hostname}\n"
+    "# MTU/MSS：GRE tunnel = 1452/1300。请按链路实测调整\n"
+    "# HKIP: {hkip}  建BGP邻居: {bgp_neighbor}\n"
+    "\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '120.76.31.146/32'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '202.104.174.178/32'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '114.112.236.97/32'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '114.112.238.8/29'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.99/32'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.100/32'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.101/32'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '10.0.0.0/8'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '172.16.0.0/12'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '192.168.0.0/16'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '100.100.100.0/24'\n"
+    "set firewall group network-group GROUP-FNET-Whitelist network '100.255.255.0/24'\n"
+    "set firewall ipv4 input filter default-action 'accept'\n"
+    "set firewall ipv4 input filter rule 100 action 'jump'\n"
+    "set firewall ipv4 input filter rule 100 jump-target 'WAN2LOCAL'\n"
+    "set firewall ipv4 name WAN2LOCAL default-action 'drop'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1010 action 'accept'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1010 source group network-group 'GROUP-FNET-Whitelist'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1030 action 'accept'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1030 state 'established'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1030 state 'related'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1210 action 'accept'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1210 protocol 'gre'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1220 action 'accept'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1220 protocol 'ipip'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1230 action 'accept'\n"
+    "set firewall ipv4 name WAN2LOCAL rule 1230 protocol 'esp'\n"
+    "\n"
+    "set interfaces dummy dum1 address '{hkip}/32'\n"
+    "set interfaces dummy dum1 description 'HKIP-{hkip}'\n"
+    "\n"
+    "set interfaces ethernet {wan_if} address '{wan_ip}/{wan_cidr_prefix}'\n"
+    "set interfaces ethernet {wan_if} description 'WAN1'\n"
+    "set interfaces ethernet {lan_if} address '{lan_ip}/{lan_cidr_prefix}'\n"
+    "set interfaces ethernet {lan_if} description 'LAN1'\n"
+    "set interfaces loopback lo address '{main_loop_ip}/32'\n"
+    "set interfaces loopback lo address '{bk_loop_ip}/32'\n"
+    "set interfaces loopback lo address '{bgp_neighbor}/32'\n"
+    "\n"
+    "set interfaces tunnel {bk_tun_id} address '{bk_tun_ce_ip}/30'\n"
+    "set interfaces tunnel {bk_tun_id} description 'bk to {bk_pe}'\n"
+    "set interfaces tunnel {bk_tun_id} encapsulation 'gre'\n"
+    "set interfaces tunnel {bk_tun_id} ip adjust-mss '1300'\n"
+    "set interfaces tunnel {bk_tun_id} mtu '1452'\n"
+    "set interfaces tunnel {bk_tun_id} remote '{bk_pe_docking}'\n"
+    "set interfaces tunnel {bk_tun_id} source-address '{bk_loop_ip}'\n"
+    "set interfaces tunnel {main_tun_id} address '{main_tun_ce_ip}/30'\n"
+    "set interfaces tunnel {main_tun_id} description 'pri to {main_pe}'\n"
+    "set interfaces tunnel {main_tun_id} encapsulation 'gre'\n"
+    "set interfaces tunnel {main_tun_id} ip adjust-mss '1300'\n"
+    "set interfaces tunnel {main_tun_id} mtu '1452'\n"
+    "set interfaces tunnel {main_tun_id} remote '{main_pe_docking}'\n"
+    "set interfaces tunnel {main_tun_id} source-address '{main_loop_ip}'\n"
+    "\n"
+    "set nat source rule 10 destination address '{bk_pe_docking}/32'\n"
+    "set nat source rule 10 exclude\n"
+    "set nat source rule 10 outbound-interface name '{wan_if}'\n"
+    "set nat source rule 20 destination address '{main_pe_docking}/32'\n"
+    "set nat source rule 20 exclude\n"
+    "set nat source rule 20 outbound-interface name '{wan_if}'\n"
+    "set nat source rule 50 outbound-interface name '{wan_if}'\n"
+    "set nat source rule 50 translation address 'masquerade'\n"
+    "\n"
+    "{lan_net_block}\n"
+    "\n"
+    "set nat source rule 50 outbound-interface name '{wan_if}'\n"
+    "set nat source rule 50 source group network-group 'LAN-NET'\n"
+    "set nat source rule 50 translation address 'masquerade'\n"
+    "set nat source rule 1000 outbound-interface name '{main_tun_id}'\n"
+    "set nat source rule 1000 source group network-group 'LAN-NET'\n"
+    "set nat source rule 1000 translation address '{hkip}'\n"
+    "set nat source rule 2000 outbound-interface name '{bk_tun_id}'\n"
+    "set nat source rule 2000 source group network-group 'LAN-NET'\n"
+    "set nat source rule 2000 translation address '{hkip}'\n"
+    "\n"
+    "set firewall group address-group DNS-NET address '8.8.8.8'\n"
+    "set firewall group address-group DNS-NET address '8.8.4.4'\n"
+    "set nat source rule 5000 destination group address-group 'DNS-NET'\n"
+    "set nat source rule 5000 outbound-interface name '{main_tun_id}'\n"
+    "set nat source rule 5000 translation address '{hkip}'\n"
+    "set nat source rule 6000 destination group address-group 'DNS-NET'\n"
+    "set nat source rule 6000 outbound-interface name '{bk_tun_id}'\n"
+    "set nat source rule 6000 translation address '{hkip}'\n"
+    "\n"
+    "set policy local-route rule 2180 set table '180'\n"
+    "set policy local-route rule 2180 source address '{main_tun_ce_ip}'\n"
+    "set policy local-route rule 2181 set table '181'\n"
+    "set policy local-route rule 2181 source address '{bk_tun_ce_ip}'\n"
+    "\n"
+    "set policy community-list 80 rule 10 action 'permit'\n"
+    "set policy community-list 80 rule 10 description 'to_hk'\n"
+    "set policy community-list 80 rule 10 regex '65000:9939'\n"
+    "set policy community-list 81 rule 10 action 'permit'\n"
+    "set policy community-list 81 rule 10 description 'to_ct'\n"
+    "set policy community-list 81 rule 10 regex '65000:4134'\n"
+    "set policy community-list 82 rule 10 action 'permit'\n"
+    "set policy community-list 82 rule 10 description 'to_cnc'\n"
+    "set policy community-list 82 rule 10 regex '65000:4837'\n"
+    "set policy community-list 83 rule 10 action 'permit'\n"
+    "set policy community-list 83 rule 10 description 'to_cn_other'\n"
+    "set policy community-list 83 rule 10 regex '65000:9808'\n"
+    "\n"
+    "set policy route-map BGP_BK rule 100 action 'permit'\n"
+    "set policy route-map BGP_BK rule 100 description 'to_hk'\n"
+    "set policy route-map BGP_BK rule 100 match community community-list '80'\n"
+    "set policy route-map BGP_BK rule 100 set ip-next-hop '{bk_tun_pe_ip}'\n"
+    "set policy route-map BGP_BK rule 100 set local-preference '150'\n"
+    "set policy route-map BGP_BK rule 200 action 'permit'\n"
+    "set policy route-map BGP_BK rule 200 description 'to_hk'\n"
+    "set policy route-map BGP_BK rule 200 match community community-list '81'\n"
+    "set policy route-map BGP_BK rule 200 set ip-next-hop '1.1.1.1'\n"
+    "set policy route-map BGP_BK rule 200 set local-preference '150'\n"
+    "set policy route-map BGP_BK rule 300 action 'permit'\n"
+    "set policy route-map BGP_BK rule 300 description 'to_hk'\n"
+    "set policy route-map BGP_BK rule 300 match community community-list '82'\n"
+    "set policy route-map BGP_BK rule 300 set ip-next-hop '1.1.1.1'\n"
+    "set policy route-map BGP_BK rule 300 set local-preference '150'\n"
+    "set policy route-map BGP_BK rule 400 action 'permit'\n"
+    "set policy route-map BGP_BK rule 400 description 'to_hk'\n"
+    "set policy route-map BGP_BK rule 400 match community community-list '83'\n"
+    "set policy route-map BGP_BK rule 400 set ip-next-hop '1.1.1.1'\n"
+    "set policy route-map BGP_BK rule 400 set local-preference '150'\n"
+    "set policy route-map BGP_BK rule 1000 action 'deny'\n"
+    "set policy route-map BGP_BK rule 1000 description 'block_route'\n"
+    "set policy route-map BGP_PRI rule 100 action 'permit'\n"
+    "set policy route-map BGP_PRI rule 100 description 'to_hk'\n"
+    "set policy route-map BGP_PRI rule 100 match community community-list '80'\n"
+    "set policy route-map BGP_PRI rule 100 set ip-next-hop '{main_tun_pe_ip}'\n"
+    "set policy route-map BGP_PRI rule 100 set local-preference '200'\n"
+    "set policy route-map BGP_PRI rule 200 action 'permit'\n"
+    "set policy route-map BGP_PRI rule 200 description 'to_hk'\n"
+    "set policy route-map BGP_PRI rule 200 match community community-list '81'\n"
+    "set policy route-map BGP_PRI rule 200 set ip-next-hop '1.1.1.1'\n"
+    "set policy route-map BGP_PRI rule 200 set local-preference '200'\n"
+    "set policy route-map BGP_PRI rule 300 action 'permit'\n"
+    "set policy route-map BGP_PRI rule 300 description 'to_hk'\n"
+    "set policy route-map BGP_PRI rule 300 match community community-list '82'\n"
+    "set policy route-map BGP_PRI rule 300 set ip-next-hop '1.1.1.1'\n"
+    "set policy route-map BGP_PRI rule 300 set local-preference '200'\n"
+    "set policy route-map BGP_PRI rule 400 action 'permit'\n"
+    "set policy route-map BGP_PRI rule 400 description 'to_hk'\n"
+    "set policy route-map BGP_PRI rule 400 match community community-list '83'\n"
+    "set policy route-map BGP_PRI rule 400 set ip-next-hop '1.1.1.1'\n"
+    "set policy route-map BGP_PRI rule 400 set local-preference '200'\n"
+    "set policy route-map BGP_PRI rule 1000 action 'deny'\n"
+    "set policy route-map BGP_PRI rule 1000 description 'block_route'\n"
+    "set policy route-map deny-any-out rule 1000 action 'deny'\n"
+    "set policy route-map deny-any-out rule 1000 description 'to_bgpserver'\n"
+    "\n"
+    "set protocols bgp neighbor {main_bgp1} peer-group 'RSVR_NOTHKOVERSEA_PRI'\n"
+    "set protocols bgp neighbor {bk_bgp1} peer-group 'RSVR_NOTHKOVERSEA_BK'\n"
+    "set protocols bgp neighbor {main_bgp2} peer-group 'RSVR_NOTHKOVERSEA_PRI'\n"
+    "set protocols bgp neighbor {bk_bgp2} peer-group 'RSVR_NOTHKOVERSEA_BK'\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_BK address-family ipv4-unicast route-map export 'deny-any-out'\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_BK address-family ipv4-unicast route-map import 'BGP_BK'\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_BK address-family ipv4-unicast soft-reconfiguration inbound\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_BK remote-as '65000'\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_BK update-source '{bgp_neighbor}'\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_PRI address-family ipv4-unicast route-map export 'deny-any-out'\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_PRI address-family ipv4-unicast route-map import 'BGP_PRI'\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_PRI address-family ipv4-unicast soft-reconfiguration inbound\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_PRI remote-as '65000'\n"
+    "set protocols bgp peer-group RSVR_NOTHKOVERSEA_PRI update-source '{bgp_neighbor}'\n"
+    "set protocols bgp system-as '65000'\n"
+    "set protocols bgp timers holdtime '15'\n"
+    "set protocols bgp timers keepalive '5'\n"
+    "\n"
+    "{bgp_server_routes_block}\n"
+    "\n"
+    "set protocols failover2 route 192.168.55.250/32 next-hop '{main_tun_pe_ip}' track 'tomain'\n"
+    "set protocols failover2 track tomain source-address '{main_tun_ce_ip}'\n"
+    "set protocols failover2 track tomain target '{main_tun_pe_ip}'\n"
+    "set protocols failover2 track tomain type 'icmp'\n"
+    "set protocols static route 192.168.55.250/32 next-hop '{bk_tun_pe_ip}' distance '10'\n"
+    "\n"
+    "# ── 默认路由 ──\n"
+    "{default_route_block}\n"
+    "\n"
+    "# ── IPSec 上游路由（拨号 IP / PE 对接）──\n"
+    "{ipsec_routes_block}\n"
+    "\n"
+    "# ── 内网防泄漏（来自 WAN/LAN 内网段配置）──\n"
+    "{bypass_block}\n"
+    "\n"
+    "# ── PBR 分表默认路由 ──\n"
+    "{pbr_tables_block}\n"
+    "\n"
+    "set service dns forwarding allow-from '0.0.0.0/0'\n"
+    "set service dns forwarding cache-size '10001'\n"
+    "set service dns forwarding dnssec 'off'\n"
+    "set service dns forwarding domain-list CN file '/opt/cn.txt'\n"
+    "set service dns forwarding domain-list CN name-server '114.114.114.114'\n"
+    "set service dns forwarding domain-list CN name-server '192.168.237.55'\n"
+    "set service dns forwarding domain-list CN name-server '223.5.5.5'\n"
+    "set service dns forwarding domain-list CN name-server '223.6.6.6'\n"
+    "set service dns forwarding domain-list CN recursion-desired\n"
+    "set service dns forwarding domain-list HK file '/opt/oversea.txt'\n"
+    "set service dns forwarding domain-list HK name-server '8.8.4.4'\n"
+    "set service dns forwarding domain-list HK name-server '8.8.8.8'\n"
+    "set service dns forwarding domain-list HK recursion-desired\n"
+    "set service dns forwarding listen-address '0.0.0.0'\n"
+    "set service dns forwarding name-server '8.8.4.4'\n"
+    "set service dns forwarding name-server '8.8.8.8'\n"
+    "set service dns forwarding recursion-desired\n"
+    "set service dns forwarding source-address '0.0.0.0'\n"
+    "set service file-sync task 1 local '/opt/cn.txt'\n"
+    "set service file-sync task 1 remote 'http://183.56.161.82:1909/f32x/domainlist/cn_domainlist.last'\n"
+    "set service file-sync task 2 local '/opt/oversea.txt'\n"
+    "set service file-sync task 2 remote 'http://183.56.161.82:1909/f32x/domainlist/oversea_domainlist.last'\n"
+    "set service ntp allow-client address '127.0.0.0/8'\n"
+    "set service ntp allow-client address '169.254.0.0/16'\n"
+    "set service ntp allow-client address '10.0.0.0/8'\n"
+    "set service ntp allow-client address '172.16.0.0/12'\n"
+    "set service ntp allow-client address '192.168.0.0/16'\n"
+    "set service ntp allow-client address '::1/128'\n"
+    "set service ntp allow-client address 'fe80::/10'\n"
+    "set service ntp allow-client address 'fc00::/7'\n"
+    "set service ntp allow-client address '0.0.0.0/0'\n"
+    "set service ntp allow-client address '::/0'\n"
+    "set service ntp server '192.168.55.250'\n"
+    "set service ntp server 'ntp.aliyun.com'\n"
+    "set service ntp server 'time1.vyos.net'\n"
+    "set service ntp server 'time2.vyos.net'\n"
+    "set service ntp server 'time3.vyos.net'\n"
+    "set service snmp community 'both-win' authorization 'ro'\n"
+    "set service ssh acl permit '114.112.138.8/29'\n"
+    "set service ssh acl permit '192.168.55.150/32'\n"
+    "set service ssh acl permit '10.0.0.0/8'\n"
+    "set service ssh acl permit '192.168.0.0/16'\n"
+    "set service ssh acl permit '172.16.0.0/12'\n"
+    "set service ssh acl permit '113.105.190.147/32'\n"
+    "set service ssh acl permit '202.104.174.178/32'\n"
+    "set service ssh acl permit '120.76.31.146/32'\n"
+    "set service ssh acl permit '59.37.116.140/32'\n"
+    "set service ssh acl permit '183.61.139.168/32'\n"
+    "set service ssh acl permit '218.93.115.16/30'\n"
+    "set service ssh acl permit '100.64.0.0/10'\n"
+    "set service ssh acl permit '100.255.255.0/24'\n"
+    "set service ssh disable-host-validation\n"
+    "set service ssh port '2707'\n"
+    "set system config-management commit-revisions '100'\n"
+    "set system conntrack modules 'ftp'\n"
+    "set system conntrack modules 'h323'\n"
+    "set system conntrack modules 'nfs'\n"
+    "set system conntrack modules 'pptp'\n"
+    "set system conntrack modules 'sip'\n"
+    "set system conntrack modules 'sqlnet'\n"
+    "set system conntrack modules 'tftp'\n"
+    "set system console device ttyS0 speed '115200'\n"
+    "set system host-name '{hostname}'\n"
+    "set system ipv6 disable-forwarding\n"
+    "set system login operator-group default command-policy allow '*'\n"
+    "set system login user bothwin authentication plaintext-password 'Tfe28@w%'\n"
+    "set system name-server '127.0.0.1'\n"
+    "set system option performance 'network-throughput'\n"
+    "set system option reboot-on-panic\n"
+    "set system option reboot-on-upgrade-failure '5'\n"
+    "set system static-host-mapping host-name update.tabine.com inet '192.168.254.20'\n"
+    "set system syslog local facility all level 'info'\n"
+    "set system syslog local facility local7 level 'debug'\n"
+    "set system time-zone 'Asia/Hong_Kong'\n"
+    "\n"
+    "set vpn ipsec authentication psk ipsec id '0.0.0.0'\n"
+    "set vpn ipsec authentication psk ipsec secret '{main_secret}'\n"
+    "set vpn ipsec esp-group ESP-FNET-01 lifetime '{esp_lifetime}'\n"
+    "set vpn ipsec esp-group ESP-FNET-01 mode 'tunnel'\n"
+    "set vpn ipsec esp-group ESP-FNET-01 pfs 'dh-group2'\n"
+    "set vpn ipsec esp-group ESP-FNET-01 proposal 1 encryption '{esp_encryption}'\n"
+    "set vpn ipsec esp-group ESP-FNET-01 proposal 1 hash '{esp_hash}'\n"
+    "set vpn ipsec ike-group IKE-FNET-01 disable-mobike\n"
+    "set vpn ipsec ike-group IKE-FNET-01 key-exchange '{ike_key_exchange}'\n"
+    "set vpn ipsec ike-group IKE-FNET-01 lifetime '{ike_lifetime}'\n"
+    "set vpn ipsec ike-group IKE-FNET-01 proposal 1 dh-group '{ike_dh_group}'\n"
+    "set vpn ipsec ike-group IKE-FNET-01 proposal 1 encryption '{ike_encryption}'\n"
+    "set vpn ipsec ike-group IKE-FNET-01 proposal 1 hash '{ike_hash}'\n"
+    "set vpn ipsec esp-group ESP-FNET-02 lifetime '{esp_lifetime}'\n"
+    "set vpn ipsec esp-group ESP-FNET-02 mode 'tunnel'\n"
+    "set vpn ipsec esp-group ESP-FNET-02 pfs 'dh-group2'\n"
+    "set vpn ipsec esp-group ESP-FNET-02 proposal 1 encryption '{esp_encryption}'\n"
+    "set vpn ipsec esp-group ESP-FNET-02 proposal 1 hash '{esp_hash}'\n"
+    "{bk_ike_dpd_block}"
+    "set vpn ipsec ike-group IKE-FNET-02 disable-mobike\n"
+    "set vpn ipsec ike-group IKE-FNET-02 key-exchange '{ike_key_exchange}'\n"
+    "set vpn ipsec ike-group IKE-FNET-02 lifetime '{ike_lifetime}'\n"
+    "set vpn ipsec ike-group IKE-FNET-02 proposal 1 dh-group '{ike_dh_group}'\n"
+    "set vpn ipsec ike-group IKE-FNET-02 proposal 1 encryption '{ike_encryption}'\n"
+    "set vpn ipsec ike-group IKE-FNET-02 proposal 1 hash '{ike_hash}'\n"
+    "\n"
+    "set vpn ipsec interface '{wan_if}'\n"
+    "set vpn ipsec options retransmission base '1'\n"
+    "set vpn ipsec options retransmission timeout '4'\n"
+    "\n"
+    "set vpn ipsec site-to-site peer main authentication mode 'pre-shared-secret'\n"
+    "set vpn ipsec site-to-site peer main connection-type 'initiate'\n"
+    "set vpn ipsec site-to-site peer main default-esp-group 'ESP-FNET-01'\n"
+    "set vpn ipsec site-to-site peer main force-udp-encapsulation\n"
+    "set vpn ipsec site-to-site peer main ike-group 'IKE-FNET-01'\n"
+    "set vpn ipsec site-to-site peer main ikev2-reauth 'inherit'\n"
+    "set vpn ipsec site-to-site peer main local-address '{wan_ip}'\n"
+    "set vpn ipsec site-to-site peer main remote-address '{main_dial_ip}'\n"
+    "set vpn ipsec site-to-site peer main tunnel 1 local prefix '{main_loop_ip}/32'\n"
+    "set vpn ipsec site-to-site peer main tunnel 1 remote prefix '{main_pe_docking}/32'\n"
+    "\n"
+    "set vpn ipsec site-to-site peer backup authentication mode 'pre-shared-secret'\n"
+    "set vpn ipsec site-to-site peer backup connection-type 'initiate'\n"
+    "set vpn ipsec site-to-site peer backup default-esp-group 'ESP-FNET-02'\n"
+    "set vpn ipsec site-to-site peer backup force-udp-encapsulation\n"
+    "set vpn ipsec site-to-site peer backup ike-group 'IKE-FNET-02'\n"
+    "set vpn ipsec site-to-site peer backup ikev2-reauth 'inherit'\n"
+    "set vpn ipsec site-to-site peer backup local-address '{wan_ip}'\n"
+    "set vpn ipsec site-to-site peer backup remote-address '{bk_dial_ip}'\n"
+    "set vpn ipsec site-to-site peer backup tunnel 1 local prefix '{bk_loop_ip}/32'\n"
+    "set vpn ipsec site-to-site peer backup tunnel 1 remote prefix '{bk_pe_docking}/32'\n"
+    "\n"
+    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 option default-router '192.168.15.1'\n"
+    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 option name-server '192.168.15.1'\n"
+    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 range Lan1_range start '192.168.15.10'\n"
+    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 range Lan1_range stop '192.168.15.200'\n"
+    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 subnet-id '15'\n"
+)
 
 
 TEMPLATE_EPOCH5_US_IPSEC = (
@@ -3157,7 +3519,316 @@ def build_epoch5_us_ipsec_format_dict(hdr_text: str):
     return d, warning
 
 
+def _parse_ipsec_hk_block(block: str, prefix: str) -> dict:
+    """解析单个 MAIN/BACKUP 混合块（NAT/GRE + IPSec 拨号字段）。
+
+    prefix: "main" / "bk"，决定返回 dict 的 key 前缀。
+    """
+    d: dict = {"_kind": "hk_ipsec"}
+
+    # ── NAT/GRE 字段 ──
+    d["lineid"] = _ipsec_get(r'^LineID\s*[:：]\s*(\S+)', block)
+    d["pe"] = (
+        _ipsec_get(r'^主PE\s*[:：]\s*(\S+)', block)
+        or _ipsec_get(r'^PE\s*[:：]\s*(\S+)', block)
+    )
+    d["wanip"] = _ipsec_get(r'^WANIP\s*[:：]\s*(\S+)', block)
+    tun_raw = _ipsec_get(r'^TUNNEL\s*[:：]\s*(\S+)', block)
+    d["tun_id"] = normalize_tun(tun_raw)
+    d["tun_num"] = re.sub(r'\D', '', d["tun_id"])
+    d["pe_docking"] = (
+        _ipsec_get(r'^PE\s*对接\s*[:：]\s*(\S+)', block)
+        or _ipsec_get(r'^PE\s*Docking\s*[:：]\s*(\S+)', block)
+    )
+    d["ce_docking"] = (
+        _ipsec_get(r'^CE\s*对接\s*[:：]\s*(\S+)', block)
+        or _ipsec_get(r'^CE\s*Docking\s*[:：]\s*(\S+)', block)
+    )
+    # HKIP: "61.244.14.63;" 末尾可能带分号，取纯 IP
+    hkip_raw = _ipsec_get(r'^HKIP\s*[:：]\s*(\S+)', block)
+    d["hkip"] = (hkip_raw or "").rstrip(";").strip()
+    # 建BGP邻居
+    d["bgp_neighbor"] = _ipsec_get(r'^建BGP邻居\s*[:：]\s*(\S+)', block)
+    # BGPSERVER IP: 逗号分隔，取前两个
+    bgp_raw = _ipsec_get(r'^BGPSERVER\s*IP\s*[:：]\s*(.+?)$', block)
+    bgps = [x.strip() for x in re.split(r'[,，]', bgp_raw) if x.strip()]
+    d["bgp1"] = bgps[0] if len(bgps) > 0 else ""
+    d["bgp2"] = bgps[1] if len(bgps) > 1 else ""
+
+    # ── IPSec 拨号字段 ──
+    d["dial_pe"] = _ipsec_get(r'^拨号PE\s*[:：]\s*(\S+)', block) or d["pe"]
+    d["dial_ip"] = _ipsec_get(r'^拨号IP\s*[:：]\s*(\S+)', block) or _ipsec_get(r'^拨号ip\s*[:：]\s*(\S+)', block)
+    d["loop_ip"] = _ipsec_get(r'^LoopIP\s*[:：]\s*(\S+)', block) or d["ce_docking"]
+    d["docking_ip"] = (
+        _ipsec_get(r'^Docking\s*[:：]\s*(\S+)', block)
+        or d["pe_docking"]
+    )
+    d["secret"] = _ipsec_get(r'^秘钥\s*[:：]\s*(\S+)', block)
+
+    # tunnel 地址：wanip /30 的两个 host（PE 端=第一个，CE 端=第二个）
+    pe_ip, ce_ip = _wan_pair(d["wanip"])
+    d["tun_pe_ip"] = pe_ip or ""
+    d["tun_ce_ip"] = ce_ip or ""
+    return d
+
+
+def _parse_ipsec_hk(hdr_text: str):
+    """解析 HK IPSec 数据头（MAIN/BACKUP 两块混合格式）。
+
+    返回 ({main, bk, hkip, bgp_neighbor}, None) 或 (None, error_msg)。
+    hkip / bgp_neighbor 主备共用，从 main 块取（若 main 无则 fallback 到 bk）。
+    """
+    raw = (hdr_text or "").strip()
+    if not raw:
+        return None, "请输入业务数据（MAIN + BACKUP 两块）"
+
+    blocks = re.split(
+        r'(?=(?:MAIN|BACKUP|主|备)\s*\n|(?:MAIN|BACKUP)\s*[：:])',
+        raw, flags=re.IGNORECASE,
+    )
+
+    main_block = ""
+    bk_block = ""
+    for b in blocks:
+        bu = b.strip()
+        if not bu:
+            continue
+        if re.match(r'(MAIN|主)\s*[\n：:]', bu, re.IGNORECASE) or bu.upper().startswith("MAIN"):
+            if not main_block:
+                main_block = bu
+            else:
+                bk_block = bu  # 第二个 MAIN 当 BACKUP 容错
+        elif re.match(r'(BACKUP|备)\s*[\n：:]', bu, re.IGNORECASE) or bu.upper().startswith("BACKUP"):
+            bk_block = bu
+
+    if not main_block:
+        return None, "未找到 MAIN 块，请检查数据头格式"
+    if not bk_block:
+        return None, "未找到 BACKUP 块，请检查数据头格式"
+
+    main = _parse_ipsec_hk_block(main_block, "main")
+    bk = _parse_ipsec_hk_block(bk_block, "bk")
+
+    hkip = main.get("hkip") or bk.get("hkip") or ""
+    bgp_neighbor = main.get("bgp_neighbor") or bk.get("bgp_neighbor") or ""
+
+    return {"main": main, "bk": bk, "hkip": hkip, "bgp_neighbor": bgp_neighbor}, None
+
+
 def build_epoch5_hk_ipsec_format_dict(hdr_text: str):
-    """HK IPSec — 正在开发中。"""
-    return {}, "HK IPSec 正在开发中，暂不支持。请使用 OpenVPN。"
+    """组装 TEMPLATE_EPOCH5_HK_IPSEC.format(**d) 所需的 dict。
+
+    成功返回 (d, warning)；失败返回 (None, (kind, payload))。
+    kind: "network" / "parse"
+    """
+    g = globals()
+    wan_cidr = str(g.get("DEFAULT_WAN_CIDR", "")).strip()
+    lan_cidr = str(g.get("DEFAULT_LAN_CIDR", "")).strip()
+    wan_gw = str(g.get("DEFAULT_WAN_GW", "")).strip()
+    wan_dhcp = bool(g.get("DEFAULT_WAN_DHCP", False))
+    inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "")).strip()
+
+    ok_wan, msg_wan = _validate_cidr(wan_cidr, "WAN IP")
+    ok_lan, msg_lan = _validate_cidr(lan_cidr, "LAN IP")
+    inner_nets, inner_errors = _validate_inner_nets(inner_nets_raw)
+    errs = []
+    if not ok_wan:
+        errs.append(msg_wan)
+    if not ok_lan:
+        errs.append(msg_lan)
+    if not wan_gw and not wan_dhcp:
+        errs.append("WAN 网关不能为空（除非启用 WAN DHCP）")
+    for frag, reason in inner_errors:
+        errs.append(f"内网段「{frag}」不符合网络标准：{reason}")
+    if not inner_nets:
+        errs.append("内网段不能为空：默认应包含 10.0.0.0/8、172.16.0.0/12、192.168.0.0/16")
+    if errs:
+        return None, ("network", errs)
+
+    parsed, perr = _parse_ipsec_hk(hdr_text)
+    if perr:
+        return None, ("parse", perr)
+
+    m = parsed["main"]
+    b = parsed["bk"]
+    hkip = parsed["hkip"]
+    bgp_neighbor = parsed["bgp_neighbor"]
+
+    # 必填字段校验
+    for label, block, fields in (
+        ("MAIN", m, [
+            ("lineid", "LineID"), ("pe", "主PE"), ("tun_id", "TUNNEL"),
+            ("wanip", "WANIP"), ("pe_docking", "PE 对接"), ("loop_ip", "LoopIP/CE 对接"),
+            ("dial_ip", "拨号IP"), ("secret", "秘钥"), ("tun_ce_ip", "WANIP(/30 CE)"),
+            ("tun_pe_ip", "WANIP(/30 PE)"), ("bgp1", "BGPSERVER IP[1]"), ("bgp2", "BGPSERVER IP[2]"),
+        ]),
+        ("BACKUP", b, [
+            ("pe", "PE"), ("tun_id", "TUNNEL"),
+            ("wanip", "WANIP"), ("pe_docking", "PE 对接"), ("loop_ip", "LoopIP/CE 对接"),
+            ("dial_ip", "拨号IP"), ("secret", "秘钥"), ("tun_ce_ip", "WANIP(/30 CE)"),
+            ("tun_pe_ip", "WANIP(/30 PE)"), ("bgp1", "BGPSERVER IP[1]"), ("bgp2", "BGPSERVER IP[2]"),
+        ]),
+    ):
+        msg = _require_fields(block, fields, label)
+        if msg:
+            return None, ("parse", msg)
+    if not hkip:
+        return None, ("parse", "缺少 HKIP 字段")
+    if not bgp_neighbor:
+        return None, ("parse", "缺少 建BGP邻居 字段")
+
+    # IKE/ESP 参数（HK IPSec 数据头通常无 IKE 块，用默认值）
+    warning = ""
+    has_ike = bool(m.get("ike_key_exchange") or b.get("ike_key_exchange"))
+    has_esp = bool(m.get("esp_encryption") or b.get("esp_encryption"))
+    if not has_ike and not has_esp:
+        warning = "未检测到IKE/IPSec参数，已按默认参数生成，请自行检查。"
+
+    src = m if m.get("ike_key_exchange") else b
+    ike_key_exchange = _ipsec_first_token(src.get("ike_key_exchange"), "ikev1")
+    ike_dh_group = src.get("ike_dh_group") or "2"
+    ike_encryption = _ipsec_first_token(src.get("ike_encryption"), "aes128")
+    ike_hash = src.get("ike_hash") or "sha1"
+    esp_encryption = _ipsec_first_token(
+        m.get("esp_encryption") or b.get("esp_encryption"), "aes128"
+    )
+    esp_hash = (m.get("esp_hash") or b.get("esp_hash") or "sha1")
+
+    wan_eth = str(g.get("DEFAULT_WAN_ETH", "0")).strip() or "0"
+    lan_eth = str(g.get("DEFAULT_LAN_ETH", "5")).strip() or "5"
+    wan_ip = wan_cidr.split("/")[0]
+    lan_ip = lan_cidr.split("/")[0]
+    wan_cidr_prefix = str(ipaddress.ip_network(wan_cidr, strict=False).prefixlen)
+    lan_cidr_prefix = str(ipaddress.ip_network(lan_cidr, strict=False).prefixlen)
+    wan_if = f"eth{wan_eth}" if not wan_eth.startswith("eth") else wan_eth
+    lan_if = f"eth{lan_eth}" if not lan_eth.startswith("eth") else lan_eth
+
+    hn = str(g.get("DEFAULT_HOSTNAME", "")).strip()
+    if not hn:
+        hn = _extract_lineid(hdr_text) or "请填写Hostname"
+
+    if _EPOCH5_PKI_SECRET_KEY:
+        pki_block = (
+            f"set pki openvpn shared-secret openvpn_secret key '{_EPOCH5_PKI_SECRET_KEY}'\n"
+            "set pki openvpn shared-secret openvpn_secret version '1'\n"
+        )
+    else:
+        pki_block = ""
+
+    # ── LAN-NET：来自统一的内网段配置 ──
+    lan_net_block = "\n".join(
+        f"set firewall group network-group LAN-NET network '{net}'"
+        for net in inner_nets
+    )
+
+    # ── 默认路由（受 WAN DHCP 影响）──
+    if wan_dhcp:
+        default_route_block = "# WAN DHCP 模式 - 不生成默认静态路由"
+    else:
+        default_route_block = (
+            f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
+            f"set protocols static route 1.1.1.1/32 next-hop {wan_gw}"
+        )
+
+    # ── IPSec 上游路由（拨号 IP / PE 对接）──
+    ipsec_route_lines = [
+        f"set protocols static route {m['dial_ip']}/32 next-hop 1.1.1.1",
+        f"set protocols static route {b['dial_ip']}/32 next-hop {wan_gw}",
+        f"set protocols static route {m['pe_docking']}/32 next-hop 1.1.1.1",
+        f"set protocols static route {b['pe_docking']}/32 next-hop 1.1.1.1",
+    ]
+    ipsec_routes_block = "\n".join(ipsec_route_lines)
+
+    # ── BGP 服务器路由（每个 BGP IP 一组 next-hop + blackhole 保护）──
+    bgp_lines = []
+    for bgp in (m["bgp1"], m["bgp2"]):
+        if bgp:
+            bgp_lines.append(f"set protocols static route {bgp}/32 next-hop {m['tun_pe_ip']}")
+            bgp_lines.append(f"set protocols static route {bgp}/32 blackhole distance '10'")
+    for bgp in (b["bgp1"], b["bgp2"]):
+        if bgp:
+            bgp_lines.append(f"set protocols static route {bgp}/32 next-hop {b['tun_pe_ip']}")
+            bgp_lines.append(f"set protocols static route {bgp}/32 blackhole distance '10'")
+    bgp_server_routes_block = "\n".join(bgp_lines)
+
+    # ── 内网防泄漏 ──
+    bypass_block = "\n".join(
+        f"set protocols static route {net} next-hop 1.1.1.1"
+        for net in inner_nets
+    )
+
+    # ── PBR 分表默认路由 ──
+    pbr_tables_block = "\n".join([
+        f"set protocols static table 180 route 0.0.0.0/0 next-hop {m['tun_pe_ip']}",
+        f"set protocols static table 181 route 0.0.0.0/0 next-hop {b['tun_pe_ip']}",
+    ])
+
+    # ── IPSec IKE DPD 块（backup，HK 数据头通常无 IKE 块，DPD 无条件生成）──
+    bk_ike_dpd_block = (
+        "set vpn ipsec ike-group IKE-FNET-02 dead-peer-detection action 'restart'\n"
+        "set vpn ipsec ike-group IKE-FNET-02 dead-peer-detection interval '10'\n"
+        "set vpn ipsec ike-group IKE-FNET-02 dead-peer-detection timeout '45'\n"
+    )
+
+    d = {
+        "hostname": hn,
+        "hkip": hkip,
+        "bgp_neighbor": bgp_neighbor,
+        "wan_if": wan_if,
+        "lan_if": lan_if,
+        "wan_ip": wan_ip,
+        "lan_ip": lan_ip,
+        "wan_cidr_prefix": wan_cidr_prefix,
+        "lan_cidr_prefix": lan_cidr_prefix,
+        "wan_gw": wan_gw,
+        # main NAT/GRE
+        "main_pe": m["pe"],
+        "main_tun_id": m["tun_id"],
+        "main_tun_num": m["tun_num"],
+        "main_tun_ce_ip": m["tun_ce_ip"],
+        "main_tun_pe_ip": m["tun_pe_ip"],
+        "main_pe_docking": m["pe_docking"],
+        "main_loop_ip": m["loop_ip"],
+        "main_bgp1": m["bgp1"],
+        "main_bgp2": m["bgp2"],
+        # main IPSec
+        "main_dial_pe": m["dial_pe"],
+        "main_dial_ip": m["dial_ip"],
+        "main_docking_ip": m["docking_ip"],
+        "main_secret": m["secret"],
+        # bk NAT/GRE
+        "bk_pe": b["pe"],
+        "bk_tun_id": b["tun_id"],
+        "bk_tun_num": b["tun_num"],
+        "bk_tun_ce_ip": b["tun_ce_ip"],
+        "bk_tun_pe_ip": b["tun_pe_ip"],
+        "bk_pe_docking": b["pe_docking"],
+        "bk_loop_ip": b["loop_ip"],
+        "bk_bgp1": b["bgp1"],
+        "bk_bgp2": b["bgp2"],
+        # bk IPSec
+        "bk_dial_pe": b["dial_pe"],
+        "bk_dial_ip": b["dial_ip"],
+        "bk_docking_ip": b["docking_ip"],
+        "bk_secret": b["secret"],
+        # IKE/ESP
+        "ike_key_exchange": ike_key_exchange,
+        "ike_dh_group": ike_dh_group,
+        "ike_encryption": ike_encryption,
+        "ike_hash": ike_hash,
+        "ike_lifetime": "28800",
+        "esp_encryption": esp_encryption,
+        "esp_hash": esp_hash,
+        "esp_lifetime": "3600",
+        "bk_ike_dpd_block": bk_ike_dpd_block,
+        # 派生块
+        "pki_block": pki_block,
+        "lan_net_block": lan_net_block,
+        "default_route_block": default_route_block,
+        "ipsec_routes_block": ipsec_routes_block,
+        "bgp_server_routes_block": bgp_server_routes_block,
+        "bypass_block": bypass_block,
+        "pbr_tables_block": pbr_tables_block,
+    }
+    return d, warning
 

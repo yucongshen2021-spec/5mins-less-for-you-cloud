@@ -47,6 +47,7 @@ HDR = {
     "usg_fl": "LineID:609526A3\nPE:szd-upe3\nTunnel:Tunnel0/0/2017\nwanip:10.40.99.44/30\nPE 对接:10.255.110.13\nCE 对接:10.18.16.58\n\nLineID:609526A4\nPE:szc-upe2\nTunnel:Tunnel0/0/1601\nwanip:10.40.194.24/30\nPE 对接:10.255.111.139\nCE 对接:10.18.14.165\n\n账号：60952601@fnetlink.com  密码：BLEIOYxT\n账号：60952602@fnetlink.com  密码：uYC3zALF\nPE：szd-vupe6  FPE：F-ShenZhen4  预留IP：100.94.11.144/29\nPE：bja-vupe6  FPE：F-BeiJing4  预留IP：100.93.11.144/29\nPE：sha-vupe6  FPE：F-ShangHai4  预留IP：100.92.11.144/29",
     "usg_ne": "LineID:609424A1\nPE： lax1-fgpe1\nWANIP: 10.22.110.24/30\nTUNNEL: tun1248\nPE对接：10.255.110.6\nCE对接：10.18.16.20\n出口ip：\n10.61.10.78-64.81.20.174\n10.61.10.106-64.81.20.178\nLineID:609424A2\nPE： sjc1-fgpe2\nWANIP: 10.22.106.20/30\nTUNNEL: tun1229\nPE对接：10.255.111.158\nCE对接：10.18.14.127\n出口ip：\n10.60.76.6-172.16.23.8\n10.60.76.14-172.16.23.9",
     "mpls_cn": "LineID:609291A1\nPE:nna-upe1\nTunnel:Tunnel0/0/1030\nwanip:10.40.79.92/30\nPE 对接:192.168.204.1\nCE 对接:10.40.91.42\nPE AS号:65512\nPE:nna-ipsecgw1\nTunnel:vtun10013\nwanip:10.40.91.40/30\nPE 对接:180.142.110.241\n\nLineID:609291A2\nPE:szd-upebk2\nTunnel:Tunnel10447\nwanip:10.40.195.188/30\nPE 对接:192.168.253.80\nPE AS号:65531",
+    "er5_hk_ipsec": "MAIN\nLineID: 609884A1\n主PE: szd-flr3\nWANIP: 10.40.146.88/30\nTUNNEL: tun42451\nPE 对接: 10.20.247.227\nCE 对接: 10.50.49.6\nHKIP: 61.244.14.63;\n建BGP邻居: 10.20.180.193\nBGPSERVER IP: 10.10.99.168,10.10.99.169\n\n拨号PE: szd-upe2\nDocking: 10.20.247.227\nLoopIP: 10.50.49.6\n拨号IP: 116.31.80.174\n秘钥: both-win\n\nBACKUP\nPE: szc-bk2\nWANIP: 10.41.146.88/30\nTUNNEL: tun52451\nPE 对接: 10.30.43.229\nCE 对接: 10.50.150.28\nHKIP: 61.244.14.63;\n建BGP邻居: 10.20.180.193\nBGPSERVER IP: 10.10.99.168,10.10.99.199\n\n拨号PE: szc-upe2\nDocking: 10.30.43.229\nLoopIP: 10.50.150.28\n拨号IP: 120.133.134.66\n秘钥: both-win\n",
     "ar": "LineID:604604Hw1\nPE:gzd-upe5\nTunnel:Tunnel0/0/1147\nwanip:10.40.232.248/30\nPE 对接:10.200.200.76\nCE 对接:10.50.131.16\n拨号PE:gzd-upe5\n对接IP:10.200.200.76\nLoopIP:10.50.131.16\n拨号ip:183.63.68.174\n秘钥:both-win\n\nLineID:604604Hw2\nPE:szd-upebk1\nTunnel:Tunnel0/0/1605\nwanip:10.30.115.252/30\nPE 对接:10.200.200.22\nCE 对接:10.120.47.20\n拨号PE:szd-upebk1\n对接IP:10.200.200.22\nLoopIP:10.120.47.20\n拨号ip:183.56.163.24\n秘钥:both-win",
 }
 
@@ -70,6 +71,7 @@ ALL_SCENARIOS = [
     ("AR DualWAN OPS", "ar_sdwan", "single_dualwan", HDR["ar"], "ops_output", ["import ops"], 50),
     ("AR Dual Pri OPS", "ar_sdwan", "dual_ops_pri", HDR["ar"], "ops_output", ["import ops"], 30),
     ("AR Dual Bak OPS", "ar_sdwan", "dual_ops_bak", HDR["ar"], "ops_output", ["import ops"], 30),
+    ("ER5 HK IPSec", "epoch_fastip5", "hk_ipsec", HDR["er5_hk_ipsec"], "output", ["set vpn ipsec","set interfaces tunnel"], 100),
 ]
 
 CUSTOM_TPL = f"# {MARKER}\nset system host-name TEST-{MARKER}\n"
@@ -152,6 +154,7 @@ TPL_SCENARIOS = [
     ("Epoch MPLS · IPSec", "epoch_mpls", "ipsec", HDR["mpls_cn"], "output"),
     ("AR SD-WAN · 单机单WAN · OPS", "ar_sdwan", "single_ops", HDR["ar"], "ops_output"),
     ("AR SD-WAN · 单机单WAN · Factory", "ar_sdwan", "single_factory", HDR["ar"], "factory_output"),
+    ("Epoch FastIP 5.0 · HK 香港出口 · IPSec", "epoch_fastip5", "hk_ipsec", HDR["er5_hk_ipsec"], "output"),
 ]
 
 for key, tool, variant, hdr, out_key in TPL_SCENARIOS:

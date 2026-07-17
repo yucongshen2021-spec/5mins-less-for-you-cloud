@@ -962,20 +962,49 @@ def generate_epoch_fastip5():
 
     try:
         hostname_override = str(network.get("hostname") or "").strip()
-        if variant == "hk":
+        if variant == "hk_ipsec":
+            # ER 5.0 香港出口 IPSec（独立 variant，与 us_ipsec 一致）
+            build_fn = er5.get("build_epoch5_hk_ipsec_format_dict")
+            tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_HK_IPSEC")
+            if not build_fn or not tpl:
+                return jsonify({"ok": False, "error": "HK IPSec builder 或模板未找到"}), 500
+            result = build_fn(hdr_text)
+            if isinstance(result, tuple):
+                if result[0] is None:
+                    return jsonify({"ok": False, "error": _humanize_error(result[1], variant)}), 400
+                d, warning = result
+            else:
+                d, warning = result, ""
+            if not isinstance(d, dict):
+                return jsonify({"ok": False, "error": "HK IPSec builder 返回格式异常"}), 500
+            if hostname_override and isinstance(d, dict):
+                d["hostname"] = hostname_override
+            output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)
+            if warning:
+                output = "# " + warning + "\n" + output
+            return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
+        elif variant == "hk":
             if tunnel_type == "ipsec":
-                tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_HK_IPSEC")
-                if not tpl:
-                    return jsonify({"ok": False, "error": "HK IPSec — 正在开发中，暂不支持。请使用 OpenVPN。"}), 400
+                # 兼容旧前端：variant=hk + tunnel_type=ipsec -> 走 hk_ipsec
+                variant = "hk_ipsec"
                 build_fn = er5.get("build_epoch5_hk_ipsec_format_dict")
-                if build_fn:
-                    result = build_fn(hdr_text)
-                    d = result if not isinstance(result, tuple) else result[0]
+                tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_HK_IPSEC")
+                if not build_fn or not tpl:
+                    return jsonify({"ok": False, "error": "HK IPSec builder 或模板未找到"}), 500
+                result = build_fn(hdr_text)
+                if isinstance(result, tuple):
+                    if result[0] is None:
+                        return jsonify({"ok": False, "error": _humanize_error(result[1], variant)}), 400
+                    d, warning = result
                 else:
-                    d = {}
+                    d, warning = result, ""
+                if not isinstance(d, dict):
+                    return jsonify({"ok": False, "error": "HK IPSec builder 返回格式异常"}), 500
                 if hostname_override and isinstance(d, dict):
                     d["hostname"] = hostname_override
                 output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)
+                if warning:
+                    output = "# " + warning + "\n" + output
                 return _log_and_return(tool_id, variant, hdr_text, output, jsonify({"ok": True, "output": output}))
             build_fn = er5.get("build_epoch5_hk_format_dict")
             tpl = _get_effective_template(er5, "TEMPLATE_EPOCH5_HK")
@@ -1570,6 +1599,7 @@ _EXAMPLE_MAP = {
     ("epoch_fastip5", "hk"): ("er_fastip_5in1_v1.py", "HK5_EXAMPLE"),
     ("epoch_fastip5", "us"): ("er_fastip_5in1_v1.py", "US5_EXAMPLE"),
     ("epoch_fastip5", "us_ipsec"): ("er_fastip_5in1_v1.py", "US5_IPSEC_EXAMPLE"),
+    ("epoch_fastip5", "hk_ipsec"): ("er_fastip_5in1_v1.py", "HK5_IPSEC_EXAMPLE"),
     ("epoch_fastip5", "flink"): ("er_fastip_5in1_v1.py", "ER5_FLINK_EXAMPLE"),
     ("epoch_fastip5", "new_exit"): ("er_fastip_5in1_v1.py", "ER5_NEW_EXIT_EXAMPLE"),
     ("epoch_fastip5", "domain_split"): ("er_fastip_5in1_v1.py", "HK5_EXAMPLE"),
@@ -1673,6 +1703,8 @@ _NOTES = {
         "flink": "5.0 ER 飞连\n\n• 使用 failover2 语法进行路由切换\n• 填写 PE/FPE/预留IP 格式数据头\n• failover source IP 从主回程下一跳所在 /30 的偶数位自动计算\n• 配置仅供参考，使用仍需谨慎。",
         "new_exit": "5.0 ER 新增出口\n\n• 使用 5.0 VyOS set 语法\n• 数据头格式与 4.0 相同（LineID/PE/WANIP/TUNNEL/Docking/海外出口ip）\n• GRE Tunnel + dummy LoopBack + NAT 规则\n• MTU & ip adjust-mss 可按需调整\n• 配置仅供参考，使用仍需谨慎。",
         "domain_split": "5.0 ER 域名分流\n\n• 使用 VyOS domain-list（带连字符）+ name-server 语法\n• 策略路由 interface 独立行\n• FNET/100.100 探测使用 failover2 语法\n• 初始化参数与 4.0 域名分流完全一致\n• 配置仅供参考，使用仍需谨慎。",
+        "us_ipsec": "5.0 非香港出口 IPSec\n\n• 使用 IPSec 拨号 + NAT/GRE 双线结构\n• 数据头含 4 个 LineID 块（2 IPSec + 2 NAT/GRE）\n• IKE/ESP 参数从数据头 IKE 块提取，无则用默认值\n• wan的dhcp是别人开给你的。wan开了dhcp，就不会生成默认路由。\n• lan的dhcp是你开给别人的。\n• 配置仅供参考，使用仍需谨慎。",
+        "hk_ipsec": "5.0 HK 香港出口 IPSec\n\n• 使用 IPSec 拨号 + NAT/GRE 双线结构（香港出口）\n• 数据头格式：MAIN/BACKUP 两块，每块同时含 NAT/GRE 字段与 IPSec 拨号字段\n• HKIP / 建BGP邻居 主备共用\n• IKE/ESP 参数无 IKE 块时用默认值（ikev1/aes128/sha1/dh-group2）\n• wan的dhcp是别人开给你的。wan开了dhcp，就不会生成默认路由。\n• lan的dhcp是你开给别人的。\n• 配置仅供参考，使用仍需谨慎。",
         "default": "• 5.0 版本使用 VyOS set 语法。\n• 配置仅供参考，使用仍需谨慎。",
     },
     "usg_fastip": {
@@ -1801,6 +1833,7 @@ _DISK_ALIASES = {
     "Epoch FastIP · ER 新增出口": "Epoch FastIP · ER 新增出口",
     "Epoch FastIP · ER 域名分流": "Epoch FastIP · ER 域名分流",
     "Epoch FastIP 5.0 · HK 香港出口": "ER_FastIP_5_0___HK_香港出口",
+    "Epoch FastIP 5.0 · HK 香港出口 · IPSec": "ER_FastIP_5_0___HK_香港出口_IPSec",
     "Epoch FastIP 5.0 · 非香港出口": "ER_FastIP_5_0___非HK出口",
     "Epoch FastIP 5.0 · ER 飞连": "ER_FastIP_5_0___ER_飞连",
     "Epoch FastIP 5.0 · ER 新增出口": "ER_FastIP_5_0___ER_新增出口",
@@ -1876,6 +1909,7 @@ _SCENARIO_LIST = [
     {"key": "Epoch FastIP 5.0 · HK 香港出口", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_HK"},
     {"key": "Epoch FastIP 5.0 · 非香港出口", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_US"},
     {"key": "Epoch FastIP 5.0 · 非香港出口 · IPSec", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_US_IPSEC"},
+    {"key": "Epoch FastIP 5.0 · HK 香港出口 · IPSec", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_HK_IPSEC"},
     {"key": "Epoch FastIP 5.0 · ER 飞连", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_FLINK"},
     {"key": "Epoch FastIP 5.0 · ER 新增出口", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_NEW_EXIT"},
     {"key": "Epoch FastIP 5.0 · ER 域名分流", "source": "er_fastip_5in1_v1.py", "tpl_slot": "TEMPLATE_EPOCH5_DOMAIN_SPLIT"},
@@ -1915,6 +1949,7 @@ _SCENARIO_TREE = [
                 "label": "5.0",
                 "children": [
                     {"label": "HK · OpenVPN",   "key": "Epoch FastIP 5.0 · HK 香港出口"},
+                    {"label": "HK · IPSec",     "key": "Epoch FastIP 5.0 · HK 香港出口 · IPSec"},
                     {"label": "非香港 · OpenVPN", "key": "Epoch FastIP 5.0 · 非香港出口"},
                     {"label": "非香港 · IPSec",   "key": "Epoch FastIP 5.0 · 非香港出口 · IPSec"},
                 ],
@@ -2069,6 +2104,7 @@ def api_template_load():
             "TEMPLATE_EPOCH5_HK": "HK5_EXAMPLE",
             "TEMPLATE_EPOCH5_US": "US5_EXAMPLE",
             "TEMPLATE_EPOCH5_US_IPSEC": "US5_IPSEC_EXAMPLE",
+            "TEMPLATE_EPOCH5_HK_IPSEC": "HK5_IPSEC_EXAMPLE",
             "TEMPLATE_EPOCH5_FLINK": "ER5_FLINK_EXAMPLE",
             "TEMPLATE_EPOCH5_NEW_EXIT": "ER5_NEW_EXIT_EXAMPLE",
             "TEMPLATE_EPOCH_HK_IPSEC": "HK_EXAMPLE_IPSEC",
@@ -2213,6 +2249,8 @@ def api_template_reset():
         "TEMPLATE_USG_NEW_EXIT_VISUAL": "USG_NEW_EXIT_EXAMPLE",
         "TEMPLATE_MPLS_DOMESTIC": "CN_EXAMPLE", "TEMPLATE_MPLS_OVERSEAS": "OV_EXAMPLE",
         "TEMPLATE_MPLS_IPSEC": "MPLS_IPSEC_EXAMPLE",
+        "TEMPLATE_EPOCH5_US_IPSEC": "US5_IPSEC_EXAMPLE",
+        "TEMPLATE_EPOCH5_HK_IPSEC": "HK5_IPSEC_EXAMPLE",
         "TEMPLATE_AR_TRADITIONAL": "AR_TRAD_EXAMPLE",
     }
     example_var = example_keys.get(slot, "")
@@ -2466,6 +2504,13 @@ def api_template_preview():
                     rendered = tpl.format(**d)
         elif slot == "TEMPLATE_EPOCH5_US_IPSEC":
             fn = ns.get("build_epoch5_us_ipsec_format_dict")
+            if fn:
+                result = fn(hdr_text)
+                d = result[0] if isinstance(result, tuple) else result
+                if d:
+                    rendered = tpl.format(**d)
+        elif slot == "TEMPLATE_EPOCH5_HK_IPSEC":
+            fn = ns.get("build_epoch5_hk_ipsec_format_dict")
             if fn:
                 result = fn(hdr_text)
                 d = result[0] if isinstance(result, tuple) else result
@@ -2840,7 +2885,7 @@ def _get_init_keys(slot):
     if slot in ("TEMPLATE_EPOCH_HK", "TEMPLATE_EPOCH_US",
                  "TEMPLATE_EPOCH_HK_IPSEC", "TEMPLATE_EPOCH_US_IPSEC",
                  "TEMPLATE_EPOCH5_HK", "TEMPLATE_EPOCH5_US",
-                 "TEMPLATE_EPOCH5_US_IPSEC"):
+                 "TEMPLATE_EPOCH5_US_IPSEC", "TEMPLATE_EPOCH5_HK_IPSEC"):
         return ["DEFAULT_WAN_ETH","DEFAULT_WAN_CIDR","DEFAULT_WAN_GW","DEFAULT_WAN_DHCP",
                 "DEFAULT_LAN_ETH","DEFAULT_LAN_CIDR","DEFAULT_LAN_GW","DEFAULT_LAN_DHCP",
                 "DEFAULT_INNER_NETS","DEFAULT_GEN_RETURN_ROUTE"]
