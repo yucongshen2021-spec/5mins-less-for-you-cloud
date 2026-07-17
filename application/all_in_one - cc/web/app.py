@@ -2920,7 +2920,7 @@ def _get_init_keys(slot):
 def _preload_all_modules():
     """Preload all embedded modules at startup so first request doesn't hang."""
     print("Preloading modules...")
-    for fn in [_get_er, _get_er5, _get_usg, _get_mpls, _get_ar]:
+    for fn in [_get_er, _get_er5, _get_usg, _get_mpls, _get_ar, _get_ar_traditional]:
         try:
             fn()
             print(f"  {fn.__name__} OK")
