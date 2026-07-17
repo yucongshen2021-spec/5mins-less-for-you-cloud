@@ -70,6 +70,7 @@ set nat source rule 50 translation address 'masquerade'
 set nat source rule 50 outbound-interface name '{wan_if}'
 set nat source rule 50 source group network-group 'LAN-NET'
 set nat source rule 50 translation address 'masquerade'
+{nat_exclude_block}
 set nat source rule 1000 outbound-interface name '{main_tun_id}'
 set nat source rule 1000 source group network-group 'LAN-NET'
 set nat source rule 1000 translation address '{hkip}'

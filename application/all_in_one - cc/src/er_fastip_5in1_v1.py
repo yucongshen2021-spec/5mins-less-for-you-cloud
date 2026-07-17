@@ -2737,6 +2737,7 @@ TEMPLATE_EPOCH5_HK_IPSEC = (
     "set nat source rule 50 outbound-interface name '{wan_if}'\n"
     "set nat source rule 50 source group network-group 'LAN-NET'\n"
     "set nat source rule 50 translation address 'masquerade'\n"
+    "{nat_exclude_block}\n"
     "set nat source rule 1000 outbound-interface name '{main_tun_id}'\n"
     "set nat source rule 1000 source group network-group 'LAN-NET'\n"
     "set nat source rule 1000 translation address '{hkip}'\n"
@@ -3730,14 +3731,24 @@ def build_epoch5_hk_ipsec_format_dict(hdr_text: str):
             f"set protocols static route 1.1.1.1/32 next-hop {wan_gw}"
         )
 
-    # ── IPSec 上游路由（拨号 IP / PE 对接）──
+    # ── IPSec 上游路由（拨号 IP / PE 对接，均走 1.1.1.1）──
     ipsec_route_lines = [
         f"set protocols static route {m['dial_ip']}/32 next-hop 1.1.1.1",
-        f"set protocols static route {b['dial_ip']}/32 next-hop {wan_gw}",
+        f"set protocols static route {b['dial_ip']}/32 next-hop 1.1.1.1",
         f"set protocols static route {m['pe_docking']}/32 next-hop 1.1.1.1",
         f"set protocols static route {b['pe_docking']}/32 next-hop 1.1.1.1",
     ]
     ipsec_routes_block = "\n".join(ipsec_route_lines)
+
+    # ── NAT exclude：192.168.55.250 走主备隧道时不被 NAT ──
+    nat_exclude_block = "\n".join([
+        f"set nat source rule 5 destination address '192.168.55.250/32'",
+        f"set nat source rule 5 exclude",
+        f"set nat source rule 5 outbound-interface name '{m['tun_id']}'",
+        f"set nat source rule 6 destination address '192.168.55.250/32'",
+        f"set nat source rule 6 exclude",
+        f"set nat source rule 6 outbound-interface name '{b['tun_id']}'",
+    ])
 
     # ── BGP 服务器路由（每个 BGP IP 一组 next-hop + blackhole 保护）──
     bgp_lines = []
@@ -3826,6 +3837,7 @@ def build_epoch5_hk_ipsec_format_dict(hdr_text: str):
         "lan_net_block": lan_net_block,
         "default_route_block": default_route_block,
         "ipsec_routes_block": ipsec_routes_block,
+        "nat_exclude_block": nat_exclude_block,
         "bgp_server_routes_block": bgp_server_routes_block,
         "bypass_block": bypass_block,
         "pbr_tables_block": pbr_tables_block,
