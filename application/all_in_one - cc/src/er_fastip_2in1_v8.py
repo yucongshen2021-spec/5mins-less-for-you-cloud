@@ -2182,7 +2182,10 @@ set interfaces tunnel {main_tun} source-address '{main_ce_docking}'
 
 set protocols static route {main_pe_docking}/32 next-hop {ER_NE_MAIN_PE_NH_DEFAULT}
 {ER_NE_MAIN_DUM_BLOCK}
-{ER_NE_BK_BLOCK}{ER_NE_NAT_HEADER_BLOCK}{ER_NE_NAT_BLOCK}{ER_NE_FNET_BLOCK}"""
+	{ER_NE_BK_BLOCK}
+{ER_NE_NAT_HEADER_BLOCK}
+{ER_NE_NAT_BLOCK}
+{ER_NE_FNET_BLOCK}"""
 ER_NEW_EXIT_EXAMPLE = (
     "LineID:609353B7\n"
     "PE： tyo2-natpe4\n"
@@ -2822,8 +2825,6 @@ def build_er_new_exit_nat_header_block(parsed: dict, init_cfg: dict) -> str:
 def build_er_new_exit_nat_block(parsed: dict, init_cfg: dict) -> str:
     """每条海外出口一对 IP 一条 NAT rule：同出口 tunnel、同一源网段，translation 为本端(dum)IP；rule 号自初始化主/备起始递增。"""
     src = _er_ne_nat_source_normalized(init_cfg.get("nat_source_cidr", ""))
-    if not src:
-        return ""
     mr = str(init_cfg.get("main_nat_rule", "")).strip()
     br = str(init_cfg.get("bk_nat_rule", "")).strip()
     if not mr.isdigit():
@@ -2850,7 +2851,7 @@ def build_er_new_exit_nat_block(parsed: dict, init_cfg: dict) -> str:
         rid = im + i
         lines.extend([
             f"set nat source rule {rid} outbound-interface '{mt}'",
-            f"set nat source rule {rid} source address '{src}'",
+            *([f"set nat source rule {rid} source address '{src}'"] if src else []),
             f"set nat source rule {rid} translation address '{tr}'",
             "",
         ])
@@ -2861,7 +2862,7 @@ def build_er_new_exit_nat_block(parsed: dict, init_cfg: dict) -> str:
         rid = ib + i
         lines.extend([
             f"set nat source rule {rid} outbound-interface '{bt}'",
-            f"set nat source rule {rid} source address '{src}'",
+            *([f"set nat source rule {rid} source address '{src}'"] if src else []),
             f"set nat source rule {rid} translation address '{tr}'",
             "",
         ])

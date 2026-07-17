@@ -525,10 +525,12 @@ def _inject_network_to_parsed(ns: dict, d: dict) -> None:
 
 
 def _log_and_return(tool: str, variant: str, header_text: str, output_text: str, result: dict) -> dict:
-    """Log generation activity and return the result dict. Skipped if TEST_MODE=1."""
+    """Log generation activity and return the result dict. Skipped if TEST_MODE=1 or guest user."""
     try:
         if os.environ.get("TEST_MODE") != "1":
-            log_generate_config(tool=tool, variant=variant, input_text=header_text, output_text=output_text)
+            uid = _get_request_user_id()
+            if uid:  # 仅记录已登录用户，跳过访客
+                log_generate_config(tool=tool, variant=variant, input_text=header_text, output_text=output_text)
     except Exception:
         pass
     return result
@@ -856,7 +858,9 @@ def generate_epoch_fastip():
             bk_dum = network.get("ER_NE_BK_DUM_DEFAULT") or er.get("ER_NE_BK_DUM_DEFAULT", "400")
             main_nat = network.get("ER_NE_MAIN_NAT_RULE_DEFAULT") or er.get("ER_NE_MAIN_NAT_RULE_DEFAULT", "300")
             bk_nat = network.get("ER_NE_BK_NAT_RULE_DEFAULT") or er.get("ER_NE_BK_NAT_RULE_DEFAULT", "400")
-            nat_src = network.get("ER_NE_NAT_SOURCE_CIDR_DEFAULT") or er.get("ER_NE_NAT_SOURCE_CIDR_DEFAULT", "")
+            nat_src = network.get("ER_NE_NAT_SOURCE_CIDR_DEFAULT")
+            if nat_src is None:
+                nat_src = er.get("ER_NE_NAT_SOURCE_CIDR_DEFAULT", "")
             # 100.100 参数：双线时从数据头自动提取探测IP和出口Tunnel，单线时不需要
             fnet_nat_rule = network.get("ER_NE_FNET_NAT_RULE_DEFAULT") or er.get("ER_NE_FNET_NAT_RULE_DEFAULT", "")
             # 从数据头提取主线隧道号和第一个出口IP作为100.100参数
@@ -1064,7 +1068,9 @@ def generate_epoch_fastip5():
             main_nat = network.get("ER5_NE_MAIN_NAT_RULE_DEFAULT") or er5.get("ER5_NE_MAIN_NAT_RULE_DEFAULT", "1001")
             bk_nat = network.get("ER5_NE_BK_NAT_RULE_DEFAULT") or er5.get("ER5_NE_BK_NAT_RULE_DEFAULT", "2001")
             nat_group = network.get("ER5_NE_NAT_GROUP_DEFAULT") or er5.get("ER5_NE_NAT_GROUP_DEFAULT", "LAN-NET1")
-            nat_src = network.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT") or er5.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT", "192.168.0.0/24")
+            nat_src = network.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT")
+            if nat_src is None:
+                nat_src = er5.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT", "")
             # 100.100 参数：双线时从数据头自动提取，单线时不需要
             fnet_nat_rule = network.get("ER5_NE_FNET_NAT_RULE_DEFAULT") or er5.get("ER5_NE_FNET_NAT_RULE_DEFAULT", "")
             fnet_probe = ""
@@ -1465,15 +1471,19 @@ def generate_ar_sdwan():
                     if "factory" in variant:
                         factory_output = output
 
-        # Fallback to legacy render functions (for 'single', 'dual' variants from frontend)
+        # Fallback to legacy render functions (for 'single', 'dual_pri', 'dual_bak' variants from frontend)
         if not ops_output and not factory_output:
             parse_fn = ar.get("parse_ar_sdwan_text")
             if parse_fn:
                 parsed = parse_fn(hdr_text)
-                ops_fn = ar.get("render_ops_script")
                 is_dual = "dual" in variant
-                role = "pri" if variant == "dual" or "pri" in variant else "bak"
+                # dual_pri → pri, dual_bak → bak, dual → pri (legacy)
+                role = "bak" if variant.endswith("_bak") else "pri"
                 device_type = "dual" if is_dual else "single"
+                if is_dual:
+                    ops_fn = ar.get(f"render_dual_{'primary' if role == 'pri' else 'backup'}")
+                else:
+                    ops_fn = ar.get("render_ops_script")
                 if ops_fn:
                     try:
                         init_cfg = {"mode": "ops", "device_type": device_type, "device_role": role}

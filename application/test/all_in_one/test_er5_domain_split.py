@@ -125,9 +125,9 @@ class Test5DomainSplitAgainstUserExample(unittest.TestCase):
             "set protocols failover2 track tomainout target '100.100.100.1'",
             "set protocols failover2 track tomainout type 'icmp'",
             "set protocols failover2 route 2.2.2.2/32 next-hop 10.22.15.185 track tomainout",
-            "set protocols failover2 route 2.2.2.2/32 next-hop 10.22.15.189 distance '20'",
+            "set protocols static route 2.2.2.2/32 next-hop 10.22.15.189 distance '20'",
             "set nat source rule 123 destination address 100.100.100.1/32",
-            "set nat source rule 123 outbound-interface 'tun1111'",
+            "set nat source rule 123 outbound-interface name 'tun1111'",
             "set nat source rule 123 translation address '5.5.5.5'",
             "set protocols static route 100.100.100.1/32 next-hop 10.22.15.185",
         ]

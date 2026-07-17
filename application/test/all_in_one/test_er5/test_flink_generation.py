@@ -45,7 +45,8 @@ class TestEpochFastIP5FlinkFailover(unittest.TestCase):
         self.assertNotIn("10.99.99.99", output)
 
     def test_template_editor_init_defaults_do_not_expose_failover_source(self):
-        resp = self.client.get("/api/init-defaults/Epoch%20FastIP%205.0%20%C2%B7%20ER%20%E9%A3%9E%E8%BF%9E")
+        resp = self.client.get("/api/init-defaults/Epoch%20FastIP%205.0%20%C2%B7%20ER%20%E9%A3%9E%E8%BF%9E",
+                               headers={"X-User-Id": "test-user-1"})
 
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
@@ -59,7 +60,8 @@ class TestEpochFastIP5FlinkFailover(unittest.TestCase):
         self.assertNotIn("ER5_FL_FAILOVER_SRC_DEFAULT", values)
 
     def test_epoch4_template_editor_init_defaults_use_new_next_hops(self):
-        resp = self.client.get("/api/init-defaults/Epoch%20FastIP%20%C2%B7%20ER%20%E9%A3%9E%E8%BF%9E")
+        resp = self.client.get("/api/init-defaults/Epoch%20FastIP%20%C2%B7%20ER%20%E9%A3%9E%E8%BF%9E",
+                               headers={"X-User-Id": "test-user-1"})
 
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()

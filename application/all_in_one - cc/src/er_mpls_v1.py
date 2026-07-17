@@ -369,8 +369,7 @@ set firewall name WAN2LOCAL rule 1210 action 'accept'
 set firewall name WAN2LOCAL rule 1210 protocol 'gre'
 set firewall name WAN2LOCAL rule 1220 action 'accept'
 set firewall name WAN2LOCAL rule 1220 protocol 'ipip'
-set firewall options interface {main_gre_tun} adjust-mss '1400'
-set firewall options interface {bk_gre_tun} adjust-mss '1400'
+{gre_fw_mss_block}
 set firewall receive-redirects 'disable'
 set firewall send-redirects 'disable'
 set firewall source-validation 'disable'
@@ -379,52 +378,10 @@ set firewall twa-hazards-protection 'disable'
 set interfaces ethernet {wan_if} address '{wan_addr}'
 set interfaces ethernet {wan_if} description 'TO-WAN'
 {lan_if_block}
-set interfaces openvpn {main_vtun_id} description 'MAIN_{main_vtun_pe}'
-set interfaces openvpn {main_vtun_id} firewall local name 'WAN2LOCAL'
-set interfaces openvpn {main_vtun_id} local-address {main_vtun_local} subnet-mask '255.255.255.252'
-set interfaces openvpn {main_vtun_id} mode 'site-to-site'
-set interfaces openvpn {main_vtun_id} openvpn-option '--nobind'
-set interfaces openvpn {main_vtun_id} openvpn-option '--ping 10'
-set interfaces openvpn {main_vtun_id} openvpn-option '--ping-restart 60'
-set interfaces openvpn {main_vtun_id} openvpn-option '--persist-tun'
-set interfaces openvpn {main_vtun_id} openvpn-option '--fragment 1300'
-set interfaces openvpn {main_vtun_id} protocol 'udp'
-set interfaces openvpn {main_vtun_id} remote-address '{main_vtun_remote}'
-set interfaces openvpn {main_vtun_id} remote-host '{main_vtun_docking}'
-set interfaces openvpn {main_vtun_id} remote-port '{main_vtun_port}'
-set interfaces openvpn {main_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'
-set interfaces openvpn {bk_vtun_id} description 'BK_{bk_vtun_pe}'
-set interfaces openvpn {bk_vtun_id} firewall local name 'WAN2LOCAL'
-set interfaces openvpn {bk_vtun_id} local-address {bk_vtun_local} subnet-mask '255.255.255.252'
-set interfaces openvpn {bk_vtun_id} mode 'site-to-site'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--nobind'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--ping 10'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--ping-restart 60'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--persist-tun'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--fragment 1300'
-set interfaces openvpn {bk_vtun_id} protocol 'udp'
-set interfaces openvpn {bk_vtun_id} remote-address '{bk_vtun_remote}'
-set interfaces openvpn {bk_vtun_id} remote-host '{bk_vtun_docking}'
-set interfaces openvpn {bk_vtun_id} remote-port '{bk_vtun_port}'
-set interfaces openvpn {bk_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'
-set interfaces tunnel {main_gre_tun} address '{main_gre_ce_ip}/30'
-set interfaces tunnel {main_gre_tun} description 'MAIN_{main_gre_pe}'
-set interfaces tunnel {main_gre_tun} encapsulation 'gre'
-set interfaces tunnel {main_gre_tun} firewall local name 'WAN2LOCAL'
-set interfaces tunnel {main_gre_tun} mtu '1476'
-set interfaces tunnel {main_gre_tun} multicast 'disable'
-set interfaces tunnel {main_gre_tun} parameters ip ttl '255'
-set interfaces tunnel {main_gre_tun} remote '{main_gre_remote}'
-set interfaces tunnel {main_gre_tun} source-address '{main_vtun_local}'
-set interfaces tunnel {bk_gre_tun} address '{bk_gre_ce_ip}/30'
-set interfaces tunnel {bk_gre_tun} description 'BK_{bk_gre_pe}'
-set interfaces tunnel {bk_gre_tun} encapsulation 'gre'
-set interfaces tunnel {bk_gre_tun} firewall local name 'WAN2LOCAL'
-set interfaces tunnel {bk_gre_tun} mtu '1476'
-set interfaces tunnel {bk_gre_tun} multicast 'disable'
-set interfaces tunnel {bk_gre_tun} parameters ip ttl '255'
-set interfaces tunnel {bk_gre_tun} remote '{bk_gre_remote}'
-set interfaces tunnel {bk_gre_tun} source-address '{bk_vtun_local}'
+{main_vtun_section}
+{bk_vtun_section}
+{main_gre_section}
+{bk_gre_section}
 set openfalcon endpoint-name '{hostname}'
 set openfalcon server-address '192.168.237.86'
 {return_routes_block}
@@ -448,23 +405,9 @@ set protocols bgp {ce_as} neighbor {bk_bgp_neighbor} remote-as '{bk_pe_as}'
 set protocols bgp {ce_as} neighbor {bk_bgp_neighbor} update-source '{bk_bgp_update_source}'
 set protocols bgp {ce_as} timers holdtime '15'
 set protocols bgp {ce_as} timers keepalive '5'
-set track name {main_track} failure-count '2'
-set track name {main_track} success-count '2'
-set track name {main_track} test 10 resp-time '5'
-set track name {main_track} test 10 target '{main_gre_pe_ip}'
-set track name {main_track} test 10 ttl-limit '1'
-set track name {main_track} test 10 type 'ping'
+{main_track_block}
 {wan_route_block}
-set protocols static route 114.113.245.99/32 next-hop {main_gre_pe_ip}
-set protocols static route 114.113.245.100/32 next-hop {bk_gre_pe_ip}
-set protocols static route {main_vtun_docking}/32 next-hop 1.1.1.1
-set protocols static route {bk_vtun_docking}/32 next-hop 1.1.1.1
-set protocols static route {main_gre_remote}/32 next-hop {main_vtun_remote}
-set protocols static route {bk_gre_remote}/32 next-hop {bk_vtun_remote}
-set protocols static route 192.168.55.250/32 next-hop {main_gre_pe_ip} track {main_track}
-set protocols static route 192.168.55.250/32 next-hop {bk_gre_pe_ip} distance '5'
-set protocols static route 192.168.237.86/32 next-hop {main_gre_pe_ip} track {main_track}
-set protocols static route 192.168.237.86/32 next-hop {bk_gre_pe_ip} distance '5'
+{mpls_static_routes_block}
 set system host-name '{hostname}'
 """
 TEMPLATE_MPLS_OVERSEAS = """# ==========================================================
@@ -511,8 +454,7 @@ set firewall name WAN2LOCAL rule 1210 action 'accept'
 set firewall name WAN2LOCAL rule 1210 protocol 'gre'
 set firewall name WAN2LOCAL rule 1220 action 'accept'
 set firewall name WAN2LOCAL rule 1220 protocol 'ipip'
-set firewall options interface {main_gre_tun} adjust-mss '1400'
-set firewall options interface {bk_gre_tun} adjust-mss '1400'
+{gre_fw_mss_block}
 set firewall receive-redirects 'disable'
 set firewall send-redirects 'disable'
 set firewall source-validation 'disable'
@@ -521,52 +463,10 @@ set firewall twa-hazards-protection 'disable'
 set interfaces ethernet {wan_if} address '{wan_addr}'
 set interfaces ethernet {wan_if} description 'TO-WAN'
 {lan_if_block}
-set interfaces openvpn {main_vtun_id} description 'MAIN_{main_vtun_pe}'
-set interfaces openvpn {main_vtun_id} firewall local name 'WAN2LOCAL'
-set interfaces openvpn {main_vtun_id} local-address {main_vtun_local} subnet-mask '255.255.255.252'
-set interfaces openvpn {main_vtun_id} mode 'site-to-site'
-set interfaces openvpn {main_vtun_id} openvpn-option '--nobind'
-set interfaces openvpn {main_vtun_id} openvpn-option '--ping 10'
-set interfaces openvpn {main_vtun_id} openvpn-option '--ping-restart 60'
-set interfaces openvpn {main_vtun_id} openvpn-option '--persist-tun'
-set interfaces openvpn {main_vtun_id} openvpn-option '--fragment 1300'
-set interfaces openvpn {main_vtun_id} protocol 'udp'
-set interfaces openvpn {main_vtun_id} remote-address '{main_vtun_remote}'
-set interfaces openvpn {main_vtun_id} remote-host '{main_vtun_docking}'
-set interfaces openvpn {main_vtun_id} remote-port '{main_vtun_port}'
-set interfaces openvpn {main_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'
-set interfaces openvpn {bk_vtun_id} description 'BK_{bk_vtun_pe}'
-set interfaces openvpn {bk_vtun_id} firewall local name 'WAN2LOCAL'
-set interfaces openvpn {bk_vtun_id} local-address {bk_vtun_local} subnet-mask '255.255.255.252'
-set interfaces openvpn {bk_vtun_id} mode 'site-to-site'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--nobind'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--ping 10'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--ping-restart 60'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--persist-tun'
-set interfaces openvpn {bk_vtun_id} openvpn-option '--fragment 1300'
-set interfaces openvpn {bk_vtun_id} protocol 'udp'
-set interfaces openvpn {bk_vtun_id} remote-address '{bk_vtun_remote}'
-set interfaces openvpn {bk_vtun_id} remote-host '{bk_vtun_docking}'
-set interfaces openvpn {bk_vtun_id} remote-port '{bk_vtun_port}'
-set interfaces openvpn {bk_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'
-set interfaces tunnel {main_gre_tun} address '{main_gre_ce_ip}/30'
-set interfaces tunnel {main_gre_tun} description 'MAIN_{main_gre_pe}'
-set interfaces tunnel {main_gre_tun} encapsulation 'gre'
-set interfaces tunnel {main_gre_tun} firewall local name 'WAN2LOCAL'
-set interfaces tunnel {main_gre_tun} mtu '1476'
-set interfaces tunnel {main_gre_tun} multicast 'disable'
-set interfaces tunnel {main_gre_tun} parameters ip ttl '255'
-set interfaces tunnel {main_gre_tun} remote '{main_gre_remote}'
-set interfaces tunnel {main_gre_tun} source-address '{main_vtun_local}'
-set interfaces tunnel {bk_gre_tun} address '{bk_gre_ce_ip}/30'
-set interfaces tunnel {bk_gre_tun} description 'BK_{bk_gre_pe}'
-set interfaces tunnel {bk_gre_tun} encapsulation 'gre'
-set interfaces tunnel {bk_gre_tun} firewall local name 'WAN2LOCAL'
-set interfaces tunnel {bk_gre_tun} mtu '1476'
-set interfaces tunnel {bk_gre_tun} multicast 'disable'
-set interfaces tunnel {bk_gre_tun} parameters ip ttl '255'
-set interfaces tunnel {bk_gre_tun} remote '{bk_gre_remote}'
-set interfaces tunnel {bk_gre_tun} source-address '{bk_vtun_local}'
+{main_vtun_section}
+{bk_vtun_section}
+{main_gre_section}
+{bk_gre_section}
 set openfalcon endpoint-name '{hostname}'
 set openfalcon server-address '192.168.237.86'
 set policy route-map AS{ce_as}-OUT rule 10 action 'permit'
@@ -587,23 +487,9 @@ set protocols bgp {ce_as} neighbor {bk_bgp_neighbor} remote-as '{bk_pe_as}'
 set protocols bgp {ce_as} neighbor {bk_bgp_neighbor} update-source '{bk_bgp_update_source}'
 set protocols bgp {ce_as} timers holdtime '15'
 set protocols bgp {ce_as} timers keepalive '5'
-set track name {main_track} failure-count '2'
-set track name {main_track} success-count '2'
-set track name {main_track} test 10 resp-time '5'
-set track name {main_track} test 10 target '{main_gre_pe_ip}'
-set track name {main_track} test 10 ttl-limit '1'
-set track name {main_track} test 10 type 'ping'
+{main_track_block}
 {wan_route_block}
-set protocols static route 114.113.245.99/32 next-hop {main_gre_pe_ip}
-set protocols static route 114.113.245.100/32 next-hop {bk_gre_pe_ip}
-set protocols static route {main_vtun_docking}/32 next-hop 1.1.1.1
-set protocols static route {bk_vtun_docking}/32 next-hop 1.1.1.1
-set protocols static route {main_gre_remote}/32 next-hop {main_vtun_remote}
-set protocols static route {bk_gre_remote}/32 next-hop {bk_vtun_remote}
-set protocols static route 192.168.55.250/32 next-hop {main_gre_pe_ip} track {main_track}
-set protocols static route 192.168.55.250/32 next-hop {bk_gre_pe_ip} distance '5'
-set protocols static route 192.168.237.86/32 next-hop {main_gre_pe_ip} track {main_track}
-set protocols static route 192.168.237.86/32 next-hop {bk_gre_pe_ip} distance '5'
+{mpls_static_routes_block}
 {return_routes_block}
 {prefix_list_block}
 {dhcp_server_block}
@@ -631,10 +517,101 @@ def _mpls_inject_init_defaults(d):
 
 
 def _mpls_compute_track_names(d):
+    """Compute {px}_track name based on line_type.
+
+    vtun_only lines have no GRE tunnel, so the track object name is derived
+    from the VTUN id (e.g. 'vtun1104' -> 'Track-vtun1104'). This matches the
+    desktop generate_mpls_config behaviour where m_tun falls back to vtun_id
+    when line_type is vtun_only.
+    """
     for px in ("main", "bk"):
         gre_tun = d.get(f"{px}_gre_tun", "")
-        d.setdefault(f"{px}_track",
-            gre_tun.replace("Tunnel", "Track-") if gre_tun else "")
+        if gre_tun:
+            d.setdefault(f"{px}_track",
+                gre_tun.replace("Tunnel", "Track-"))
+        else:
+            vtun_id = d.get(f"{px}_vtun_id", "")
+            d.setdefault(f"{px}_track",
+                f"Track-{vtun_id}" if vtun_id else "")
+
+
+def _mpls_line_pe_ce(d, px):
+    """Return (pe_ip, ce_ip, tun_name) for line `px` based on line_type.
+
+    For vtun_only lines, the BGP peer / track target is the VTUN remote /
+    local IP rather than the GRE PE/CE IP. Mirrors the logic in
+    generate_mpls_config (lines 792-825).
+    """
+    lt = d.get(f"{px}_line_type", "")
+    if lt == "vtun_only":
+        return (d.get(f"{px}_vtun_remote", ""),
+                d.get(f"{px}_vtun_local", ""),
+                d.get(f"{px}_vtun_id", ""))
+    return (d.get(f"{px}_gre_pe_ip", ""),
+            d.get(f"{px}_gre_ce_ip", ""),
+            d.get(f"{px}_gre_tun", ""))
+
+
+def _mpls_compute_section_blocks(d):
+    """Pre-compute conditional template blocks so the disk template can be
+    rendered with a plain ``str.format(**d)`` call.
+
+    These block placeholders let the overseas/domestic templates omit GRE
+    tunnel / track / static-route lines when a line is ``vtun_only`` (the
+    overseas main-line design: only a VTUN is used, no GRE tunnel).
+    """
+    # 1) firewall options adjust-mss -- only for tunnels that actually exist
+    mss_lines = []
+    for tun in (d.get("main_gre_tun", ""), d.get("bk_gre_tun", "")):
+        if tun:
+            mss_lines.append(f"set firewall options interface {tun} adjust-mss '1400'")
+    d["gre_fw_mss_block"] = "\n".join(mss_lines)
+
+    # 2) VTUN (OpenVPN) interface sections
+    d["main_vtun_section"] = _build_vtun_section("main", d)
+    d["bk_vtun_section"]   = _build_vtun_section("bk", d)
+
+    # 3) GRE tunnel interface sections (empty when line is vtun_only)
+    d["main_gre_section"] = _build_gre_section("main", d)
+    d["bk_gre_section"]   = _build_gre_section("bk", d)
+
+    # 4) Track object block (only when there is a tun to track).
+    #    The track object name is m_tun / b_tun (the raw vtun_id for vtun_only
+    #    lines, or the gre_tun for vtun_gre lines) -- this mirrors the desktop
+    #    generate_mpls_config logic (m_tun / b_tun are passed straight to the
+    #    `set track name` line).
+    m_pe_ip, _m_ce, m_tun = _mpls_line_pe_ce(d, "main")
+    b_pe_ip, _b_ce, b_tun = _mpls_line_pe_ce(d, "bk")
+    d["main_track_block"] = ""
+    if m_tun:
+        d["main_track_block"] = "\n".join([
+            f"set track name {m_tun} failure-count '2'",
+            f"set track name {m_tun} success-count '2'",
+            f"set track name {m_tun} test 10 resp-time '5'",
+            f"set track name {m_tun} test 10 target '{m_pe_ip}'",
+            f"set track name {m_tun} test 10 ttl-limit '1'",
+            f"set track name {m_tun} test 10 type 'ping'",
+        ])
+
+    # 5) Static routes that depend on line_type (PE-IP next-hop / track name).
+    #    Empty next-hop / track lines are skipped to avoid broken config.
+    route_lines = []
+    if m_pe_ip:
+        route_lines.append(f"set protocols static route 114.113.245.99/32 next-hop {m_pe_ip}")
+    if b_pe_ip:
+        route_lines.append(f"set protocols static route 114.113.245.100/32 next-hop {b_pe_ip}")
+    # Tunnel docking routes (vtun_docking -> 1.1.1.1) and gre_remote -> vtun_remote
+    route_lines.append(_build_tunnel_routes(d))
+    # Tracked / backup routes to the monitoring targets (only when pe_ip exists)
+    if m_pe_ip and m_tun:
+        route_lines.append(f"set protocols static route 192.168.55.250/32 next-hop {m_pe_ip} track {m_tun}")
+    if b_pe_ip:
+        route_lines.append(f"set protocols static route 192.168.55.250/32 next-hop {b_pe_ip} distance '5'")
+    if m_pe_ip and m_tun:
+        route_lines.append(f"set protocols static route 192.168.237.86/32 next-hop {m_pe_ip} track {m_tun}")
+    if b_pe_ip:
+        route_lines.append(f"set protocols static route 192.168.237.86/32 next-hop {b_pe_ip} distance '5'")
+    d["mpls_static_routes_block"] = "\n".join(l for l in route_lines if l)
 
 
 def _mpls_compute_bgp_vars(d):
@@ -674,6 +651,7 @@ def build_mpls_domestic_format_dict(raw: str):
     d.update(blocks)
     _mpls_compute_track_names(d)
     _mpls_compute_bgp_vars(d)
+    _mpls_compute_section_blocks(d)
     return d, None
 
 
@@ -701,6 +679,7 @@ def build_mpls_overseas_format_dict(raw: str):
     d.update(blocks)
     _mpls_compute_track_names(d)
     _mpls_compute_bgp_vars(d)
+    _mpls_compute_section_blocks(d)
     return d, None
 
 

@@ -10,4 +10,6 @@ set interfaces tunnel {main_tun} remote '{main_pe_docking}'
 set interfaces tunnel {main_tun} source-address '{main_ce_docking}'
 {ER_NE_BK_BLOCK}
 set protocols static route {main_pe_docking}/32 next-hop {ER_NE_MAIN_PE_NH_DEFAULT}
-{ER_NE_NAT_HEADER_BLOCK}{ER_NE_NAT_BLOCK}{ER_NE_FNET_BLOCK}
+	{ER_NE_NAT_HEADER_BLOCK}
+	{ER_NE_NAT_BLOCK}
+	{ER_NE_FNET_BLOCK}

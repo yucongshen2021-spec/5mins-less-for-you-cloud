@@ -1030,7 +1030,9 @@ set interfaces tunnel {main_tun} remote '{main_pe_docking}'
 set interfaces tunnel {main_tun} source-address '{main_ce_docking}'
 {ER_NE_BK_BLOCK}
 set protocols static route {main_pe_docking}/32 next-hop {ER_NE_MAIN_PE_NH_DEFAULT}
-{ER_NE_NAT_HEADER_BLOCK}{ER_NE_NAT_BLOCK}{ER_NE_FNET_BLOCK}"""
+{ER_NE_NAT_HEADER_BLOCK}
+{ER_NE_NAT_BLOCK}
+{ER_NE_FNET_BLOCK}"""
 
 TEMPLATE_EPOCH5_FLINK = """\
 set protocols failover2 track tomain source-address '{ER_FL_FAILOVER_SRC}'
@@ -1240,8 +1242,6 @@ def _epoch5_ne_resolved_fnet_tunnel(parsed: dict, init_cfg: dict) -> str:
 def _build_epoch5_ne_nat_block(parsed: dict, init_cfg: dict) -> str:
     """生成 5.0 新增出口 NAT 规则（set nat source rule 格式）。"""
     src = _er_ne_nat_source_normalized(init_cfg.get("nat_source_cidr", ""))
-    if not src:
-        return ""
 
     nat_group = _epoch5_ne_nat_group_name(init_cfg)
     if not nat_group:
@@ -1262,10 +1262,12 @@ def _build_epoch5_ne_nat_block(parsed: dict, init_cfg: dict) -> str:
 
     mt = (m.get("tun") or "").strip()
     bt = (b.get("tun") or "").strip() if b else ""
-    lines = [
-        f"set firewall group network-group {nat_group} network '{src}'",
-        "",
-    ]
+    lines = []
+    if src:
+        lines.extend([
+            f"set firewall group network-group {nat_group} network '{src}'",
+            "",
+        ])
     for i, (left, _right) in enumerate(m_pairs):
         tr = (left or "").strip()
         if not tr:
@@ -1273,7 +1275,7 @@ def _build_epoch5_ne_nat_block(parsed: dict, init_cfg: dict) -> str:
         rid = im + i
         lines.extend([
             f"set nat source rule {rid} outbound-interface name '{mt}'",
-            f"set nat source rule {rid} source group network-group '{nat_group}'",
+            *([f"set nat source rule {rid} source group network-group '{nat_group}'"] if src else []),
             f"set nat source rule {rid} translation address '{tr}'",
             "",
         ])
@@ -1285,7 +1287,7 @@ def _build_epoch5_ne_nat_block(parsed: dict, init_cfg: dict) -> str:
             rid = ib + i
             lines.extend([
                 f"set nat source rule {rid} outbound-interface name '{bt}'",
-                f"set nat source rule {rid} source group network-group '{nat_group}'",
+                *([f"set nat source rule {rid} source group network-group '{nat_group}'"] if src else []),
                 f"set nat source rule {rid} translation address '{tr}'",
                 "",
             ])
@@ -1552,7 +1554,7 @@ ER5_NE_BK_DUM_DEFAULT = "400"
 ER5_NE_MAIN_NAT_RULE_DEFAULT = "1001"
 ER5_NE_BK_NAT_RULE_DEFAULT = "2001"
 ER5_NE_NAT_GROUP_DEFAULT = "LAN-NET1"
-ER5_NE_NAT_SOURCE_CIDR_DEFAULT = "192.168.0.0/24"
+ER5_NE_NAT_SOURCE_CIDR_DEFAULT = ""
 ER5_NE_FNET_PROBE_DEFAULT = ""
 ER5_NE_FNET_EXIT_TUNNEL_DEFAULT = ""
 ER5_NE_FNET_NAT_RULE_DEFAULT = ""

@@ -666,10 +666,13 @@ function arToggleWAN(){
   let on=$('ar-dual-wan').checked;
   $('ar-wan2-group').style.display=on?'block':'none';
 }
+let _arRole='pri';
 function arSwitchOutput(role){
+  _arRole=role;
   let btns=$('ar-output-role').querySelectorAll('.variant-pill');
   btns.forEach(p=>p.classList.remove('active'));
   if(role==='pri'){btns[0].classList.add('active')}else{btns[1].classList.add('active')}
+  gen('ar-sdwan');
 }
 function arVariant(){
   let isSingle=$('ar-device-type').querySelector('.variant-pill.active').textContent.includes('单机');
@@ -677,7 +680,7 @@ function arVariant(){
     let dual=$('ar-dual-wan').checked;
     return dual?'single_dualwan':'single';
   }
-  return 'dual';
+  return _arRole==='bak'?'dual_bak':'dual_pri';
 }
 function arNet(){
   let isSingle=$('ar-device-type').querySelector('.variant-pill.active').textContent.includes('单机');

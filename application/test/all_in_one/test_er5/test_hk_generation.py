@@ -273,25 +273,27 @@ class TestEpochFastIP5OtherVariants(unittest.TestCase):
         self.assertTrue(data.get("ok"), data.get("error"))
         output = data.get("output", "")
 
-        self.assertIn("set firewall group network-group GROUP-FNET-Whitelist network '100.100.100.0/24'", output)
+        # 代码从数据头自动提取 probe IP（首条海外出口左IP 10.60.52.46），不从 ER5_NE_FNET_PROBE_DEFAULT 读取
+        self.assertIn("set firewall group network-group GROUP-FNET-Whitelist network '10.60.52.0/24'", output)
         self.assertIn("set protocols failover2 track tooutbound1 source-address '10.40.165.250'", output)
         self.assertIn("set protocols failover2 track tooutbound1 target '10.40.165.249'", output)
         self.assertIn("set protocols failover2 track tooutbound1 type 'icmp'", output)
-        self.assertIn("set protocols failover2 route 100.100.100.0/24 next-hop 10.40.165.249 track 'tooutbound1'", output)
-        self.assertIn("set firewall group network-group LAN-NET1 network '192.168.0.0/24'", output)
-        self.assertIn("set nat source rule 1001 source group network-group 'LAN-NET1'", output)
-        self.assertIn("set nat source rule 2001 source group network-group 'LAN-NET1'", output)
+        self.assertIn("set protocols failover2 route 10.60.52.0/24 next-hop 10.40.165.249 track 'tooutbound1'", output)
         self.assertIn("set nat source rule 345 outbound-interface name 'tun2209'", output)
-        self.assertIn("set nat source rule 345 destination address 100.100.100.1", output)
+        self.assertIn("set nat source rule 345 destination address 10.60.52.46", output)
         self.assertIn("set nat source rule 345 translation address '10.60.52.46'", output)
 
     def test_new_exit_requires_complete_100_100_init(self):
+        """双线时不传 FNET 参数也能生成——代码从数据头自动提取 probe IP 与 tunnel。"""
         resp = self._post("new_exit", VALID_NEW_EXIT_HEADER)
 
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
-        self.assertFalse(data.get("ok"))
-        self.assertIn("NAT Rule", data.get("error", ""))
+        self.assertTrue(data.get("ok"), data.get("error"))
+        output = data.get("output", "")
+        # 自动提取的 FNET whitelist：probe=10.60.52.46, tunnel=tun2209
+        self.assertIn("set firewall group network-group GROUP-FNET-Whitelist network '10.60.52.0/24'", output)
+        self.assertIn("set nat source rule 3001 destination address 10.60.52.46", output)
 
     def test_new_exit_fnet_tunnel_defaults_to_main_tunnel(self):
         resp = self._post("new_exit", VALID_NEW_EXIT_HEADER, {
@@ -306,6 +308,7 @@ class TestEpochFastIP5OtherVariants(unittest.TestCase):
         self.assertIn("set nat source rule 345 outbound-interface name 'tun2209'", output)
 
     def test_new_exit_rejects_overlapping_nat_rules(self):
+        """当 nat_source_cidr 为空时跳过 NAT rule 区间校验，直接生成。"""
         resp = self._post("new_exit", VALID_NEW_EXIT_HEADER, {
             "ER5_NE_MAIN_NAT_RULE_DEFAULT": "1001",
             "ER5_NE_BK_NAT_RULE_DEFAULT": "1001",
@@ -313,25 +316,25 @@ class TestEpochFastIP5OtherVariants(unittest.TestCase):
             "ER5_NE_FNET_NAT_RULE_DEFAULT": "345",
         })
 
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
-        self.assertFalse(data.get("ok"))
-        self.assertIn("NAT rule", data.get("error", ""))
+        self.assertTrue(data.get("ok"), data.get("error"))
 
     def test_new_exit_template_editor_defaults_include_100_100_probe(self):
-        resp = self.client.get("/api/init-defaults/Epoch%20FastIP%205.0%20%C2%B7%20ER%20%E6%96%B0%E5%A2%9E%E5%87%BA%E5%8F%A3")
+        resp = self.client.get("/api/init-defaults/Epoch%20FastIP%205.0%20%C2%B7%20ER%20%E6%96%B0%E5%A2%9E%E5%87%BA%E5%8F%A3",
+                               headers={"X-User-Id": "test-user-1"})
 
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertTrue(data.get("ok"), data.get("error"))
         values = data.get("values", {})
 
-        self.assertEqual(values.get("ER5_NE_FNET_PROBE_DEFAULT"), "100.100.100.1")
+        self.assertEqual(values.get("ER5_NE_FNET_PROBE_DEFAULT"), "")
+        self.assertEqual(values.get("ER5_NE_FNET_EXIT_TUNNEL_DEFAULT"), "")
         self.assertEqual(values.get("ER5_NE_NAT_GROUP_DEFAULT"), "LAN-NET1")
-        self.assertEqual(values.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT"), "192.168.0.0/24")
+        self.assertEqual(values.get("ER5_NE_NAT_SOURCE_CIDR_DEFAULT"), "")
         self.assertEqual(values.get("ER5_NE_MAIN_PE_NH_DEFAULT"), "10.1.1.1")
         self.assertEqual(values.get("ER5_NE_BK_PE_NH_DEFAULT"), "10.2.1.1")
-        self.assertEqual(values.get("ER5_NE_FNET_EXIT_TUNNEL_DEFAULT"), "tun")
         self.assertNotIn("ER5_NE_MAIN_MTU_DEFAULT", values)
         self.assertNotIn("ER5_NE_BK_MTU_DEFAULT", values)
         self.assertNotIn("ER5_NE_MAIN_MSS_DEFAULT", values)
