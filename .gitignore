@@ -88,3 +88,4 @@ user_activity/
 **/user_activity/
 data/users/test*
 data/users/ctest*
+db_backup/
