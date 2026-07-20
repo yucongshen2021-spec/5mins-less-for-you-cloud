@@ -352,21 +352,24 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False, ns: dict = 
                     bk_tun = d.get("bk_tunnel", "") or d.get("bk_us_tun", "")
                     main_nat = d.get("hkip_nat", "") or d.get("main_us_nat_ip", "")
                     bk_nat = d.get("hkip_nat", "") or d.get("bk_us_nat_ip", "")
+                    # 单出口判断：备线 tunnel 或 NAT IP 为空 -> 不生成备线 NAT rule
+                    is_single_us = (not bk_tun) or (not bk_nat)
                     for i, net in enumerate(nets):
                         r_main = 100 + i
-                        r_bk = 200 + i
                         overseas_lines.append(
                             f"set nat source rule {r_main} outbound-interface '{main_tun}'")
                         overseas_lines.append(
                             f"set nat source rule {r_main} source address '{net}'")
                         overseas_lines.append(
                             f"set nat source rule {r_main} translation address '{main_nat}'")
-                        overseas_lines.append(
-                            f"set nat source rule {r_bk} outbound-interface '{bk_tun}'")
-                        overseas_lines.append(
-                            f"set nat source rule {r_bk} source address '{net}'")
-                        overseas_lines.append(
-                            f"set nat source rule {r_bk} translation address '{bk_nat}'")
+                        if not is_single_us:
+                            r_bk = 200 + i
+                            overseas_lines.append(
+                                f"set nat source rule {r_bk} outbound-interface '{bk_tun}'")
+                            overseas_lines.append(
+                                f"set nat source rule {r_bk} source address '{net}'")
+                            overseas_lines.append(
+                                f"set nat source rule {r_bk} translation address '{bk_nat}'")
                     d["overseas_nat_block"] = "\n".join(overseas_lines)
     for dhcp_k in ("wan_dhcp", "lan_dhcp", "gen_return_route", "bypass"):
         v = network.get(dhcp_k)

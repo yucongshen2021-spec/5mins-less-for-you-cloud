@@ -352,8 +352,109 @@ r = c.post('/api/template/load', json={'key':'不存在的场景'}).get_json()
 t("无效场景-返回404", not r.get("ok"))
 
 # ═════════════════════════════════════════════════════════════
-# RESULTS
+# SECTION 12: ER 4.0 非香港出口单出口（无备线）测试
 # ═════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("SECTION 12: ER 4.0 非香港出口 -- 单出口（无备线）")
+print("=" * 60)
+
+# 单出口数据头：只有主 ACVPN + 主 natpe，无备线
+HDR_SINGLE = HDR["er_us_single"]
+
+# 1. 生成成功 + 提示
+r = c.post("/api/generate/epoch_fastip", json={
+    "variant": "us", "header_text": HDR_SINGLE,
+    "network": {"wan_cidr": "192.168.1.10/24", "wan_gw": "192.168.1.1",
+               "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"}
+}).get_json()
+out_single = r.get("output", "")
+t("单出口-生成成功", r.get("ok"))
+t("单出口-有提示", "单出口" in out_single)
+t("单出口-主线tun1267存在", "tun1267" in out_single)
+t("单出口-主线vtun17953存在", "vtun17953" in out_single)
+t("单出口-dum100存在", "dum100" in out_single)
+t("单出口-无备线tun2366", "tun2366" not in out_single)
+t("单出口-无备线vtun50057", "vtun50057" not in out_single)
+t("单出口-无RSVR2", "RSVR2" not in out_single)
+t("单出口-无backupe", "backupe" not in out_single)
+t("单出口-无backnatpe", "backnatpe" not in out_single)
+t("单出口-无table102", "table 102" not in out_single)
+t("单出口-无dum200", "dum200" not in out_single)
+t("单出口-无rule3050", "rule 3050" not in out_single)
+t("单出口-无空tunnel行", "set interfaces tunnel  address" not in out_single)
+t("单出口-无空openvpn行", "set interfaces openvpn  description" not in out_single)
+t("单出口-无空outbound", "outbound-interface ''" not in out_single)
+t("单出口-NAT rule 100存在", "rule 100 outbound" in out_single)
+t("单出口-无NAT rule 200", "rule 200 outbound" not in out_single)
+t("单出口-有track mainupe", "mainupe" in out_single)
+t("单出口-有track mainnatpe", "mainnatpe" in out_single)
+t("单出口-有table 101", "table 101" in out_single)
+t("单出口-有BGP RSVR", "peer-group RSVR" in out_single)
+t("单出口-有route 192.168.55.250", "192.168.55.250" in out_single)
+t("单出口-无distance 5(备)", "distance '5'" not in out_single)
+
+# 2. 单出口 + bypass 模式
+r2 = c.post("/api/generate/epoch_fastip", json={
+    "variant": "us", "header_text": HDR_SINGLE,
+    "network": {"wan_cidr": "192.168.1.10/24", "wan_gw": "192.168.1.1",
+               "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8",
+               "bypass": True}
+}).get_json()
+t("单出口+bypass-生成成功", r2.get("ok"))
+t("单出口+bypass-无LAN接口", "eth5 address" not in r2.get("output", ""))
+
+# 3. 单出口 + 回程路由
+r3 = c.post("/api/generate/epoch_fastip", json={
+    "variant": "us", "header_text": HDR_SINGLE,
+    "network": {"wan_cidr": "192.168.1.10/24", "wan_gw": "192.168.1.1",
+               "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8",
+               "gen_return_route": True}
+}).get_json()
+t("单出口+回程-生成成功", r3.get("ok"))
+t("单出口+回程-有回程路由", "static route 10.0.0.0/8 next-hop 192.168.5.1" in r3.get("output", ""))
+
+# 4. 双出口回归（确保不回归）
+HDR_DUAL_FULL = (
+    "LineID:609169A1\nPE:gzd-upe5\nTunnel:Tunnel0/0/1165\nwanip:10.55.14.64/30\n"
+    "PE 对接:192.168.247.17\nPE:gzd-acvpnpe2\nTunnel:vtun17953\nwanip:10.23.0.120/30\n"
+    "PE 对接:183.63.68.171\n\n"
+    "LineID:609169A2\nPE:dgb-upebk2\nTunnel:Tunnel0/0/1998\nwanip:10.40.209.220/30\n"
+    "PE 对接:192.168.251.100\nPE:dgb-acvpnpe2\nTunnel:vtun50057\nwanip:10.30.167.200/30\n"
+    "PE 对接:121.12.128.254\n\n"
+    "LineID:609169A5\nPE： twb-natpe2\nWANIP: 10.21.32.124/30\nTUNNEL: tun1267\n"
+    "PE Docking：192.168.239.12\nCE Docking：10.22.241.232\n"
+    "BGPSERVER IP：103.252.19.25,43.229.117.226\n海外出口ip：\n10.60.44.28-218.32.88.83\n\n"
+    "LineID:609169A6\nPE： twb-natpe1\nWANIP: 10.21.31.120/30\nTUNNEL: tun2366\n"
+    "PE Docking：192.168.239.14\nCE Docking：10.22.241.232\n"
+    "BGPSERVER IP：103.252.19.99,43.229.119.251\n海外出口ip：\n10.60.18.22-150.116.112.236"
+)
+r4 = c.post("/api/generate/epoch_fastip", json={
+    "variant": "us", "header_text": HDR_DUAL_FULL,
+    "network": {"wan_cidr": "192.168.1.10/24", "wan_gw": "192.168.1.1",
+               "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"}
+}).get_json()
+out_dual = r4.get("output", "")
+t("双出口回归-生成成功", r4.get("ok"))
+t("双出口-无单出口提示", "单出口" not in out_dual)
+t("双出口-有备线tun2366", "tun2366" in out_dual)
+t("双出口-有RSVR2", "RSVR2" in out_dual)
+t("双出口-有backupe", "backupe" in out_dual)
+t("双出口-有table 102", "table 102" in out_dual)
+t("双出口-有dum200", "dum200" in out_dual)
+t("双出口-有rule 3050", "rule 3050" in out_dual)
+t("双出口-有NAT rule 200", "rule 200 outbound" in out_dual)
+t("双出口-无空行", "set interfaces tunnel  address" not in out_dual and "outbound-interface ''" not in out_dual)
+
+# 5. HK 出口不受影响
+r5 = c.post("/api/generate/epoch_fastip", json={
+    "variant": "hk", "header_text": HDR["er_hk"],
+    "network": {"wan_cidr": "192.168.1.10/24", "wan_gw": "192.168.1.1",
+               "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"}
+}).get_json()
+t("HK不受影响-生成成功", r5.get("ok"))
+t("HK不受影响-无空outbound", "outbound-interface ''" not in r5.get("output", ""))
+
+
 print(f"\n{'='*60}")
 print(f"  完整测试报告")
 print(f"{'='*60}")
