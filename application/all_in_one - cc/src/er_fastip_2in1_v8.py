@@ -2649,6 +2649,9 @@ def parse_er_flink_headers(raw_text: str):
     支持两种格式：
     1. 新格式：PE：szd-vupe6  FPE：F-ShenZhen4  预留IP：100.94.1.0/29
     2. 旧格式：name:cidr 或纯 cidr
+
+    放宽策略：遇到无法解析的行跳过（不报错）；预留 IP 无 /掩码 自动补 /32。
+    只要能提取到至少 1 个有效网段就返回成功。不足 3 个时返回提示（不阻断）。
     """
     routes = []
     for ln in (raw_text or "").splitlines():
@@ -2670,19 +2673,27 @@ def parse_er_flink_headers(raw_text: str):
             name = name.strip() or "预留IP"
             cidr = cidr.strip()
         else:
+            # 纯 IP/CIDR 行
             name = "预留IP"
             cidr = line
         if not cidr:
-            return [], f"数据头格式错误：{line}"
+            continue  # 跳过无法提取的行
+        # 无 /掩码 时自动补 /32
         if "/" not in cidr:
-            return [], f"CIDR 缺少掩码：{cidr}"
+            # 确认是合法 IP 才补 /32，否则跳过
+            if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", cidr):
+                cidr = cidr + "/32"
+            else:
+                continue  # 不是 IP/CIDR，跳过
         try:
             cidr_norm = str(ipaddress.ip_network(cidr, strict=False))
-        except ValueError as e:
-            return [], f"CIDR 非法：{cidr} ({e})"
+        except ValueError:
+            continue  # CIDR 非法，跳过不报错
         routes.append((name, cidr_norm))
     if not routes:
-        return [], "请先填写飞连数据头（至少 1 行）"
+        return [], "请先填写飞连数据头（至少 1 行有效的预留IP/网段）"
+    if len(routes) < 3:
+        return routes, f"仅识别到 {len(routes)} 个飞连网段，不足 3 个，已按有效网段生成（不足部分需手动补充）"
     return routes, None
 
 

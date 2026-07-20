@@ -826,8 +826,8 @@ def generate_epoch_fastip():
             if not parse_fn:
                 return jsonify({"ok": False, "error": _humanize_error("Flink parser not found", variant)}), 500
             routes, err = parse_fn(hdr_text)
-            if err:
-                return jsonify({"ok": False, "error": _humanize_error(err, variant)}), 400
+            if not routes:
+                return jsonify({"ok": False, "error": _humanize_error(err or "解析失败", variant)}), 400
             main_nh = network.get("ER_FL_MAIN_NH_DEFAULT", er.get("ER_FL_MAIN_NH_DEFAULT", "10.1.1.1"))
             backup_nh = network.get("ER_FL_BACKUP_NH_DEFAULT", er.get("ER_FL_BACKUP_NH_DEFAULT", "10.2.1.1"))
             output = ""
@@ -1065,8 +1065,8 @@ def generate_epoch_fastip5():
             if not parse_fn:
                 return jsonify({"ok": False, "error": "Flink parser not found"}), 500
             routes, err = parse_fn(hdr_text)
-            if err:
-                return jsonify({"ok": False, "error": _humanize_error(err, variant)}), 400
+            if not routes:
+                return jsonify({"ok": False, "error": _humanize_error(err or "解析失败", variant)}), 400
             main_nh = network.get("ER5_FL_MAIN_NH_DEFAULT", er5.get("ER5_FL_MAIN_NH_DEFAULT", "10.1.1.1"))
             backup_nh = network.get("ER5_FL_BACKUP_NH_DEFAULT", er5.get("ER5_FL_BACKUP_NH_DEFAULT", "10.2.1.1"))
             output = ""
