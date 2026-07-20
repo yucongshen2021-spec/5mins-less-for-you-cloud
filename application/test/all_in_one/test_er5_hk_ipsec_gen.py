@@ -67,6 +67,100 @@ def test_generate_success():
     assert "10.20.180.193" in output  # bgp_neighbor
 
 
+def test_wan_dhcp_mode():
+    """WAN DHCP=True -> WAN 接口用 dhcp，不生成默认路由。"""
+    r = client.post("/api/generate/epoch_fastip5", json={
+        "variant": "hk_ipsec", "header_text": SAMPLE_HEADER,
+        "network": {**NET, "wan_dhcp": True}
+    })
+    data = r.get_json()
+    assert data["ok"], data.get("error", "")
+    output = data["output"]
+    assert "eth0 address 'dhcp'" in output
+    # 默认路由不应生成
+    assert "0.0.0.0/0 next-hop 1.1.1.1 distance '222'" not in output
+
+
+def test_bypass_mode():
+    """旁挂(单臂)模式 -> 不生成 LAN 接口和 DHCP server。"""
+    r = client.post("/api/generate/epoch_fastip5", json={
+        "variant": "hk_ipsec", "header_text": SAMPLE_HEADER,
+        "network": {**NET, "bypass": True}
+    })
+    data = r.get_json()
+    assert data["ok"], data.get("error", "")
+    output = data["output"]
+    assert "旁挂" in output
+    assert "eth5 address" not in output  # LAN 接口不生成
+    assert "NAT_LAN subnet" not in output  # DHCP server 不生成
+
+
+def test_return_routes():
+    """回程路由=True -> 生成内网段回程路由，next-hop 用 LAN 网关。"""
+    r = client.post("/api/generate/epoch_fastip5", json={
+        "variant": "hk_ipsec", "header_text": SAMPLE_HEADER,
+        "network": {**NET, "gen_return_route": True, "bypass": False}
+    })
+    data = r.get_json()
+    assert data["ok"], data.get("error", "")
+    output = data["output"]
+    # 回程路由 next-hop 应该是 LAN IP（192.168.15.1），不是旧的模块默认 192.168.5.1
+    assert "set protocols static route 10.0.0.0/8 next-hop 192.168.15.1" in output
+    assert "192.168.5.1" not in output  # 不应出现旧默认网关
+
+
+def test_bypass_return_routes():
+    """旁挂 + 回程路由 -> 回程路由 next-hop 用 WAN 网关。"""
+    r = client.post("/api/generate/epoch_fastip5", json={
+        "variant": "hk_ipsec", "header_text": SAMPLE_HEADER,
+        "network": {**NET, "bypass": True, "gen_return_route": True}
+    })
+    data = r.get_json()
+    assert data["ok"], data.get("error", "")
+    output = data["output"]
+    assert "set protocols static route 10.0.0.0/8 next-hop 192.168.1.1" in output
+
+
+def test_lan_dhcp_off():
+    """LAN DHCP=False -> 不生成 DHCP server 块。"""
+    r = client.post("/api/generate/epoch_fastip5", json={
+        "variant": "hk_ipsec", "header_text": SAMPLE_HEADER,
+        "network": {**NET, "lan_dhcp": False}
+    })
+    data = r.get_json()
+    assert data["ok"], data.get("error", "")
+    output = data["output"]
+    assert "NAT_LAN subnet" not in output
+
+
+def test_nat_exclude_rules():
+    """NAT exclude rule 5/6 让 192.168.55.250 不被 NAT。"""
+    r = client.post("/api/generate/epoch_fastip5", json={
+        "variant": "hk_ipsec", "header_text": SAMPLE_HEADER,
+        "network": NET
+    })
+    data = r.get_json()
+    assert data["ok"], data.get("error", "")
+    output = data["output"]
+    assert "set nat source rule 5 destination address '192.168.55.250/32'" in output
+    assert "set nat source rule 5 exclude" in output
+    assert "set nat source rule 6 destination address '192.168.55.250/32'" in output
+    assert "set nat source rule 6 exclude" in output
+
+
+def test_dial_ip_routes():
+    """拨号 IP 路由都走 1.1.1.1（不走 wan_gw）。"""
+    r = client.post("/api/generate/epoch_fastip5", json={
+        "variant": "hk_ipsec", "header_text": SAMPLE_HEADER,
+        "network": NET
+    })
+    data = r.get_json()
+    assert data["ok"], data.get("error", "")
+    output = data["output"]
+    assert "set protocols static route 116.31.80.174/32 next-hop 1.1.1.1" in output
+    assert "set protocols static route 120.133.134.66/32 next-hop 1.1.1.1" in output
+
+
 def test_generate_empty_header():
     r = client.post("/api/generate/epoch_fastip5", json={
         "variant": "hk_ipsec", "header_text": "", "network": {}

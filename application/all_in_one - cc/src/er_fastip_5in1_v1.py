@@ -2700,10 +2700,8 @@ TEMPLATE_EPOCH5_HK_IPSEC = (
     "set interfaces dummy dum1 address '{hkip}/32'\n"
     "set interfaces dummy dum1 description 'HKIP-{hkip}'\n"
     "\n"
-    "set interfaces ethernet {wan_if} address '{wan_ip}/{wan_cidr_prefix}'\n"
-    "set interfaces ethernet {wan_if} description 'WAN1'\n"
-    "set interfaces ethernet {lan_if} address '{lan_ip}/{lan_cidr_prefix}'\n"
-    "set interfaces ethernet {lan_if} description 'LAN1'\n"
+    "{wan_if_block}\n"
+    "{lan_if_block}\n"
     "set interfaces loopback lo address '{main_loop_ip}/32'\n"
     "set interfaces loopback lo address '{bk_loop_ip}/32'\n"
     "set interfaces loopback lo address '{bgp_neighbor}/32'\n"
@@ -2984,11 +2982,8 @@ TEMPLATE_EPOCH5_HK_IPSEC = (
     "set vpn ipsec site-to-site peer backup tunnel 1 local prefix '{bk_loop_ip}/32'\n"
     "set vpn ipsec site-to-site peer backup tunnel 1 remote prefix '{bk_pe_docking}/32'\n"
     "\n"
-    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 option default-router '192.168.15.1'\n"
-    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 option name-server '192.168.15.1'\n"
-    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 range Lan1_range start '192.168.15.10'\n"
-    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 range Lan1_range stop '192.168.15.200'\n"
-    "set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 subnet-id '15'\n"
+    "{dhcp_block}\n"
+    "{return_routes_block}\n"
 )
 
 
@@ -3627,6 +3622,10 @@ def build_epoch5_hk_ipsec_format_dict(hdr_text: str):
     lan_cidr = str(g.get("DEFAULT_LAN_CIDR", "")).strip()
     wan_gw = str(g.get("DEFAULT_WAN_GW", "")).strip()
     wan_dhcp = bool(g.get("DEFAULT_WAN_DHCP", False))
+    lan_dhcp = bool(g.get("DEFAULT_LAN_DHCP", True))
+    bypass = bool(g.get("DEFAULT_BYPASS", False))
+    gen_return_route = bool(g.get("DEFAULT_GEN_RETURN_ROUTE", False))
+    lan_gw = str(g.get("DEFAULT_LAN_GW", "")).strip()
     inner_nets_raw = str(g.get("DEFAULT_INNER_NETS", "")).strip()
 
     ok_wan, msg_wan = _validate_cidr(wan_cidr, "WAN IP")
@@ -3715,6 +3714,76 @@ def build_epoch5_hk_ipsec_format_dict(hdr_text: str):
         )
     else:
         pki_block = ""
+
+    # ── WAN 接口块（DHCP 模式用 dhcp）──
+    if wan_dhcp:
+        wan_if_block = (
+            f"set interfaces ethernet {wan_if} address 'dhcp'\n"
+            f"set interfaces ethernet {wan_if} description 'WAN1'"
+        )
+    else:
+        wan_if_block = (
+            f"set interfaces ethernet {wan_if} address '{wan_ip}/{wan_cidr_prefix}'\n"
+            f"set interfaces ethernet {wan_if} description 'WAN1'"
+        )
+
+    # ── LAN 接口块（旁挂模式跳过）──
+    if bypass:
+        lan_if_block = "# 旁挂模式 - 跳过 LAN 接口配置"
+    else:
+        lan_if_block = (
+            f"set interfaces ethernet {lan_if} address '{lan_ip}/{lan_cidr_prefix}'\n"
+            f"set interfaces ethernet {lan_if} description 'LAN1'"
+        )
+
+    # ── DHCP server 块（LAN DHCP 开启且非旁挂时生成）──
+    if lan_dhcp and lan_cidr and lan_ip and not bypass:
+        try:
+            _net = ipaddress.ip_network(lan_cidr.strip(), strict=False)
+            _prefix = _net.prefixlen
+            _network_addr = str(_net.network_address)
+            _hosts = list(_net.hosts())
+            if _hosts:
+                d_start = str(_hosts[min(9, len(_hosts) - 1)])
+                d_stop = str(_hosts[min(199, len(_hosts) - 1)])
+            else:
+                d_start = d_stop = ""
+            dhcp_block = (
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {_network_addr}/{_prefix} option default-router '{lan_ip}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {_network_addr}/{_prefix} option name-server '{lan_ip}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {_network_addr}/{_prefix} range Lan1_range start '{d_start}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {_network_addr}/{_prefix} range Lan1_range stop '{d_stop}'\n"
+                f"set service dhcp-server shared-network-name NAT_LAN "
+                f"subnet {_network_addr}/{_prefix} subnet-id '{_prefix}'"
+            )
+        except Exception:
+            dhcp_block = "# DHCP 服务器未配置 - LAN CIDR 解析失败"
+    else:
+        dhcp_block = "# DHCP 服务器未启用"
+
+    # ── 回程路由块 ──
+    if gen_return_route:
+        rr_base_cidr = wan_cidr if bypass else lan_cidr
+        # LAN_GW 优先用显式值，否则从 lan_cidr 提取（模块级 DEFAULT_LAN_GW 可能是旧值）
+        rr_gw = wan_gw if bypass else (lan_gw or (lan_cidr.split("/")[0] if lan_cidr else ""))
+        # 若 lan_gw 仍是模块默认值（与 lan_cidr 不匹配），回退到 lan_cidr 提取
+        if not bypass and lan_cidr and rr_gw:
+            try:
+                _lan_net = ipaddress.ip_network(lan_cidr.strip(), strict=False)
+                _gw_net = ipaddress.ip_network(f"{rr_gw}/32", strict=False)
+                if _gw_net.network_address not in _lan_net:
+                    rr_gw = lan_cidr.split("/")[0]
+            except Exception:
+                pass
+        rr_outside = _nets_needing_return(rr_base_cidr, inner_nets)
+        rr_lines = [f"set protocols static route {net} next-hop {rr_gw}" for net in rr_outside]
+        return_routes_block = "\n".join(rr_lines) if rr_lines else ""
+    else:
+        return_routes_block = ""
 
     # ── LAN-NET：来自统一的内网段配置 ──
     lan_net_block = "\n".join(
@@ -3834,6 +3903,10 @@ def build_epoch5_hk_ipsec_format_dict(hdr_text: str):
         "bk_ike_dpd_block": bk_ike_dpd_block,
         # 派生块
         "pki_block": pki_block,
+        "wan_if_block": wan_if_block,
+        "lan_if_block": lan_if_block,
+        "dhcp_block": dhcp_block,
+        "return_routes_block": return_routes_block,
         "lan_net_block": lan_net_block,
         "default_route_block": default_route_block,
         "ipsec_routes_block": ipsec_routes_block,

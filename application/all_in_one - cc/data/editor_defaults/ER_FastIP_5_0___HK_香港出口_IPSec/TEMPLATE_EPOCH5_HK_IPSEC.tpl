@@ -33,10 +33,8 @@ set firewall ipv4 name WAN2LOCAL rule 1230 protocol 'esp'
 set interfaces dummy dum1 address '{hkip}/32'
 set interfaces dummy dum1 description 'HKIP-{hkip}'
 
-set interfaces ethernet {wan_if} address '{wan_ip}/{wan_cidr_prefix}'
-set interfaces ethernet {wan_if} description 'WAN1'
-set interfaces ethernet {lan_if} address '{lan_ip}/{lan_cidr_prefix}'
-set interfaces ethernet {lan_if} description 'LAN1'
+{wan_if_block}
+{lan_if_block}
 set interfaces loopback lo address '{main_loop_ip}/32'
 set interfaces loopback lo address '{bk_loop_ip}/32'
 set interfaces loopback lo address '{bgp_neighbor}/32'
@@ -316,8 +314,5 @@ set vpn ipsec site-to-site peer backup remote-address '{bk_dial_ip}'
 set vpn ipsec site-to-site peer backup tunnel 1 local prefix '{bk_loop_ip}/32'
 set vpn ipsec site-to-site peer backup tunnel 1 remote prefix '{bk_pe_docking}/32'
 
-set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 option default-router '192.168.15.1'
-set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 option name-server '192.168.15.1'
-set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 range Lan1_range start '192.168.15.10'
-set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 range Lan1_range stop '192.168.15.200'
-set service dhcp-server shared-network-name NAT_LAN subnet 192.168.15.0/24 subnet-id '15'
+{dhcp_block}
+{return_routes_block}
