@@ -505,6 +505,7 @@ TEMPLATE_EPOCH_US = """\
 #   WANIP:{bk_us_wanip}  PE侧:{bk_us_pe_ip}  CE侧:{bk_us_gre_ce_ip}
 #   PE docking:{bk_us_pe_docking}  NAT IP(FakeIP):{bk_us_nat_ip_all}
 #   BGP: {bk_us_bgp1}, {bk_us_bgp2}
+{bk_header_block}
 # ───────────────────────────────────────────────────────
 # BGP更新源(主)：{main_us_nat_ip_all}  BGP更新源(备)：{bk_us_nat_ip_all}
 # 注意：请自行增加nat/dns/mtu部分！！
@@ -561,9 +562,7 @@ set interfaces dummy dum0 description 'CE Docking'
 set interfaces dummy dum100 address '{main_us_nat_ip}/32'
 set interfaces dummy dum100 description '{main_us_dum100_desc}'
 {extra_dum_main_block}
-set interfaces dummy dum200 address '{bk_us_nat_ip}/32'
-set interfaces dummy dum200 description '{bk_us_dum200_desc}'
-{extra_dum_bk_block}
+{bk_dum_block}
 set interfaces openvpn {main_acvpn_vtun_id} description 'MAIN_{main_acvpn_vtun_pe}'
 set interfaces openvpn {main_acvpn_vtun_id} firewall local name 'WAN2LOCAL'
 set interfaces openvpn {main_acvpn_vtun_id} local-address {main_acvpn_vtun_local} subnet-mask '255.255.255.252'
@@ -578,20 +577,7 @@ set interfaces openvpn {main_acvpn_vtun_id} remote-address '{main_acvpn_vtun_rem
 set interfaces openvpn {main_acvpn_vtun_id} remote-host '{main_acvpn_vtun_docking}'
 set interfaces openvpn {main_acvpn_vtun_id} remote-port '{main_acvpn_vtun_port}'
 set interfaces openvpn {main_acvpn_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'
-set interfaces openvpn {bk_acvpn_vtun_id} description 'BK_{bk_acvpn_vtun_pe}'
-set interfaces openvpn {bk_acvpn_vtun_id} firewall local name 'WAN2LOCAL'
-set interfaces openvpn {bk_acvpn_vtun_id} local-address {bk_acvpn_vtun_local} subnet-mask '255.255.255.252'
-set interfaces openvpn {bk_acvpn_vtun_id} mode 'site-to-site'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--nobind'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--ping 10'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--ping-restart 60'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--persist-tun'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--fragment 1300'
-set interfaces openvpn {bk_acvpn_vtun_id} protocol 'udp'
-set interfaces openvpn {bk_acvpn_vtun_id} remote-address '{bk_acvpn_vtun_remote}'
-set interfaces openvpn {bk_acvpn_vtun_id} remote-host '{bk_acvpn_vtun_docking}'
-set interfaces openvpn {bk_acvpn_vtun_id} remote-port '{bk_acvpn_vtun_port}'
-set interfaces openvpn {bk_acvpn_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'
+{bk_acvpn_vtun_section}
 set interfaces tunnel {main_acvpn_gre_tun} address '{main_acvpn_gre_ce_ip}/30'
 set interfaces tunnel {main_acvpn_gre_tun} description 'MAIN_{main_acvpn_gre_pe}'
 set interfaces tunnel {main_acvpn_gre_tun} encapsulation 'gre'
@@ -601,15 +587,7 @@ set interfaces tunnel {main_acvpn_gre_tun} multicast 'disable'
 set interfaces tunnel {main_acvpn_gre_tun} parameters ip ttl '255'
 set interfaces tunnel {main_acvpn_gre_tun} remote '{main_acvpn_gre_remote}'
 set interfaces tunnel {main_acvpn_gre_tun} source-address '{main_acvpn_vtun_local}'
-set interfaces tunnel {bk_acvpn_gre_tun} address '{bk_acvpn_gre_ce_ip}/30'
-set interfaces tunnel {bk_acvpn_gre_tun} description 'BK_{bk_acvpn_gre_pe}'
-set interfaces tunnel {bk_acvpn_gre_tun} encapsulation 'gre'
-set interfaces tunnel {bk_acvpn_gre_tun} firewall local name 'WAN2LOCAL'
-set interfaces tunnel {bk_acvpn_gre_tun} mtu '1476'
-set interfaces tunnel {bk_acvpn_gre_tun} multicast 'disable'
-set interfaces tunnel {bk_acvpn_gre_tun} parameters ip ttl '255'
-set interfaces tunnel {bk_acvpn_gre_tun} remote '{bk_acvpn_gre_remote}'
-set interfaces tunnel {bk_acvpn_gre_tun} source-address '{bk_acvpn_vtun_local}'
+{bk_acvpn_gre_section}
 set interfaces tunnel {main_us_tun} address '{main_us_gre_ce_ip}/30'
 set interfaces tunnel {main_us_tun} description 'MAIN_{main_us_pe}'
 set interfaces tunnel {main_us_tun} encapsulation 'gre'
@@ -619,24 +597,14 @@ set interfaces tunnel {main_us_tun} multicast 'disable'
 set interfaces tunnel {main_us_tun} parameters ip ttl '255'
 set interfaces tunnel {main_us_tun} remote '{main_us_pe_docking}'
 set interfaces tunnel {main_us_tun} source-address '{ce_docking}'
-set interfaces tunnel {bk_us_tun} address '{bk_us_gre_ce_ip}/30'
-set interfaces tunnel {bk_us_tun} description 'BK_{bk_us_pe}'
-set interfaces tunnel {bk_us_tun} encapsulation 'gre'
-set interfaces tunnel {bk_us_tun} firewall local name 'WAN2LOCAL'
-set interfaces tunnel {bk_us_tun} mtu '1452'
-set interfaces tunnel {bk_us_tun} multicast 'disable'
-set interfaces tunnel {bk_us_tun} parameters ip ttl '255'
-set interfaces tunnel {bk_us_tun} remote '{bk_us_pe_docking}'
-set interfaces tunnel {bk_us_tun} source-address '{ce_docking}'
+{bk_us_tunnel_section}
 set nat source rule 10 outbound-interface '{wan_if}'
 set nat source rule 10 translation address 'masquerade'
 {overseas_nat_block}
 set nat source rule 3000 destination address '8.8.0.0/16'
 set nat source rule 3000 outbound-interface '{main_us_tun}'
 set nat source rule 3000 translation address '{main_us_nat_ip}'
-set nat source rule 3050 destination address '8.8.0.0/16'
-set nat source rule 3050 outbound-interface '{bk_us_tun}'
-set nat source rule 3050 translation address '{bk_us_nat_ip}'
+{bk_nat_block}
 set openfalcon endpoint-name '{hostname}'
 set openfalcon server-address '192.168.237.86'
 set policy community-list 80 rule 10 action 'permit'
@@ -673,38 +641,14 @@ set policy route-map bgp-from--RSVR rule 400 action 'permit'
 set policy route-map bgp-from--RSVR rule 400 description 'to_cn_other'
 set policy route-map bgp-from--RSVR rule 400 match community community-list '83'
 set policy route-map bgp-from--RSVR rule 400 set ip-next-hop '1.1.1.1'
-set policy route-map bgp-from--RSVR2 rule 100 action 'permit'
-set policy route-map bgp-from--RSVR2 rule 100 description 'to_hk'
-set policy route-map bgp-from--RSVR2 rule 100 match community community-list '80'
-set policy route-map bgp-from--RSVR2 rule 100 set ip-next-hop '{bk_us_pe_ip}'
-set policy route-map bgp-from--RSVR2 rule 100 set local-preference '50'
-set policy route-map bgp-from--RSVR2 rule 200 action 'permit'
-set policy route-map bgp-from--RSVR2 rule 200 description 'to_ct'
-set policy route-map bgp-from--RSVR2 rule 200 match community community-list '81'
-set policy route-map bgp-from--RSVR2 rule 200 set ip-next-hop '1.1.1.1'
-set policy route-map bgp-from--RSVR2 rule 200 set local-preference '50'
-set policy route-map bgp-from--RSVR2 rule 300 action 'permit'
-set policy route-map bgp-from--RSVR2 rule 300 description 'to_cnc'
-set policy route-map bgp-from--RSVR2 rule 300 match community community-list '82'
-set policy route-map bgp-from--RSVR2 rule 300 set ip-next-hop '1.1.1.1'
-set policy route-map bgp-from--RSVR2 rule 300 set local-preference '50'
-set policy route-map bgp-from--RSVR2 rule 400 action 'permit'
-set policy route-map bgp-from--RSVR2 rule 400 description 'to_cn_other'
-set policy route-map bgp-from--RSVR2 rule 400 match community community-list '83'
-set policy route-map bgp-from--RSVR2 rule 400 set ip-next-hop '1.1.1.1'
-set policy route-map bgp-from--RSVR2 rule 400 set local-preference '50'
+{bk_route_map2_block}
 set protocols bgp 65000 neighbor {main_us_bgp1} peer-group 'RSVR'
 set protocols bgp 65000 neighbor {main_us_bgp2} peer-group 'RSVR'
-set protocols bgp 65000 neighbor {bk_us_bgp1} peer-group 'RSVR2'
-set protocols bgp 65000 neighbor {bk_us_bgp2} peer-group 'RSVR2'
+{bk_bgp_block}
 set protocols bgp 65000 peer-group RSVR address-family ipv4-unicast route-map import 'bgp-from--RSVR'
 set protocols bgp 65000 peer-group RSVR address-family ipv4-unicast soft-reconfiguration inbound
 set protocols bgp 65000 peer-group RSVR remote-as '65000'
 set protocols bgp 65000 peer-group RSVR update-source '{main_us_nat_ip}'
-set protocols bgp 65000 peer-group RSVR2 address-family ipv4-unicast route-map import 'bgp-from--RSVR2'
-set protocols bgp 65000 peer-group RSVR2 address-family ipv4-unicast soft-reconfiguration inbound
-set protocols bgp 65000 peer-group RSVR2 remote-as '65000'
-set protocols bgp 65000 peer-group RSVR2 update-source '{bk_us_nat_ip}'
 set protocols bgp 65000 timers holdtime '15'
 set protocols bgp 65000 timers keepalive '5'
 set track name mainupe failure-count '2'
@@ -713,45 +657,27 @@ set track name mainupe test 10 resp-time '5'
 set track name mainupe test 10 target '{main_acvpn_gre_pe_ip}'
 set track name mainupe test 10 ttl-limit '1'
 set track name mainupe test 10 type 'ping'
-set track name backupe failure-count '2'
-set track name backupe success-count '2'
-set track name backupe test 10 resp-time '5'
-set track name backupe test 10 target '{bk_acvpn_gre_pe_ip}'
-set track name backupe test 10 ttl-limit '1'
-set track name backupe test 10 type 'ping'
+{bk_track_block}
 set track name mainnatpe failure-count '2'
 set track name mainnatpe success-count '2'
 set track name mainnatpe test 10 resp-time '5'
 set track name mainnatpe test 10 target '{main_us_pe_ip}'
 set track name mainnatpe test 10 ttl-limit '1'
 set track name mainnatpe test 10 type 'ping'
-set track name backnatpe failure-count '2'
-set track name backnatpe success-count '2'
-set track name backnatpe test 10 resp-time '5'
-set track name backnatpe test 10 target '{bk_us_pe_ip}'
-set track name backnatpe test 10 ttl-limit '1'
-set track name backnatpe test 10 type 'ping'
 {wan_route_block}
 set protocols static route {main_acvpn_vtun_docking}/32 next-hop 1.1.1.1
-set protocols static route {bk_acvpn_vtun_docking}/32 next-hop 1.1.1.1
 set protocols static route {main_us_pe_docking}/32 next-hop {main_acvpn_gre_pe_ip}
-set protocols static route {bk_us_pe_docking}/32 next-hop {bk_acvpn_gre_pe_ip}
 set protocols static route {main_acvpn_gre_remote}/32 next-hop {main_acvpn_vtun_remote}
-set protocols static route {bk_acvpn_gre_remote}/32 next-hop {bk_acvpn_vtun_remote}
 {us_bgp_routes}
 set protocols static route 192.168.55.250/32 next-hop {main_acvpn_gre_pe_ip} track mainupe
-set protocols static route 192.168.55.250/32 next-hop {bk_acvpn_gre_pe_ip} distance '5'
 set protocols static route 192.168.237.86/32 next-hop {main_acvpn_gre_pe_ip} track mainupe
-set protocols static route 192.168.237.86/32 next-hop {bk_acvpn_gre_pe_ip} distance '5'
 set protocols static route 114.113.245.99/32 next-hop {main_acvpn_gre_pe_ip}
-set protocols static route 114.113.245.100/32 next-hop {bk_acvpn_gre_pe_ip}
+{bk_routes_block}
 {return_routes_block}
 set policy local-route rule 1001 set table '101'
 set policy local-route rule 1001 source '{main_us_gre_ce_ip}'
 set protocols static table 101 route 0.0.0.0/0 next-hop {main_us_pe_ip}
-set policy local-route rule 1002 set table '102'
-set policy local-route rule 1002 source '{bk_us_gre_ce_ip}'
-set protocols static table 102 route 0.0.0.0/0 next-hop {bk_us_pe_ip}
+{bk_pbr_block}
 set system host-name '{hostname}'
 set service dns forwarding allow-from '0.0.0.0/0'
 set service dns forwarding cache-size '1001'
@@ -2012,20 +1938,18 @@ def build_epoch_us_format_dict(raw: str):
         warn_msgs.append(f"备出口IP共{len(bk_nat_ips)}个，超出dum200-dum209限制（最多10个），已截断！")
         bk_nat_ips = bk_nat_ips[:10]
 
-    if not main_nat_ips or not bk_nat_ips:
-        miss = []
-        if not main_nat_ips:
-            miss.append("主线海外出口ip")
-        if not bk_nat_ips:
-            miss.append("备线海外出口ip")
-        return None, ("natmiss", miss), []
+    if not main_nat_ips:
+        return None, ("natmiss", ["主线海外出口ip"]), []
+
+    # 单出口判断：备线无 nat_ip -> 单出口模式
+    is_single = not bk_nat_ips
+    if is_single:
+        warn_msgs.append("检测到单出口数据头（无备线），已按单出口模式生成")
 
     d["main_us_nat_ips"] = main_nat_ips
     d["bk_us_nat_ips"] = bk_nat_ips
-    if main_nat_ips:
-        d["main_us_nat_ip"] = main_nat_ips[0]
-    if bk_nat_ips:
-        d["bk_us_nat_ip"] = bk_nat_ips[0]
+    d["main_us_nat_ip"] = main_nat_ips[0] if main_nat_ips else ""
+    d["bk_us_nat_ip"] = bk_nat_ips[0] if bk_nat_ips else ""
     d["main_us_nat_ip_all"] = ", ".join(main_nat_ips) if main_nat_ips else d.get("main_us_nat_ip", "")
     d["bk_us_nat_ip_all"] = ", ".join(bk_nat_ips) if bk_nat_ips else d.get("bk_us_nat_ip", "")
     d["main_us_dum100_desc"] = "MAIN_OUTIP" if len(main_nat_ips) <= 1 else "MAIN_OUTIP_01"
@@ -2054,7 +1978,7 @@ def build_epoch_us_format_dict(raw: str):
             bgp_lines += [f"set protocols static route {bgp}/32 blackhole distance '10'",
                           f"set protocols static route {bgp}/32 next-hop {main_peip} track mainnatpe"]
     for bgp in [d.get("bk_us_bgp1", ""), d.get("bk_us_bgp2", "")]:
-        if bgp:
+        if bgp and not is_single:
             bgp_lines += [f"set protocols static route {bgp}/32 blackhole distance '10'",
                           f"set protocols static route {bgp}/32 next-hop {bk_peip} track backnatpe"]
     d["us_bgp_routes"] = "\n".join(bgp_lines)
@@ -2063,14 +1987,174 @@ def build_epoch_us_format_dict(raw: str):
     overseas_lines = []
     for i, net in enumerate(inner_nets):
         r_main = 100 + i
-        r_bk = 200 + i
         overseas_lines.append(f"set nat source rule {r_main} outbound-interface '{d['main_us_tun']}'")
         overseas_lines.append(f"set nat source rule {r_main} source address '{net}'")
         overseas_lines.append(f"set nat source rule {r_main} translation address '{d['main_us_nat_ip']}'")
-        overseas_lines.append(f"set nat source rule {r_bk} outbound-interface '{d['bk_us_tun']}'")
-        overseas_lines.append(f"set nat source rule {r_bk} source address '{net}'")
-        overseas_lines.append(f"set nat source rule {r_bk} translation address '{d['bk_us_nat_ip']}'")
+        if not is_single:
+            r_bk = 200 + i
+            overseas_lines.append(f"set nat source rule {r_bk} outbound-interface '{d['bk_us_tun']}'")
+            overseas_lines.append(f"set nat source rule {r_bk} source address '{net}'")
+            overseas_lines.append(f"set nat source rule {r_bk} translation address '{d['bk_us_nat_ip']}'")
     d["overseas_nat_block"] = "\n".join(overseas_lines)
+
+    # ── 单出口条件块构建 ──
+    # 有备线时生成完整备线配置；无备线时各块为空字符串，模板渲染后行消失
+    if is_single:
+        d["bk_dum_block"] = ""
+        d["bk_nat_block"] = ""
+        d["bk_bgp_block"] = ""
+        d["bk_track_block"] = ""
+        d["bk_routes_block"] = ""
+        d["bk_pbr_block"] = ""
+        d["bk_header_block"] = ""
+        d["bk_route_map2_block"] = ""
+        d["bk_acvpn_vtun_section"] = ""
+        d["bk_acvpn_gre_section"] = ""
+        d["bk_us_tunnel_section"] = ""
+    else:
+        # dummy dum200 + extra
+        bk_dum_lines = [f"set interfaces dummy dum200 address '{d['bk_us_nat_ip']}/32'",
+                        f"set interfaces dummy dum200 description '{d['bk_us_dum200_desc']}'"]
+        d["bk_dum_block"] = "\n".join(bk_dum_lines)
+
+        # NAT rule 3050 (DNS NAT via bk tunnel)
+        d["bk_nat_block"] = (
+            f"set nat source rule 3050 destination address '8.8.0.0/16'\n"
+            f"set nat source rule 3050 outbound-interface '{d['bk_us_tun']}'\n"
+            f"set nat source rule 3050 translation address '{d['bk_us_nat_ip']}'"
+        )
+
+        # RSVR2 route-map (4 communities x 4 lines each)
+        rm2_lines = []
+        for rule_num, desc, comm in [(100, "to_hk", "80"), (200, "to_ct", "81"),
+                                      (300, "to_cnc", "82"), (400, "to_cn_other", "83")]:
+            rm2_lines.append(f"set policy route-map bgp-from--RSVR2 rule {rule_num} action 'permit'")
+            rm2_lines.append(f"set policy route-map bgp-from--RSVR2 rule {rule_num} description '{desc}'")
+            rm2_lines.append(f"set policy route-map bgp-from--RSVR2 rule {rule_num} match community community-list '{comm}'")
+            nh = bk_peip if comm == "80" else "1.1.1.1"
+            rm2_lines.append(f"set policy route-map bgp-from--RSVR2 rule {rule_num} set ip-next-hop '{nh}'")
+            if comm != "80":
+                rm2_lines.append(f"set policy route-map bgp-from--RSVR2 rule {rule_num} set local-preference '50'")
+        d["bk_route_map2_block"] = "\n".join(rm2_lines)
+
+        # BGP neighbor + peer-group RSVR2
+        bgp_bk_lines = [f"set protocols bgp 65000 neighbor {d['bk_us_bgp1']} peer-group 'RSVR2'",
+                        f"set protocols bgp 65000 neighbor {d['bk_us_bgp2']} peer-group 'RSVR2'",
+                        "set protocols bgp 65000 peer-group RSVR2 address-family ipv4-unicast route-map import 'bgp-from--RSVR2'",
+                        "set protocols bgp 65000 peer-group RSVR2 address-family ipv4-unicast soft-reconfiguration inbound",
+                        "set protocols bgp 65000 peer-group RSVR2 remote-as '65000'",
+                        f"set protocols bgp 65000 peer-group RSVR2 update-source '{d['bk_us_nat_ip']}'"]
+        d["bk_bgp_block"] = "\n".join(bgp_bk_lines)
+
+        # track backupe + backnatpe
+        d["bk_track_block"] = "\n".join([
+            "set track name backupe failure-count '2'",
+            "set track name backupe success-count '2'",
+            "set track name backupe test 10 resp-time '5'",
+            f"set track name backupe test 10 target '{d.get('bk_acvpn_gre_pe_ip', '')}'",
+            "set track name backupe test 10 ttl-limit '1'",
+            "set track name backupe test 10 type 'ping'",
+            "set track name backnatpe failure-count '2'",
+            "set track name backnatpe success-count '2'",
+            "set track name backnatpe test 10 resp-time '5'",
+            f"set track name backnatpe test 10 target '{bk_peip}'",
+            "set track name backnatpe test 10 ttl-limit '1'",
+            "set track name backnatpe test 10 type 'ping'",
+        ])
+
+        # 备线静态路由
+        bk_route_lines = []
+        if d.get("bk_acvpn_vtun_docking"):
+            bk_route_lines.append(f"set protocols static route {d['bk_acvpn_vtun_docking']}/32 next-hop 1.1.1.1")
+        if d.get("bk_us_pe_docking"):
+            bk_route_lines.append(f"set protocols static route {d['bk_us_pe_docking']}/32 next-hop {d.get('bk_acvpn_gre_pe_ip', '')}")
+        if d.get("bk_acvpn_gre_remote"):
+            bk_route_lines.append(f"set protocols static route {d['bk_acvpn_gre_remote']}/32 next-hop {d.get('bk_acvpn_vtun_remote', '')}")
+        for bgp in [d.get("bk_us_bgp1", ""), d.get("bk_us_bgp2", "")]:
+            if bgp:
+                bk_route_lines.append(f"set protocols static route {bgp}/32 next-hop {bk_peip} track backnatpe")
+        # 192.168.55.250 backup + 192.168.237.86 backup
+        if d.get("bk_acvpn_gre_pe_ip"):
+            bk_route_lines.append(f"set protocols static route 192.168.55.250/32 next-hop {d['bk_acvpn_gre_pe_ip']} distance '5'")
+            bk_route_lines.append(f"set protocols static route 192.168.237.86/32 next-hop {d['bk_acvpn_gre_pe_ip']} distance '5'")
+        if d.get("bk_acvpn_gre_pe_ip"):
+            bk_route_lines.append(f"set protocols static route 114.113.245.100/32 next-hop {d['bk_acvpn_gre_pe_ip']}")
+        d["bk_routes_block"] = "\n".join(bk_route_lines)
+
+        # PBR table 102
+        d["bk_pbr_block"] = (
+            f"set policy local-route rule 1002 set table '102'\n"
+            f"set policy local-route rule 1002 source '{d.get('bk_us_gre_ce_ip', '')}'\n"
+            f"set protocols static table 102 route 0.0.0.0/0 next-hop {bk_peip}"
+        )
+
+        # 注释头备线信息
+        d["bk_header_block"] = "\n".join([
+            f"# 备ACVPN GRE  {d.get('bk_acvpn_gre_tun', '')}  PE:{d.get('bk_acvpn_gre_pe', '')}",
+            f"#   WANIP:{d.get('bk_acvpn_gre_wanip', '')}  PE侧:{d.get('bk_acvpn_gre_pe_ip', '')}  CE侧:{d.get('bk_acvpn_gre_ce_ip', '')}",
+            f"#   GRE remote:{d.get('bk_acvpn_gre_remote', '')}",
+            f"# 备ACVPN vtun  {d.get('bk_acvpn_vtun_id', '')}(port:{d.get('bk_acvpn_vtun_port', '')})  PE:{d.get('bk_acvpn_vtun_pe', '')}",
+            f"#   local:{d.get('bk_acvpn_vtun_local', '')}  remote:{d.get('bk_acvpn_vtun_remote', '')}  docking:{d.get('bk_acvpn_vtun_docking', '')}",
+            f"# 备非香港出口  {d.get('bk_us_tun', '')}  PE:{d.get('bk_us_pe', '')}",
+            f"#   WANIP:{d.get('bk_us_wanip', '')}  PE侧:{d.get('bk_us_pe_ip', '')}  CE侧:{d.get('bk_us_gre_ce_ip', '')}",
+            f"#   PE docking:{d.get('bk_us_pe_docking', '')}  NAT IP(FakeIP):{d.get('bk_us_nat_ip_all', '')}",
+            f"#   BGP: {d.get('bk_us_bgp1', '')}, {d.get('bk_us_bgp2', '')}",
+        ])
+
+        # 备线接口段
+        bk_vtun_id = d.get("bk_acvpn_vtun_id", "")
+        if bk_vtun_id:
+            d["bk_acvpn_vtun_section"] = "\n".join([
+                f"set interfaces openvpn {bk_vtun_id} description 'BK_{d.get('bk_acvpn_vtun_pe', '')}'",
+                f"set interfaces openvpn {bk_vtun_id} firewall local name 'WAN2LOCAL'",
+                f"set interfaces openvpn {bk_vtun_id} local-address {d.get('bk_acvpn_vtun_local', '')} subnet-mask '255.255.255.252'",
+                f"set interfaces openvpn {bk_vtun_id} mode 'site-to-site'",
+                f"set interfaces openvpn {bk_vtun_id} openvpn-option '--nobind'",
+                f"set interfaces openvpn {bk_vtun_id} openvpn-option '--ping 10'",
+                f"set interfaces openvpn {bk_vtun_id} openvpn-option '--ping-restart 60'",
+                f"set interfaces openvpn {bk_vtun_id} openvpn-option '--persist-tun'",
+                f"set interfaces openvpn {bk_vtun_id} openvpn-option '--fragment 1300'",
+                f"set interfaces openvpn {bk_vtun_id} protocol 'udp'",
+                f"set interfaces openvpn {bk_vtun_id} remote-address '{d.get('bk_acvpn_vtun_remote', '')}'",
+                f"set interfaces openvpn {bk_vtun_id} remote-host '{d.get('bk_acvpn_vtun_docking', '')}'",
+                f"set interfaces openvpn {bk_vtun_id} remote-port '{d.get('bk_acvpn_vtun_port', '')}'",
+                f"set interfaces openvpn {bk_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'",
+            ])
+        else:
+            d["bk_acvpn_vtun_section"] = ""
+
+        bk_gre_tun = d.get("bk_acvpn_gre_tun", "")
+        if bk_gre_tun:
+            d["bk_acvpn_gre_section"] = "\n".join([
+                f"set interfaces tunnel {bk_gre_tun} address '{d.get('bk_acvpn_gre_ce_ip', '')}/30'",
+                f"set interfaces tunnel {bk_gre_tun} description 'BK_{d.get('bk_acvpn_gre_pe', '')}'",
+                f"set interfaces tunnel {bk_gre_tun} encapsulation 'gre'",
+                f"set interfaces tunnel {bk_gre_tun} firewall local name 'WAN2LOCAL'",
+                f"set interfaces tunnel {bk_gre_tun} mtu '1476'",
+                f"set interfaces tunnel {bk_gre_tun} multicast 'disable'",
+                f"set interfaces tunnel {bk_gre_tun} parameters ip ttl '255'",
+                f"set interfaces tunnel {bk_gre_tun} remote '{d.get('bk_acvpn_gre_remote', '')}'",
+                f"set interfaces tunnel {bk_gre_tun} source-address '{d.get('bk_acvpn_vtun_local', '')}'",
+            ])
+        else:
+            d["bk_acvpn_gre_section"] = ""
+
+        bk_us_tun = d.get("bk_us_tun", "")
+        if bk_us_tun:
+            d["bk_us_tunnel_section"] = "\n".join([
+                f"set interfaces tunnel {bk_us_tun} address '{d.get('bk_us_gre_ce_ip', '')}/30'",
+                f"set interfaces tunnel {bk_us_tun} description 'BK_{d.get('bk_us_pe', '')}'",
+                f"set interfaces tunnel {bk_us_tun} encapsulation 'gre'",
+                f"set interfaces tunnel {bk_us_tun} firewall local name 'WAN2LOCAL'",
+                f"set interfaces tunnel {bk_us_tun} mtu '1452'",
+                f"set interfaces tunnel {bk_us_tun} multicast 'disable'",
+                f"set interfaces tunnel {bk_us_tun} parameters ip ttl '255'",
+                f"set interfaces tunnel {bk_us_tun} remote '{d.get('bk_us_pe_docking', '')}'",
+                f"set interfaces tunnel {bk_us_tun} source-address '{d.get('ce_docking', '')}'",
+            ])
+        else:
+            d["bk_us_tunnel_section"] = ""
+
     return d, None, warn_msgs
 
 

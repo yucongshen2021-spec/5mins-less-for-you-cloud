@@ -930,16 +930,21 @@ def generate_epoch_fastip():
         if isinstance(result, tuple):
             d = result[0]
             err = result[1] if len(result) >= 2 else None
+            warn_msgs = result[2] if len(result) >= 3 else []
             if d is None:
                 return jsonify({"ok": False, "error": _humanize_error(err, variant)}), 400
         else:
             d = result
+            warn_msgs = []
 
         _patch_format_dict(d, network, is_usg=False, ns=er)
         hostname_override = str(network.get("hostname") or "").strip()
         if hostname_override and isinstance(d, dict):
             d["hostname"] = hostname_override
         output = tpl.format(**d) if isinstance(d, dict) and tpl else str(d)
+        # 前置 warning 提示行（如单出口提示）
+        if warn_msgs:
+            output = "# " + "; ".join(warn_msgs) + "\n" + output
         return _log_and_return("epoch_fastip", variant, hdr_text, output, jsonify({"ok": True, "output": output}))
     except Exception as e:
         import traceback

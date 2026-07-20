@@ -140,8 +140,12 @@ docker compose up -d --build
 │   └── test/                           测试套件
 │       ├── blackbox_8000/              黑箱测试（86 个）
 │       └── all_in_one/                 单元测试 + comprehensive.py（185 个）
-├── docs/AGENTS.md                      架构/运维/坑点（给 AI agent 看）
-├── log/                                变更日志
+├── docs/
+│   ├── AGENTS.md                      项目级工程守则（架构/运维/坑点，给 AI agent 看）
+│   ├── GLOBAL_RULES.md                跨项目全局规则层（优先级低于 AGENTS.md）
+│   ├── DESIGN.md                      UI 设计规范（以 all_in_one index.html :root 为真相来源）
+│   └── 经历.md                        项目叙事与踩坑总结
+├── log/                                变更日志（按日期）+ mistake.txt（跨日期踩坑记录）
 └── test_features.md                    完整功能测试清单
 ```
 

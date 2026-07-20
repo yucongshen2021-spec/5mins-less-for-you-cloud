@@ -114,6 +114,18 @@ python -m pytest all_in_one/test_apis.py test_generation.py -q
 cd all_in_one && python3 comprehensive.py                          # 185 个
 ```
 
+## 端到端测试定义（项目级细化全局 Rule 8）
+
+全局规则（`docs/GLOBAL_RULES.md` Rule 8）默认要求 UI 项目用 Playwright。**本项目按优先级做如下细化，优先于全局 Rule 8**：
+
+本项目的"端到端真实测试"= 以下三件齐备，不强制引入 Playwright：
+
+1. **pytest 黑箱全绿**：`blackbox_8000/`（覆盖 5000 入口真实 HTTP 路径）
+2. **comprehensive 全绿**：`all_in_one/comprehensive.py`（全场景生成回归）
+3. **浏览器手动冒烟**（mistake #52 铁律）：启动 portal -> 选场景 -> 粘贴标准数据头 -> 点生成 -> 肉眼检查输出与标准脚本一致；并检查「我来定模板」级联下拉可见/可加载/可预览。**禁止只 `curl /api/generate/...` 就宣称完成。**
+
+Playwright 仅在需要回归一段固定交互序列（如级联下拉、模板编辑器生命周期）且手动冒烟成本过高时才引入，引入前需在 `plan/` 落方案。
+
 ## Git Push 网络问题
 
 ```bash

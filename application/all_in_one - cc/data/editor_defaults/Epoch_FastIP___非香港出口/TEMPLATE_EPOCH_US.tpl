@@ -1,4 +1,4 @@
-﻿# ==========================================================
+# ==========================================================
 # Epoch 非香港出口配置  Hostname: {hostname}
 # 主ACVPN GRE  {main_acvpn_gre_tun}  PE:{main_acvpn_gre_pe}
 #   WANIP:{main_acvpn_gre_wanip}  PE侧:{main_acvpn_gre_pe_ip}  CE侧:{main_acvpn_gre_ce_ip}
@@ -18,6 +18,7 @@
 #   WANIP:{bk_us_wanip}  PE侧:{bk_us_pe_ip}  CE侧:{bk_us_gre_ce_ip}
 #   PE docking:{bk_us_pe_docking}  NAT IP(FakeIP):{bk_us_nat_ip_all}
 #   BGP: {bk_us_bgp1}, {bk_us_bgp2}
+{bk_header_block}
 # ───────────────────────────────────────────────────────
 # BGP更新源(主)：{main_us_nat_ip_all}  BGP更新源(备)：{bk_us_nat_ip_all}
 # 注意：请自行增加nat/dns/mtu部分！！
@@ -74,9 +75,7 @@ set interfaces dummy dum0 description 'CE Docking'
 set interfaces dummy dum100 address '{main_us_nat_ip}/32'
 set interfaces dummy dum100 description '{main_us_dum100_desc}'
 {extra_dum_main_block}
-set interfaces dummy dum200 address '{bk_us_nat_ip}/32'
-set interfaces dummy dum200 description '{bk_us_dum200_desc}'
-{extra_dum_bk_block}
+{bk_dum_block}
 set interfaces openvpn {main_acvpn_vtun_id} description 'MAIN_{main_acvpn_vtun_pe}'
 set interfaces openvpn {main_acvpn_vtun_id} firewall local name 'WAN2LOCAL'
 set interfaces openvpn {main_acvpn_vtun_id} local-address {main_acvpn_vtun_local} subnet-mask '255.255.255.252'
@@ -91,20 +90,7 @@ set interfaces openvpn {main_acvpn_vtun_id} remote-address '{main_acvpn_vtun_rem
 set interfaces openvpn {main_acvpn_vtun_id} remote-host '{main_acvpn_vtun_docking}'
 set interfaces openvpn {main_acvpn_vtun_id} remote-port '{main_acvpn_vtun_port}'
 set interfaces openvpn {main_acvpn_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'
-set interfaces openvpn {bk_acvpn_vtun_id} description 'BK_{bk_acvpn_vtun_pe}'
-set interfaces openvpn {bk_acvpn_vtun_id} firewall local name 'WAN2LOCAL'
-set interfaces openvpn {bk_acvpn_vtun_id} local-address {bk_acvpn_vtun_local} subnet-mask '255.255.255.252'
-set interfaces openvpn {bk_acvpn_vtun_id} mode 'site-to-site'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--nobind'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--ping 10'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--ping-restart 60'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--persist-tun'
-set interfaces openvpn {bk_acvpn_vtun_id} openvpn-option '--fragment 1300'
-set interfaces openvpn {bk_acvpn_vtun_id} protocol 'udp'
-set interfaces openvpn {bk_acvpn_vtun_id} remote-address '{bk_acvpn_vtun_remote}'
-set interfaces openvpn {bk_acvpn_vtun_id} remote-host '{bk_acvpn_vtun_docking}'
-set interfaces openvpn {bk_acvpn_vtun_id} remote-port '{bk_acvpn_vtun_port}'
-set interfaces openvpn {bk_acvpn_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'
+{bk_acvpn_vtun_section}
 set interfaces tunnel {main_acvpn_gre_tun} address '{main_acvpn_gre_ce_ip}/30'
 set interfaces tunnel {main_acvpn_gre_tun} description 'MAIN_{main_acvpn_gre_pe}'
 set interfaces tunnel {main_acvpn_gre_tun} encapsulation 'gre'
@@ -114,15 +100,7 @@ set interfaces tunnel {main_acvpn_gre_tun} multicast 'disable'
 set interfaces tunnel {main_acvpn_gre_tun} parameters ip ttl '255'
 set interfaces tunnel {main_acvpn_gre_tun} remote '{main_acvpn_gre_remote}'
 set interfaces tunnel {main_acvpn_gre_tun} source-address '{main_acvpn_vtun_local}'
-set interfaces tunnel {bk_acvpn_gre_tun} address '{bk_acvpn_gre_ce_ip}/30'
-set interfaces tunnel {bk_acvpn_gre_tun} description 'BK_{bk_acvpn_gre_pe}'
-set interfaces tunnel {bk_acvpn_gre_tun} encapsulation 'gre'
-set interfaces tunnel {bk_acvpn_gre_tun} firewall local name 'WAN2LOCAL'
-set interfaces tunnel {bk_acvpn_gre_tun} mtu '1476'
-set interfaces tunnel {bk_acvpn_gre_tun} multicast 'disable'
-set interfaces tunnel {bk_acvpn_gre_tun} parameters ip ttl '255'
-set interfaces tunnel {bk_acvpn_gre_tun} remote '{bk_acvpn_gre_remote}'
-set interfaces tunnel {bk_acvpn_gre_tun} source-address '{bk_acvpn_vtun_local}'
+{bk_acvpn_gre_section}
 set interfaces tunnel {main_us_tun} address '{main_us_gre_ce_ip}/30'
 set interfaces tunnel {main_us_tun} description 'MAIN_{main_us_pe}'
 set interfaces tunnel {main_us_tun} encapsulation 'gre'
@@ -132,24 +110,14 @@ set interfaces tunnel {main_us_tun} multicast 'disable'
 set interfaces tunnel {main_us_tun} parameters ip ttl '255'
 set interfaces tunnel {main_us_tun} remote '{main_us_pe_docking}'
 set interfaces tunnel {main_us_tun} source-address '{ce_docking}'
-set interfaces tunnel {bk_us_tun} address '{bk_us_gre_ce_ip}/30'
-set interfaces tunnel {bk_us_tun} description 'BK_{bk_us_pe}'
-set interfaces tunnel {bk_us_tun} encapsulation 'gre'
-set interfaces tunnel {bk_us_tun} firewall local name 'WAN2LOCAL'
-set interfaces tunnel {bk_us_tun} mtu '1452'
-set interfaces tunnel {bk_us_tun} multicast 'disable'
-set interfaces tunnel {bk_us_tun} parameters ip ttl '255'
-set interfaces tunnel {bk_us_tun} remote '{bk_us_pe_docking}'
-set interfaces tunnel {bk_us_tun} source-address '{ce_docking}'
+{bk_us_tunnel_section}
 set nat source rule 10 outbound-interface '{wan_if}'
 set nat source rule 10 translation address 'masquerade'
 {overseas_nat_block}
 set nat source rule 3000 destination address '8.8.0.0/16'
 set nat source rule 3000 outbound-interface '{main_us_tun}'
 set nat source rule 3000 translation address '{main_us_nat_ip}'
-set nat source rule 3050 destination address '8.8.0.0/16'
-set nat source rule 3050 outbound-interface '{bk_us_tun}'
-set nat source rule 3050 translation address '{bk_us_nat_ip}'
+{bk_nat_block}
 set openfalcon endpoint-name '{hostname}'
 set openfalcon server-address '192.168.237.86'
 set policy community-list 80 rule 10 action 'permit'
@@ -186,38 +154,14 @@ set policy route-map bgp-from--RSVR rule 400 action 'permit'
 set policy route-map bgp-from--RSVR rule 400 description 'to_cn_other'
 set policy route-map bgp-from--RSVR rule 400 match community community-list '83'
 set policy route-map bgp-from--RSVR rule 400 set ip-next-hop '1.1.1.1'
-set policy route-map bgp-from--RSVR2 rule 100 action 'permit'
-set policy route-map bgp-from--RSVR2 rule 100 description 'to_hk'
-set policy route-map bgp-from--RSVR2 rule 100 match community community-list '80'
-set policy route-map bgp-from--RSVR2 rule 100 set ip-next-hop '{bk_us_pe_ip}'
-set policy route-map bgp-from--RSVR2 rule 100 set local-preference '50'
-set policy route-map bgp-from--RSVR2 rule 200 action 'permit'
-set policy route-map bgp-from--RSVR2 rule 200 description 'to_ct'
-set policy route-map bgp-from--RSVR2 rule 200 match community community-list '81'
-set policy route-map bgp-from--RSVR2 rule 200 set ip-next-hop '1.1.1.1'
-set policy route-map bgp-from--RSVR2 rule 200 set local-preference '50'
-set policy route-map bgp-from--RSVR2 rule 300 action 'permit'
-set policy route-map bgp-from--RSVR2 rule 300 description 'to_cnc'
-set policy route-map bgp-from--RSVR2 rule 300 match community community-list '82'
-set policy route-map bgp-from--RSVR2 rule 300 set ip-next-hop '1.1.1.1'
-set policy route-map bgp-from--RSVR2 rule 300 set local-preference '50'
-set policy route-map bgp-from--RSVR2 rule 400 action 'permit'
-set policy route-map bgp-from--RSVR2 rule 400 description 'to_cn_other'
-set policy route-map bgp-from--RSVR2 rule 400 match community community-list '83'
-set policy route-map bgp-from--RSVR2 rule 400 set ip-next-hop '1.1.1.1'
-set policy route-map bgp-from--RSVR2 rule 400 set local-preference '50'
+{bk_route_map2_block}
 set protocols bgp 65000 neighbor {main_us_bgp1} peer-group 'RSVR'
 set protocols bgp 65000 neighbor {main_us_bgp2} peer-group 'RSVR'
-set protocols bgp 65000 neighbor {bk_us_bgp1} peer-group 'RSVR2'
-set protocols bgp 65000 neighbor {bk_us_bgp2} peer-group 'RSVR2'
+{bk_bgp_block}
 set protocols bgp 65000 peer-group RSVR address-family ipv4-unicast route-map import 'bgp-from--RSVR'
 set protocols bgp 65000 peer-group RSVR address-family ipv4-unicast soft-reconfiguration inbound
 set protocols bgp 65000 peer-group RSVR remote-as '65000'
 set protocols bgp 65000 peer-group RSVR update-source '{main_us_nat_ip}'
-set protocols bgp 65000 peer-group RSVR2 address-family ipv4-unicast route-map import 'bgp-from--RSVR2'
-set protocols bgp 65000 peer-group RSVR2 address-family ipv4-unicast soft-reconfiguration inbound
-set protocols bgp 65000 peer-group RSVR2 remote-as '65000'
-set protocols bgp 65000 peer-group RSVR2 update-source '{bk_us_nat_ip}'
 set protocols bgp 65000 timers holdtime '15'
 set protocols bgp 65000 timers keepalive '5'
 set track name mainupe failure-count '2'
@@ -226,45 +170,27 @@ set track name mainupe test 10 resp-time '5'
 set track name mainupe test 10 target '{main_acvpn_gre_pe_ip}'
 set track name mainupe test 10 ttl-limit '1'
 set track name mainupe test 10 type 'ping'
-set track name backupe failure-count '2'
-set track name backupe success-count '2'
-set track name backupe test 10 resp-time '5'
-set track name backupe test 10 target '{bk_acvpn_gre_pe_ip}'
-set track name backupe test 10 ttl-limit '1'
-set track name backupe test 10 type 'ping'
+{bk_track_block}
 set track name mainnatpe failure-count '2'
 set track name mainnatpe success-count '2'
 set track name mainnatpe test 10 resp-time '5'
 set track name mainnatpe test 10 target '{main_us_pe_ip}'
 set track name mainnatpe test 10 ttl-limit '1'
 set track name mainnatpe test 10 type 'ping'
-set track name backnatpe failure-count '2'
-set track name backnatpe success-count '2'
-set track name backnatpe test 10 resp-time '5'
-set track name backnatpe test 10 target '{bk_us_pe_ip}'
-set track name backnatpe test 10 ttl-limit '1'
-set track name backnatpe test 10 type 'ping'
 {wan_route_block}
 set protocols static route {main_acvpn_vtun_docking}/32 next-hop 1.1.1.1
-set protocols static route {bk_acvpn_vtun_docking}/32 next-hop 1.1.1.1
 set protocols static route {main_us_pe_docking}/32 next-hop {main_acvpn_gre_pe_ip}
-set protocols static route {bk_us_pe_docking}/32 next-hop {bk_acvpn_gre_pe_ip}
 set protocols static route {main_acvpn_gre_remote}/32 next-hop {main_acvpn_vtun_remote}
-set protocols static route {bk_acvpn_gre_remote}/32 next-hop {bk_acvpn_vtun_remote}
 {us_bgp_routes}
 set protocols static route 192.168.55.250/32 next-hop {main_acvpn_gre_pe_ip} track mainupe
-set protocols static route 192.168.55.250/32 next-hop {bk_acvpn_gre_pe_ip} distance '5'
 set protocols static route 192.168.237.86/32 next-hop {main_acvpn_gre_pe_ip} track mainupe
-set protocols static route 192.168.237.86/32 next-hop {bk_acvpn_gre_pe_ip} distance '5'
 set protocols static route 114.113.245.99/32 next-hop {main_acvpn_gre_pe_ip}
-set protocols static route 114.113.245.100/32 next-hop {bk_acvpn_gre_pe_ip}
+{bk_routes_block}
 {return_routes_block}
 set policy local-route rule 1001 set table '101'
 set policy local-route rule 1001 source '{main_us_gre_ce_ip}'
 set protocols static table 101 route 0.0.0.0/0 next-hop {main_us_pe_ip}
-set policy local-route rule 1002 set table '102'
-set policy local-route rule 1002 source '{bk_us_gre_ce_ip}'
-set protocols static table 102 route 0.0.0.0/0 next-hop {bk_us_pe_ip}
+{bk_pbr_block}
 set system host-name '{hostname}'
 set service dns forwarding allow-from '0.0.0.0/0'
 set service dns forwarding cache-size '1001'
