@@ -1274,20 +1274,25 @@ def generate_usg_fastip():
         _usg_exit_ips = re.findall(r'出口ip[：:]\s*(\S+)', hdr_text, re.IGNORECASE)
         _usg_exit_ips = [m.rstrip(';').strip() for m in _usg_exit_ips]
         _has_dash = any('-' in ip for ip in _usg_exit_ips) if _usg_exit_ips else False
-        _same_ip = len(set(_usg_exit_ips)) == 1 if _usg_exit_ips else False
+        # "主备相同"只在有2+个出口IP时才有意义；只有1个IP（单出口）不算"主备相同"
+        _same_ip = (len(_usg_exit_ips) >= 2 and len(set(_usg_exit_ips)) == 1) if _usg_exit_ips else False
         _usg_pe_names = re.findall(r'PE[：:]\s*(\S+)', hdr_text)
         _has_hk_pe = any(re.search(r'[Hh][Kk]', pe) for pe in _usg_pe_names)
         _usg_warning = None
 
         if variant == "hk":
-            # HK：出口IP无 dash 且主备相同。不满足 -> 可能是 US
+            # HK：出口IP无 dash 且（有2+个IP且主备相同）。不满足 -> 可能是 US
             if _has_dash or not _same_ip:
-                return jsonify({"ok": False, "error": _humanize_error(
-                    ("wrong_scenario", "出口IP格式不符合香港出口特征（HK出口IP应为纯公网IP且主备相同），数据头可能为非香港出口格式（US），请切换到「非香港出口」场景"), variant)}), 400
+                # 但如果是单出口（只有1个IP），不阻断（无法判断主备）
+                if len(_usg_exit_ips) <= 1:
+                    pass  # 单出口，跳过条件1检测
+                else:
+                    return jsonify({"ok": False, "error": _humanize_error(
+                        ("wrong_scenario", "出口IP格式不符合香港出口特征（HK出口IP应为纯公网IP且主备相同），数据头可能为非香港出口格式（US），请切换到「非香港出口」场景"), variant)}), 400
             if not _has_hk_pe:
                 _usg_warning = "出口IP格式符合香港出口特征，但PE名称中未检测到HK标识，请确认数据头是否正确"
         elif variant == "us":
-            # US：出口IP有 dash 或主备不同。不满足（无dash且主备相同） -> 可能是 HK
+            # US：出口IP有 dash 或主备不同。不满足（无dash且主备相同且2+个IP） -> 可能是 HK
             if not _has_dash and _same_ip:
                 return jsonify({"ok": False, "error": _humanize_error(
                     ("wrong_scenario", "出口IP格式不符合非香港出口特征（US出口IP应主备不同或为内网-公网IP格式），数据头可能为香港出口格式（HK），请切换到「HK 香港出口」场景"), variant)}), 400

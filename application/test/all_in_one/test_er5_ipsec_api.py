@@ -84,26 +84,80 @@ BGPSERVER IP：103.252.19.99,43.229.119.251
 10.60.79.99-172.16.212.58
 """
 
-OPENVPN_HDR = """LineID:609430B1
-PE:szd-natflr2
-WANIP:10.40.25.188/30
-TUNNEL:vtun40826
-Docking:121.12.81.3
-CE LOIP:10.20.186.235
-HKIP:10.60.241.250 --> 103.48.141.157
-BGPSERVER IP:10.10.99.168,10.10.99.169
-海外出口ip:10.60.52.46-8.3.6.111
-BACKUP
-PE:szc-natbk10
-WANIP:10.41.25.188/30
-TUNNEL:vtun50826
-Docking:120.133.129.72
-CE LOIP:10.20.186.235
-HKIP:10.60.241.250 --> 103.48.141.157
-BGPSERVER IP:10.10.99.198,10.10.99.199
-海外出口ip:10.60.79.99-172.16.212.58
+OPENVPN_HDR = """LineID:609169A1
+PE:gzd-upe5
+Tunnel:Tunnel0/0/1165
+wanip:10.55.14.64/30
+PE 对接:192.168.247.17
+PE:gzd-acvpnpe2
+Tunnel:vtun17953
+wanip:10.23.0.120/30
+PE 对接:183.63.68.171
+
+LineID:609169A2
+PE:dgb-upebk2
+Tunnel:Tunnel0/0/1998
+wanip:10.40.209.220/30
+PE 对接:192.168.251.100
+PE:dgb-acvpnpe2
+Tunnel:vtun50057
+wanip:10.30.167.200/30
+PE 对接:121.12.128.254
+
+LineID:609169A5
+PE： twb-natpe2
+WANIP: 10.21.32.124/30
+TUNNEL: tun1267
+PE Docking：192.168.239.12
+CE Docking：10.22.241.232
+BGPSERVER IP：103.252.19.25,43.229.117.226
+海外出口ip：
+10.60.44.28-218.32.88.83
+
+LineID:609169A6
+PE： twb-natpe1
+WANIP: 10.21.31.120/30
+TUNNEL: tun2366
+PE Docking：192.168.239.14
+CE Docking：10.22.241.232
+BGPSERVER IP：103.252.19.99,43.229.119.251
+海外出口ip：
+10.60.18.22-150.116.112.236
 """
 
+HK_IPSEC_HDR = """MAIN
+LineID: 609884A1
+主PE: szd-flr3
+WANIP: 10.40.146.88/30
+TUNNEL: tun42451
+PE 对接: 10.20.247.227
+CE 对接: 10.50.49.6
+HKIP: 61.244.14.63;
+建BGP邻居: 10.20.180.193
+BGPSERVER IP: 10.10.99.168,10.10.99.169
+
+拨号PE: szd-upe2
+Docking: 10.20.247.227
+LoopIP: 10.50.49.6
+拨号IP: 116.31.80.174
+秘钥: both-win
+
+BACKUP
+PE: szc-bk2
+WANIP: 10.41.146.88/30
+TUNNEL: tun52451
+PE 对接: 10.30.43.229
+CE 对接: 10.50.150.28
+HKIP: 61.244.14.63;
+建BGP邻居: 10.20.180.193
+BGPSERVER IP: 10.10.99.168,10.10.99.199
+
+拨号PE: szc-upe2
+Docking: 10.30.43.229
+LoopIP: 10.50.150.28
+拨号IP: 120.133.134.66
+秘钥: both-win
+"""
 
 _BASE_NETWORK = {
     "wan_cidr": "111.111.115.2/30",
@@ -180,14 +234,14 @@ def test_openvpn_default_when_tunnel_type_omitted(client):
 
 
 def test_hk_ipsec_returns_dev_in_progress(client):
-    """HK IPSec → 占位符 "正在开发中"。"""
+    """HK IPSec 已实现，应返回 200 + ipsec 配置。"""
     network = dict(_BASE_NETWORK)
     network["tunnel_type"] = "ipsec"
     resp = client.post(
         "/api/generate/epoch_fastip5",
-        json={"variant": "hk", "header_text": FULL_IPSEC_HDR, "network": network},
+        json={"variant": "hk", "header_text": HK_IPSEC_HDR, "network": network},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 200
     data = resp.get_json()
-    assert data["ok"] is False
-    assert "正在开发" in data["error"]
+    assert data["ok"] is True
+    assert "vpn ipsec" in data["output"]
