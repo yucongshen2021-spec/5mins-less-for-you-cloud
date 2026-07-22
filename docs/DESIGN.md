@@ -105,7 +105,9 @@ components:
     height: auto
     textColor: "{colors.ink}"
     typography: "{typography.display-top-title}"
-    note: "左：橙脉冲点 + 'all_in_one' 衬线标题 + 灰副标题。"
+    note: "左：橙脉冲点 + 'all_in_one' 衬线标题 + 灰副标题。右：whatsnew 告示栏（见 whatsnew-board）。"
+  whatsnew-board:
+    note: "顶栏右侧（margin-left:auto）。📣 pill 按钮（12px/500 --mu 字 + --sf 底 + --hl 边 + --rp 圆角）+ 右上 8px --p 未读点（--cv 描边）。点击展开 .whatsnew-popover（320px，--sf 底 + --hl 边 + --rl 圆角 + 0 8px 24px rgba(0,0,0,.12) 投影 z200，cardIn .2s 入场），head 11px 大写灰 + ✕ 关闭，列表项 date（10px f-code --mu-soft）/title（13px/600 --ink）/desc（12px --body）。toggle/close/click-outside 关闭；localStorage(whatsnew_lastSeen) 控未读点。内容来自 data/whatsnew/updates.json，Flask index() 注入 whatsnew 上下文服务端渲染。"
   nav-bar:
     backgroundColor: "{colors.canvas}"
     border: "1px solid {colors.hairline}"
@@ -315,6 +317,7 @@ components:
 | Hairline | 1px `--hl` | 卡片边、分隔 |
 | Toast 投影 | `0 4px 16px rgba(0,0,0,.15)` | toast（唯一浮层投影） |
 | Dropdown 投影 | `0 4px 12px rgba(0,0,0,.08)` | cascade-dropdown |
+| Whatsnew 投影 | `0 8px 24px rgba(0,0,0,.12)` | whatsnew-popover（比 dropdown 更深的浮层） |
 
 > 不允许给卡片/按钮加投影。浮层（toast/dropdown）的投影是物理上"浮起"的语义，才用。
 
@@ -330,7 +333,10 @@ components:
 ## Components
 
 ### 顶栏 `top-bar`
-`--cv` 底 + 下边 1px `--hl`，padding 12px 28px。左：9px 橙脉冲点（2s pulse 动画）+ DM Serif 20px 'all_in_one' + 11px 灰副标题。
+`--cv` 底 + 下边 1px `--hl`，padding 12px 28px。左：9px 橙脉冲点（2s pulse 动画）+ DM Serif 20px 'all_in_one' + 11px 灰副标题。右：whatsnew 告示栏（见下）。
+
+### 最近更新告示栏 `whatsnew-board`
+顶栏右侧（`margin-left:auto` 推到右）。📣 pill 按钮（12px/500 `--mu` 字 + `--sf` 底 + `--hl` 边 + `--rp` 圆角）+ 右上 8px `--p` 未读点（`--cv` 描边）。点击展开 `.whatsnew-popover`：320px、`--sf` 底 + `--hl` 边 + `--rl` 圆角 + `0 8px 24px rgba(0,0,0,.12)` 投影 z200、`cardIn .2s` 入场；head 11px 大写灰 label + ✕ 关闭；列表项 date（10px `--f-code` `--mu-soft`）/ title（13px/600 `--ink`）/ desc（12px `--body`）。`toggle/close/click-outside` 关闭；`localStorage('whatsnew_lastSeen')` 控未读点。内容来自 `data/whatsnew/updates.json`，Flask `index()` 注入 `whatsnew` 上下文服务端渲染（无 JS 拉取）。
 
 ### 导航 `nav-bar` / `nav-tab`
 `--cv` 底，sticky top:0，高 42px，z 100。tab 12px/500，默认 `--mu`，hover ink+`--hls` 底，active 白底+`--hl` 边+ink 字。可横滚。
@@ -420,6 +426,9 @@ nav-bar 可横滚（不折叠 hamburger）。主内容 max-width 1440px。
 
 **统一方向**（待你定夺）：portal 两套逐步迁到 all_in_one 的 token 名 + 字体 + 主色。login 的蓝 `#4a90d9` 是最大的偏离，建议优先处理。本次只规范 DESIGN.md，不动 portal 代码。
 
+### 4. whatsnew-popover 投影未进 token
+`.whatsnew-popover` 硬编码 `0 8px 24px rgba(0,0,0,.12)`（`index.html` whatsnew CSS），是继 toast（`0 4px 16px`）、dropdown（`0 4px 12px`）之后的第三个浮层投影值。建议引入 `--shadow-popover` token 统一，或与 dropdown 合并。当前可用，仅作待统一记录。
+
 ## Iteration Guide
 
 1. 改 UI 前先读 `index.html:9-28` 的 `:root`，用现有 token。
@@ -436,4 +445,5 @@ nav-bar 可横滚（不折叠 hamburger）。主内容 max-width 1440px。
 |---|---|---|
 | 2026-07-20 | 1.0 | 以 `all_in_one - cc/web/templates/index.html:9-28` 为真相来源反向重写：字体改 DM Serif Display/DM Sans/JetBrains Mono（原 CursorGothic 不适用）；组件清单替换为项目实际组件（top-bar/nav-tab/variant-pill/card/field/btn/toast/cascade-dropdown 等）；移除营销组件（hero-band/pricing/testimonial）与 timeline pastel 5 色；如实记录 5 个未定义变量与三套 UI 差异为「已知缺口」。 |
 | 2026-07-20 | 1.1 | 「已知缺口 #1」已修复：在 `index.html:9-28` 的 `:root` 末尾补齐 5 个语义别名变量（`--primary/--bd/--sf-strong/--hl-strong/--f-zh`），全文件引用与定义均为 33 个、无遗留；DESIGN.md 同步标注为 ✓ 已补。 |
+| 2026-07-21 | 1.2 | 新增 `whatsnew-board` 组件文档（顶栏右侧 📣 告示栏 + popover + 未读点 + localStorage）；`top-bar` note 补右侧；Elevation 表加 Whatsnew 投影行；「已知缺口 #4」记录 whatsnew-popover 投影未进 token。 |
 | (原 alpha) | alpha | 原始版本（Cursor 营销站设计，与本项目实际 UI 不符，已废弃）。 |

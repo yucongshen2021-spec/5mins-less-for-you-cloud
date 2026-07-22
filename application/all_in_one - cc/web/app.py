@@ -728,10 +728,20 @@ def index():
     uid = _get_request_user_id()
     template_editable = bool(uid)  # 登录用户可编辑自己的模板
     is_admin = (username == _TEMPLATE_ADMIN_USER)  # yucs 是管理员
+    # 最近更新告示栏：读取 data/whatsnew/updates.json，缺失/异常降级为空列表
+    whatsnew = []
+    try:
+        _wn_path = _DATA_RO_DIR / "whatsnew" / "updates.json"
+        if _wn_path.exists():
+            _wn = json.loads(_wn_path.read_text(encoding="utf-8-sig"))
+            whatsnew = _wn.get("updates", []) if isinstance(_wn, dict) else (_wn if isinstance(_wn, list) else [])
+    except Exception:
+        whatsnew = []
     return render_template("index.html",
                            username=username,
                            template_editable=template_editable,
-                           is_admin=is_admin)
+                           is_admin=is_admin,
+                           whatsnew=whatsnew)
 
 
 @app.errorhandler(500)
@@ -821,6 +831,9 @@ def generate_epoch_fastip():
         elif variant == "us":
             build_fn = er.get("build_epoch_us_format_dict")
             tpl = _get_effective_template(er, "TEMPLATE_EPOCH_US")
+        elif variant == "us_single":
+            build_fn = er.get("build_epoch_us_format_dict")
+            tpl = _get_effective_template(er, "TEMPLATE_EPOCH_US_SINGLE")
         elif variant == "flink":
             parse_fn = er.get("parse_er_flink_headers")
             fmt_fn = er.get("_build_er_flink_format_dict")
@@ -1590,6 +1603,7 @@ def generate_ar_traditional():
 _EXAMPLE_MAP = {
     ("epoch_fastip", "hk"): ("er_fastip_2in1_v8.py", "HK_EXAMPLE"),
     ("epoch_fastip", "us"): ("er_fastip_2in1_v8.py", "US_EXAMPLE"),
+    ("epoch_fastip", "us_single"): ("er_fastip_2in1_v8.py", "US_SINGLE_EXAMPLE"),
     ("epoch_fastip", "flink"): ("er_fastip_2in1_v8.py", "ER_FL_DEFAULT_HEADERS"),
     ("epoch_fastip", "new_exit"): ("er_fastip_2in1_v8.py", "ER_NEW_EXIT_EXAMPLE"),
     ("epoch_fastip", "domain_split"): ("er_fastip_2in1_v8.py", "ER_DOMAIN_SPLIT_EXAMPLE"),
@@ -1663,6 +1677,16 @@ _NOTES = {
             "• lan的dhcp是你开给别人的。\n"
             "• BGP更新源：默认使用假ip。如果要建内网的，请自行调整。\n"
             "• 多出口ip请自己验证，不一定能识别到所有的分割符。\n"
+            "• 请自行修改nat/dns/mtu等部分。\n"
+            "• 配置仅供参考，使用仍需谨慎。"
+        ),
+        "us_single": (
+            "Epoch FastIP · 非香港出口 · 单出口\n\n"
+            "• 数据头只需主线（主 ACVPN + 主 natpe），无需备线\n"
+            "• 自动识别单出口模式，备线配置不生成\n"
+            "• wan的dhcp是别人开给你的。wan开了dhcp，就不会生成默认路由。\n"
+            "• lan的dhcp是你开给别人的。\n"
+            "• BGP更新源：默认使用假ip。如果要建内网的，请自行调整。\n"
             "• 请自行修改nat/dns/mtu等部分。\n"
             "• 配置仅供参考，使用仍需谨慎。"
         ),
@@ -1837,6 +1861,7 @@ def api_sponsor_board():
 _DISK_ALIASES = {
     "Epoch FastIP · HK 香港出口": "ER FastIP · HK 香港出口",
     "Epoch FastIP · 非香港出口": "ER FastIP · 非HK出口",
+    "Epoch FastIP · 非香港出口 · 单出口": "ER_FastIP___非HK出口_单出口",
     "Epoch FastIP · ER 飞连": "Epoch FastIP · ER 飞连",
     "Epoch FastIP · ER 新增出口": "Epoch FastIP · ER 新增出口",
     "Epoch FastIP · ER 域名分流": "Epoch FastIP · ER 域名分流",
@@ -1910,6 +1935,7 @@ _SCENARIO_LIST = [
     {"key": "Epoch FastIP · HK 香港出口", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_EPOCH_HK"},
     {"key": "Epoch FastIP · HK 香港出口 · IPSec", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_EPOCH_HK_IPSEC"},
     {"key": "Epoch FastIP · 非香港出口", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_EPOCH_US"},
+    {"key": "Epoch FastIP · 非香港出口 · 单出口", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_EPOCH_US_SINGLE"},
     {"key": "Epoch FastIP · 非香港出口 · IPSec", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_EPOCH_US_IPSEC"},
     {"key": "Epoch FastIP · ER 飞连", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_ER_FLINK_VISUAL"},
     {"key": "Epoch FastIP · ER 新增出口", "source": "er_fastip_2in1_v8.py", "tpl_slot": "TEMPLATE_ER_NEW_EXIT_VISUAL"},
@@ -1950,6 +1976,7 @@ _SCENARIO_TREE = [
                     {"label": "HK · OpenVPN",   "key": "Epoch FastIP · HK 香港出口"},
                     {"label": "HK · IPSec",     "key": "Epoch FastIP · HK 香港出口 · IPSec"},
                     {"label": "非香港 · OpenVPN", "key": "Epoch FastIP · 非香港出口"},
+                    {"label": "非香港 · 单出口", "key": "Epoch FastIP · 非香港出口 · 单出口"},
                     {"label": "非香港 · IPSec",   "key": "Epoch FastIP · 非香港出口 · IPSec"},
                 ],
             },
@@ -2109,6 +2136,7 @@ def api_template_load():
         example_keys = {
             "TEMPLATE_EPOCH_HK": "HK_EXAMPLE",
             "TEMPLATE_EPOCH_US": "US_EXAMPLE",
+            "TEMPLATE_EPOCH_US_SINGLE": "US_SINGLE_EXAMPLE",
             "TEMPLATE_EPOCH5_HK": "HK5_EXAMPLE",
             "TEMPLATE_EPOCH5_US": "US5_EXAMPLE",
             "TEMPLATE_EPOCH5_US_IPSEC": "US5_IPSEC_EXAMPLE",
@@ -2251,6 +2279,7 @@ def api_template_reset():
     # Try example data first
     example_keys = {
         "TEMPLATE_EPOCH_HK": "HK_EXAMPLE", "TEMPLATE_EPOCH_US": "US_EXAMPLE",
+        "TEMPLATE_EPOCH_US_SINGLE": "US_SINGLE_EXAMPLE",
         "TEMPLATE_ER_FLINK_VISUAL": "ER_FL_DEFAULT_HEADERS",
         "TEMPLATE_ER_NEW_EXIT_VISUAL": "ER_NEW_EXIT_EXAMPLE",
         "TEMPLATE_USG_HK": "HK_EXAMPLE", "TEMPLATE_USG_NONHK": "US_EXAMPLE",
@@ -2330,6 +2359,13 @@ def api_template_preview():
                 if d:
                     rendered = tpl.format(**d)
         elif slot == "TEMPLATE_EPOCH_US_IPSEC":
+            fn = ns.get("build_epoch_us_format_dict")
+            if fn:
+                result = fn(hdr_text)
+                d = result[0] if isinstance(result, tuple) else result
+                if d:
+                    rendered = tpl.format(**d)
+        elif slot == "TEMPLATE_EPOCH_US_SINGLE":
             fn = ns.get("build_epoch_us_format_dict")
             if fn:
                 result = fn(hdr_text)
@@ -2892,6 +2928,7 @@ def _get_init_keys(slot):
     """Return the list of init keys for a given scenario slot."""
     if slot in ("TEMPLATE_EPOCH_HK", "TEMPLATE_EPOCH_US",
                  "TEMPLATE_EPOCH_HK_IPSEC", "TEMPLATE_EPOCH_US_IPSEC",
+                 "TEMPLATE_EPOCH_US_SINGLE",
                  "TEMPLATE_EPOCH5_HK", "TEMPLATE_EPOCH5_US",
                  "TEMPLATE_EPOCH5_US_IPSEC", "TEMPLATE_EPOCH5_HK_IPSEC"):
         return ["DEFAULT_WAN_ETH","DEFAULT_WAN_CIDR","DEFAULT_WAN_GW","DEFAULT_WAN_DHCP",

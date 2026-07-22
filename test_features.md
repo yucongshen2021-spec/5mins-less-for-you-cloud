@@ -49,6 +49,13 @@
 - **预期**: 点击每个页签正常切换，内容区显示对应面板
 - **预期**: Ctrl+Enter 快捷键在当前页签触发生成
 
+### 2.1b 最近更新告示栏
+- **顶栏右侧**: 可见 📣「最近更新」按钮；首次（localStorage 无 `whatsnew_lastSeen`）时右上角橙色未读小点
+- **展开**: 点击展开 popover，列出 `data/whatsnew/updates.json` 的 title/date/desc
+- **关闭**: 点 ✕ 或点 popover 外部收起
+- **已读**: 点开按钮后未读点消失（localStorage 记 `whatsnew_lastSeen` = 最新条目 id）；刷新仍无点
+- **空态**: `updates.json` 缺失/空 → popover 显示「暂无更新」，按钮仍在，页面不报错
+
 ### 2.2 Epoch FastIP 4.0
 - **版本切换**: 点击「4.0」/「5.0」按钮切换版本
 - **变体**: HK 香港出口 / 非香港出口 / ER 飞连 / ER 新增出口 / ER 域名分流
@@ -70,10 +77,15 @@
 - **预期**: 生成的 NAT 规则中 outbound-interface 为隧道号（如 tun1165），translation address 为海外出口 IP
 - **预期**: 修改内网段后，overseas NAT 规则的 source address 和 outbound-interface 正确
 
+#### 2.2.2b 单出口（无备线）
+- **数据头**: 非香港出口 LineID 格式，但只含主线（无备线 PE/tunnel，即无 BACKUP 段）
+- **预期**: 不报缺备线错误，正常生成；备线相关 NAT/路由块省略（`is_single_us` 判定无备线）；`overseas_nat_block` 无残留空行
+
 #### 2.2.3 ER 飞连
 - **数据头**: PE/FPE/预留IP 格式
 - **参数**: 主回程下一跳、备回程下一跳
 - **预期**: 生成 `set protocols` 相关配置
+- **容错**: 数据头含空行/注释行或预留 IP 无掩码时，parser 跳过无效行、自动补 `/32`，仍能生成（仅当 0 条有效段才报错）
 
 #### 2.2.4 ER 新增出口
 - **数据头**: LineID 格式，含 `海外出口ip:`

@@ -1,0 +1,20 @@
+LineID:609169A1
+PE:gzd-upe5
+Tunnel:Tunnel0/0/1165
+wanip:10.55.14.64/30
+PE 对接:192.168.247.17
+CE 对接:10.23.0.122
+PE:gzd-acvpnpe2
+Tunnel:vtun17953
+wanip:10.23.0.120/30
+PE 对接:183.63.68.171
+
+LineID:609169A5
+PE： twb-natpe2
+WANIP: 10.21.32.124/30
+TUNNEL: tun1267
+PE Docking：192.168.239.12
+CE Docking：: 10.22.241.232
+BGPSERVER IP：103.252.19.25,43.229.117.226
+海外出口ip：
+10.60.44.28-218.32.88.83

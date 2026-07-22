@@ -44,6 +44,26 @@ body{font-family:var(--f-body);background:var(--cv);color:var(--ink);line-height
 @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.6}}
 .top-title{font-family:var(--f-display);font-size:20px;font-weight:400;letter-spacing:-0.3px;color:var(--ink)}
 .top-subtitle{font-size:11px;color:var(--mu-soft);margin-left:4px;font-weight:400}
+
+/* ═══════════════════════════════════════════════════ whatsnew ═══════════════════════════════════════════════════ */
+.whatsnew-wrap{margin-left:auto;position:relative}
+.whatsnew-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--rp);font-size:12px;font-weight:500;color:var(--mu);cursor:pointer;border:1px solid var(--hl);background:var(--sf);font-family:var(--f-body);transition:all .15s}
+.whatsnew-btn:hover{border-color:var(--hls2);color:var(--ink);background:var(--cvs)}
+.whatsnew-btn .ic{font-size:13px}
+.whatsnew-badge{position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--p);border:1.5px solid var(--cv)}
+.whatsnew-popover{position:absolute;top:calc(100% + 8px);right:0;width:320px;max-height:60vh;overflow:auto;background:var(--sf);border:1px solid var(--hl);border-radius:var(--rl);box-shadow:0 8px 24px rgba(0,0,0,.12);padding:6px 0;display:none;z-index:200}
+.whatsnew-popover.open{display:block;animation:cardIn .2s ease}
+.whatsnew-head{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid var(--hls)}
+.whatsnew-head .t{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--mu)}
+.whatsnew-close{border:none;background:transparent;color:var(--mu);cursor:pointer;font-size:14px;padding:0 4px;line-height:1}
+.whatsnew-close:hover{color:var(--ink)}
+.whatsnew-item{display:flex;flex-direction:column;gap:2px;padding:10px 16px;border-bottom:1px solid var(--hls)}
+.whatsnew-item:last-child{border-bottom:none}
+.whatsnew-date{font-size:10px;color:var(--mu-soft);font-family:var(--f-code)}
+.whatsnew-title{font-size:13px;font-weight:600;color:var(--ink)}
+.whatsnew-desc{font-size:12px;color:var(--body);line-height:1.5}
+.whatsnew-empty{padding:20px 16px;font-size:12px;color:var(--mu-soft);text-align:center}
+@media(max-width:600px){.whatsnew-popover{width:min(86vw,320px)}}
 .nav-bar{background:var(--cv);border-bottom:1px solid var(--hl);padding:0 28px;display:flex;align-items:center;height:42px;position:sticky;top:0;z-index:100;gap:var(--sp-xs)}
 .nav-tabs{display:flex;gap:2px;overflow-x:auto}
 .nav-tab{padding:6px 18px;border-radius:var(--rs);font-size:12px;font-weight:500;color:var(--mu);cursor:pointer;border:none;background:transparent;white-space:nowrap;font-family:var(--f-body);flex-shrink:0;transition:all .15s}
@@ -208,7 +228,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 </style>
 </head>
 <body>
-<header class="top-bar"><div class="top-logo"><div class="top-dot"></div><span class="top-title">all_in_one</span><span class="top-subtitle">· 网络配置生成工具</span></div></header>
+<header class="top-bar"><div class="top-logo"><div class="top-dot"></div><span class="top-title">all_in_one</span><span class="top-subtitle">· 网络配置生成工具</span></div><div class="whatsnew-wrap" id="whatsnew-wrap"><button class="whatsnew-btn" type="button" onclick="toggleWhatsnew(event)" aria-label="最近更新"><span class="ic">📣</span><span>最近更新</span><span class="whatsnew-badge" id="whatsnew-dot" style="display:none"></span></button><div class="whatsnew-popover" id="whatsnew-popover"><div class="whatsnew-head"><span class="t">最近更新</span><button class="whatsnew-close" type="button" onclick="closeWhatsnew(event)" aria-label="关闭">✕</button></div>{% if whatsnew %}<ul class="whatsnew-list">{% for item in whatsnew %}<li class="whatsnew-item" data-id="{{ item.id }}"><span class="whatsnew-date">{{ item.date }}</span><span class="whatsnew-title">{{ item.title }}</span>{% if item.desc %}<span class="whatsnew-desc">{{ item.desc }}</span>{% endif %}</li>{% endfor %}</ul>{% else %}<div class="whatsnew-empty">暂无更新</div>{% endif %}</div></div></header>
 <nav class="nav-bar"><div class="nav-tabs" id="navTabs">
 <button class="nav-tab active" data-panel="epoch-fastip">Epoch FastIP</button>
 <button class="nav-tab" data-panel="usg-fastip">USG FastIP</button>
@@ -230,7 +250,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <button class="variant-pill" id="er-ver-5" onclick="switchERVersion('5')">5.0</button>
 </div>
 <div class="variant-bar" data-tool="epoch-fastip">
-<button class="variant-pill active" data-variant="hk">HK 香港出口</button><button class="variant-pill" data-variant="us">非香港出口</button><button class="variant-pill" data-variant="flink">ER 飞连</button><button class="variant-pill" data-variant="new_exit">ER 新增出口</button><button class="variant-pill" data-variant="domain_split">ER 域名分流</button>
+<button class="variant-pill active" data-variant="hk">HK 香港出口</button><button class="variant-pill" data-variant="us">非香港出口</button><button class="variant-pill" data-variant="us_single">单出口</button><button class="variant-pill" data-variant="flink">ER 飞连</button><button class="variant-pill" data-variant="new_exit">ER 新增出口</button><button class="variant-pill" data-variant="domain_split">ER 域名分流</button>
 </div>
 <!-- Normal layout (HK/US/Flink/New Exit) -->
 <div id="er-normal-layout">
@@ -528,6 +548,7 @@ all_in_one<span style="margin:0 6px;color:#4a4038">·</span>Config Generator<spa
 const TEMPLATE_EDITABLE = {{ template_editable|tojson }};
 const IS_ADMIN = {{ is_admin|tojson }};
 const USERNAME = {{ username|tojson }};
+const WHATSNEW = {{ whatsnew|tojson }};
 const TM={'epoch-fastip':'epoch_fastip','epoch-fastip5':'epoch_fastip5','usg-fastip':'usg_fastip','epoch-mpls':'epoch_mpls','ar-sdwan':'ar_sdwan','ar-traditional':'ar_traditional'};
 let erVersion='4';
 function onER5TunnelTypeChange(){
@@ -767,7 +788,7 @@ document.querySelectorAll('.variant-bar').forEach(bar=>{bar.addEventListener('cl
 async function ldInitForm(tp){
   // Load saved init defaults into the formal page form fields
   try{
-    let scenarioMap={'epoch-fastip+hk':'Epoch FastIP · HK 香港出口','epoch-fastip+us':'Epoch FastIP · 非香港出口',
+    let scenarioMap={'epoch-fastip+hk':'Epoch FastIP · HK 香港出口','epoch-fastip+us':'Epoch FastIP · 非香港出口','epoch-fastip+us_single':'Epoch FastIP · 非香港出口 · 单出口',
       'ar-traditional+dual':'AR 传统组网 · 双线',
       'usg-fastip+us':'USG FastIP · 非香港出口','usg-fastip+hk':'USG FastIP · HK 香港出口',
       'epoch-mpls+domestic':'Epoch MPLS · 国内配置','epoch-mpls+overseas':'Epoch MPLS · 海外配置','epoch-mpls+ipsec':'Epoch MPLS · IPSec',
@@ -1163,6 +1184,32 @@ let _fwNavHandler=function(e){
     else{if(_fwRunning)fwStop()}
   }catch(ex){}
 };
+// ── 最近更新告示栏 ──────────────────────────────────────────────
+function toggleWhatsnew(e){
+  e.stopPropagation();
+  let p=$('whatsnew-popover'),open=p.classList.toggle('open');
+  if(open&&WHATSNEW.length){
+    let latest=WHATSNEW[0].id||WHATSNEW[0].date;
+    localStorage.setItem('whatsnew_lastSeen',latest);
+    $('whatsnew-dot').style.display='none';
+  }
+}
+function closeWhatsnew(e){e.stopPropagation();$('whatsnew-popover').classList.remove('open')}
+// 首次访问且有未读更新 → 显示小红点
+(function(){
+  if(!WHATSNEW.length)return;
+  let latest=WHATSNEW[0].id||WHATSNEW[0].date;
+  let seen=localStorage.getItem('whatsnew_lastSeen');
+  let dot=$('whatsnew-dot');
+  if(dot)dot.style.display=(seen===latest)?'none':'';
+})();
+// 点击弹层外区域关闭
+document.addEventListener('click',function(e){
+  let p=$('whatsnew-popover');
+  if(!p||!p.classList.contains('open'))return;
+  if(!e.target.closest('#whatsnew-wrap'))p.classList.remove('open');
+});
+
 document.querySelector('.nav-bar').addEventListener('click',_fwNavHandler);
 </script>
 </body>

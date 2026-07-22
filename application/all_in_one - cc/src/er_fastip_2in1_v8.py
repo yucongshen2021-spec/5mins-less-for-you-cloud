@@ -1873,6 +1873,20 @@ US_EXAMPLE = (
     "BGPSERVER IP：103.252.19.99,43.229.119.251\n海外出口ip：\n10.60.18.22-150.116.112.236\n"
 )
 
+# 单出口示例数据头：只有主 ACVPN + 主 natpe，无备线
+US_SINGLE_EXAMPLE = (
+    "LineID:609169A1\nPE:gzd-upe5\nTunnel:Tunnel0/0/1165\nwanip:10.55.14.64/30\n"
+    "PE 对接:192.168.247.17\nCE 对接:10.23.0.122\n"
+    "PE:gzd-acvpnpe2\nTunnel:vtun17953\nwanip:10.23.0.120/30\nPE 对接:183.63.68.171\n\n"
+    "LineID:609169A5\nPE： twb-natpe2\nWANIP: 10.21.32.124/30\nTUNNEL: tun1267\n"
+    "PE Docking：192.168.239.12\nCE Docking：: 10.22.241.232\n"
+    "BGPSERVER IP：103.252.19.25,43.229.117.226\n海外出口ip：\n10.60.44.28-218.32.88.83\n"
+)
+
+# 单出口模板：初始与 TEMPLATE_EPOCH_US 一致（bk_*_block 在单出口时自动为空）
+# 用户可在"我来定模板"里独立修改此模板
+TEMPLATE_EPOCH_US_SINGLE = TEMPLATE_EPOCH_US
+
 us_access_mode_var = tk.StringVar(value="OpenVPN")
 tab_us.columnconfigure(0, weight=1)
 tab_us.rowconfigure(0, weight=0)

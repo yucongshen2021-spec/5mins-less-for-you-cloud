@@ -1,0 +1,210 @@
+# ==========================================================
+# Epoch 非香港出口配置  Hostname: {hostname}
+# 主ACVPN GRE  {main_acvpn_gre_tun}  PE:{main_acvpn_gre_pe}
+#   WANIP:{main_acvpn_gre_wanip}  PE侧:{main_acvpn_gre_pe_ip}  CE侧:{main_acvpn_gre_ce_ip}
+#   GRE remote:{main_acvpn_gre_remote}
+# 主ACVPN vtun  {main_acvpn_vtun_id}(port:{main_acvpn_vtun_port})  PE:{main_acvpn_vtun_pe}
+#   local:{main_acvpn_vtun_local}  remote:{main_acvpn_vtun_remote}  docking:{main_acvpn_vtun_docking}
+# 主非香港出口  {main_us_tun}  PE:{main_us_pe}
+#   WANIP:{main_us_wanip}  PE侧:{main_us_pe_ip}  CE侧:{main_us_gre_ce_ip}
+#   PE docking:{main_us_pe_docking}  NAT IP(FakeIP):{main_us_nat_ip_all}
+#   BGP: {main_us_bgp1}, {main_us_bgp2}
+# 备ACVPN GRE  {bk_acvpn_gre_tun}  PE:{bk_acvpn_gre_pe}
+#   WANIP:{bk_acvpn_gre_wanip}  PE侧:{bk_acvpn_gre_pe_ip}  CE侧:{bk_acvpn_gre_ce_ip}
+#   GRE remote:{bk_acvpn_gre_remote}
+# 备ACVPN vtun  {bk_acvpn_vtun_id}(port:{bk_acvpn_vtun_port})  PE:{bk_acvpn_vtun_pe}
+#   local:{bk_acvpn_vtun_local}  remote:{bk_acvpn_vtun_remote}  docking:{bk_acvpn_vtun_docking}
+# 备非香港出口  {bk_us_tun}  PE:{bk_us_pe}
+#   WANIP:{bk_us_wanip}  PE侧:{bk_us_pe_ip}  CE侧:{bk_us_gre_ce_ip}
+#   PE docking:{bk_us_pe_docking}  NAT IP(FakeIP):{bk_us_nat_ip_all}
+#   BGP: {bk_us_bgp1}, {bk_us_bgp2}
+{bk_header_block}
+# ───────────────────────────────────────────────────────
+# BGP更新源(主)：{main_us_nat_ip_all}  BGP更新源(备)：{bk_us_nat_ip_all}
+# 注意：请自行增加nat/dns/mtu部分！！
+# ==========================================================
+set epoch file-sync task 1 local '/opt/cn.txt'
+set epoch file-sync task 1 remote 'http://183.56.161.82:1909/f32x/domainlist/cn_domainlist.last'
+set epoch file-sync task 2 local '/opt/oversea.txt'
+set epoch file-sync task 2 remote 'http://183.56.161.82:1909/f32x/domainlist/oversea_domainlist.last'
+set firewall all-ping 'enable'
+set firewall broadcast-ping 'disable'
+set firewall config-trap 'disable'
+set firewall group network-group GROUP-FNET-Whitelist network '43.229.117.226/32'
+set firewall group network-group GROUP-FNET-Whitelist network '43.229.119.251/32'
+set firewall group network-group GROUP-FNET-Whitelist network '120.76.31.146/32'
+set firewall group network-group GROUP-FNET-Whitelist network '202.104.174.178/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.112.236.97/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.112.238.8/29'
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.55.250/32'
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.55.10/32'
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.55.11/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.99/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.100/32'
+set firewall group network-group GROUP-FNET-Whitelist network '114.113.245.101/32'
+set firewall group network-group GROUP-FNET-Whitelist network '10.0.0.0/8'
+set firewall group network-group GROUP-FNET-Whitelist network '172.16.0.0/12'
+set firewall group network-group GROUP-FNET-Whitelist network '192.168.0.0/16'
+set firewall group network-group GROUP-FNET-Whitelist network '100.68.250.0/24'
+set firewall group network-group GROUP-FNET-Whitelist network '224.0.0.0/4'
+set firewall ipv6-receive-redirects 'disable'
+set firewall ipv6-src-route 'disable'
+set firewall ip-src-route 'disable'
+set firewall log-martians 'enable'
+set firewall name WAN2LOCAL default-action 'drop'
+set firewall name WAN2LOCAL rule 1005 action 'accept'
+set firewall name WAN2LOCAL rule 1005 state established 'enable'
+set firewall name WAN2LOCAL rule 1005 state related 'enable'
+set firewall name WAN2LOCAL rule 1010 action 'accept'
+set firewall name WAN2LOCAL rule 1010 source group network-group 'GROUP-FNET-Whitelist'
+set firewall name WAN2LOCAL rule 1210 action 'accept'
+set firewall name WAN2LOCAL rule 1210 protocol 'gre'
+set firewall name WAN2LOCAL rule 1220 action 'accept'
+set firewall name WAN2LOCAL rule 1220 protocol 'ipip'
+{fw_options_block}
+set firewall receive-redirects 'disable'
+set firewall send-redirects 'disable'
+set firewall source-validation 'disable'
+set firewall syn-cookies 'enable'
+set firewall twa-hazards-protection 'disable'
+set interfaces ethernet {wan_if} address '{wan_addr}'
+set interfaces ethernet {wan_if} description 'TO-WAN'
+{lan_if_block}
+set interfaces dummy dum0 address '{ce_docking}/32'
+set interfaces dummy dum0 description 'CE Docking'
+set interfaces dummy dum100 address '{main_us_nat_ip}/32'
+set interfaces dummy dum100 description '{main_us_dum100_desc}'
+{extra_dum_main_block}
+{bk_dum_block}
+set interfaces openvpn {main_acvpn_vtun_id} description 'MAIN_{main_acvpn_vtun_pe}'
+set interfaces openvpn {main_acvpn_vtun_id} firewall local name 'WAN2LOCAL'
+set interfaces openvpn {main_acvpn_vtun_id} local-address {main_acvpn_vtun_local} subnet-mask '255.255.255.252'
+set interfaces openvpn {main_acvpn_vtun_id} mode 'site-to-site'
+set interfaces openvpn {main_acvpn_vtun_id} openvpn-option '--nobind'
+set interfaces openvpn {main_acvpn_vtun_id} openvpn-option '--ping 10'
+set interfaces openvpn {main_acvpn_vtun_id} openvpn-option '--ping-restart 60'
+set interfaces openvpn {main_acvpn_vtun_id} openvpn-option '--persist-tun'
+set interfaces openvpn {main_acvpn_vtun_id} openvpn-option '--fragment 1300'
+set interfaces openvpn {main_acvpn_vtun_id} protocol 'udp'
+set interfaces openvpn {main_acvpn_vtun_id} remote-address '{main_acvpn_vtun_remote}'
+set interfaces openvpn {main_acvpn_vtun_id} remote-host '{main_acvpn_vtun_docking}'
+set interfaces openvpn {main_acvpn_vtun_id} remote-port '{main_acvpn_vtun_port}'
+set interfaces openvpn {main_acvpn_vtun_id} shared-secret-key-file '/config/auth/openvpn.secret'
+{bk_acvpn_vtun_section}
+set interfaces tunnel {main_acvpn_gre_tun} address '{main_acvpn_gre_ce_ip}/30'
+set interfaces tunnel {main_acvpn_gre_tun} description 'MAIN_{main_acvpn_gre_pe}'
+set interfaces tunnel {main_acvpn_gre_tun} encapsulation 'gre'
+set interfaces tunnel {main_acvpn_gre_tun} firewall local name 'WAN2LOCAL'
+set interfaces tunnel {main_acvpn_gre_tun} mtu '1476'
+set interfaces tunnel {main_acvpn_gre_tun} multicast 'disable'
+set interfaces tunnel {main_acvpn_gre_tun} parameters ip ttl '255'
+set interfaces tunnel {main_acvpn_gre_tun} remote '{main_acvpn_gre_remote}'
+set interfaces tunnel {main_acvpn_gre_tun} source-address '{main_acvpn_vtun_local}'
+{bk_acvpn_gre_section}
+set interfaces tunnel {main_us_tun} address '{main_us_gre_ce_ip}/30'
+set interfaces tunnel {main_us_tun} description 'MAIN_{main_us_pe}'
+set interfaces tunnel {main_us_tun} encapsulation 'gre'
+set interfaces tunnel {main_us_tun} firewall local name 'WAN2LOCAL'
+set interfaces tunnel {main_us_tun} mtu '1452'
+set interfaces tunnel {main_us_tun} multicast 'disable'
+set interfaces tunnel {main_us_tun} parameters ip ttl '255'
+set interfaces tunnel {main_us_tun} remote '{main_us_pe_docking}'
+set interfaces tunnel {main_us_tun} source-address '{ce_docking}'
+{bk_us_tunnel_section}
+set nat source rule 10 outbound-interface '{wan_if}'
+set nat source rule 10 translation address 'masquerade'
+{overseas_nat_block}
+set nat source rule 3000 destination address '8.8.0.0/16'
+set nat source rule 3000 outbound-interface '{main_us_tun}'
+set nat source rule 3000 translation address '{main_us_nat_ip}'
+{bk_nat_block}
+set openfalcon endpoint-name '{hostname}'
+set openfalcon server-address '192.168.237.86'
+set policy community-list 80 rule 10 action 'permit'
+set policy community-list 80 rule 10 description 'to_hk'
+set policy community-list 80 rule 10 regex '65000:9939'
+set policy community-list 81 rule 10 action 'permit'
+set policy community-list 81 rule 10 description 'to_ct'
+set policy community-list 81 rule 10 regex '65000:4134'
+set policy community-list 82 rule 10 action 'permit'
+set policy community-list 82 rule 10 description 'to_cnc'
+set policy community-list 82 rule 10 regex '65000:4837'
+set policy community-list 83 rule 10 action 'permit'
+set policy community-list 83 rule 10 description 'to_cn_other'
+set policy community-list 83 rule 10 regex '65000:9808'
+set policy community-list 85 rule 10 action 'permit'
+set policy community-list 85 rule 10 description 'to_deny'
+set policy community-list 85 rule 10 regex '65000:9807'
+set policy community-list 88 rule 10 action 'permit'
+set policy community-list 88 rule 10 description 'to_google'
+set policy community-list 88 rule 10 regex '65000:9008'
+set policy route-map bgp-from--RSVR rule 100 action 'permit'
+set policy route-map bgp-from--RSVR rule 100 description 'to_hk'
+set policy route-map bgp-from--RSVR rule 100 match community community-list '80'
+set policy route-map bgp-from--RSVR rule 100 set ip-next-hop '{main_us_pe_ip}'
+set policy route-map bgp-from--RSVR rule 200 action 'permit'
+set policy route-map bgp-from--RSVR rule 200 description 'to_ct'
+set policy route-map bgp-from--RSVR rule 200 match community community-list '81'
+set policy route-map bgp-from--RSVR rule 200 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR rule 300 action 'permit'
+set policy route-map bgp-from--RSVR rule 300 description 'to_cnc'
+set policy route-map bgp-from--RSVR rule 300 match community community-list '82'
+set policy route-map bgp-from--RSVR rule 300 set ip-next-hop '1.1.1.1'
+set policy route-map bgp-from--RSVR rule 400 action 'permit'
+set policy route-map bgp-from--RSVR rule 400 description 'to_cn_other'
+set policy route-map bgp-from--RSVR rule 400 match community community-list '83'
+set policy route-map bgp-from--RSVR rule 400 set ip-next-hop '1.1.1.1'
+{bk_route_map2_block}
+set protocols bgp 65000 neighbor {main_us_bgp1} peer-group 'RSVR'
+set protocols bgp 65000 neighbor {main_us_bgp2} peer-group 'RSVR'
+{bk_bgp_block}
+set protocols bgp 65000 peer-group RSVR address-family ipv4-unicast route-map import 'bgp-from--RSVR'
+set protocols bgp 65000 peer-group RSVR address-family ipv4-unicast soft-reconfiguration inbound
+set protocols bgp 65000 peer-group RSVR remote-as '65000'
+set protocols bgp 65000 peer-group RSVR update-source '{main_us_nat_ip}'
+set protocols bgp 65000 timers holdtime '15'
+set protocols bgp 65000 timers keepalive '5'
+set track name mainupe failure-count '2'
+set track name mainupe success-count '2'
+set track name mainupe test 10 resp-time '5'
+set track name mainupe test 10 target '{main_acvpn_gre_pe_ip}'
+set track name mainupe test 10 ttl-limit '1'
+set track name mainupe test 10 type 'ping'
+{bk_track_block}
+set track name mainnatpe failure-count '2'
+set track name mainnatpe success-count '2'
+set track name mainnatpe test 10 resp-time '5'
+set track name mainnatpe test 10 target '{main_us_pe_ip}'
+set track name mainnatpe test 10 ttl-limit '1'
+set track name mainnatpe test 10 type 'ping'
+{wan_route_block}
+set protocols static route {main_acvpn_vtun_docking}/32 next-hop 1.1.1.1
+set protocols static route {main_us_pe_docking}/32 next-hop {main_acvpn_gre_pe_ip}
+set protocols static route {main_acvpn_gre_remote}/32 next-hop {main_acvpn_vtun_remote}
+{us_bgp_routes}
+set protocols static route 192.168.55.250/32 next-hop {main_acvpn_gre_pe_ip} track mainupe
+set protocols static route 192.168.237.86/32 next-hop {main_acvpn_gre_pe_ip} track mainupe
+set protocols static route 114.113.245.99/32 next-hop {main_acvpn_gre_pe_ip}
+{bk_routes_block}
+{return_routes_block}
+set policy local-route rule 1001 set table '101'
+set policy local-route rule 1001 source '{main_us_gre_ce_ip}'
+set protocols static table 101 route 0.0.0.0/0 next-hop {main_us_pe_ip}
+{bk_pbr_block}
+set system host-name '{hostname}'
+set service dns forwarding allow-from '0.0.0.0/0'
+set service dns forwarding cache-size '1001'
+set service dns forwarding dnssec 'off'
+set service dns forwarding domainlist CN file '/opt/cn.txt'
+set service dns forwarding domainlist CN recursion-desired
+set service dns forwarding domainlist CN server '114.114.114.114'
+set service dns forwarding domainlist CN server '114.114.115.115'
+set service dns forwarding domainlist HK file '/opt/oversea.txt'
+set service dns forwarding domainlist HK recursion-desired
+set service dns forwarding domainlist HK server '8.8.8.8'
+set service dns forwarding domainlist HK server '8.8.4.4'
+set service dns forwarding listen-address '0.0.0.0'
+set service dns forwarding name-server '8.8.8.8'
+set service dns forwarding name-server '8.8.4.4'
+set service dns forwarding source-address '0.0.0.0'
+{dhcp_server_block}

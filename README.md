@@ -65,7 +65,7 @@ docker compose up -d --build
 
 | 工具 | 变体 | 接口格式 |
 |------|------|---------|
-| ER FastIP 4.0 | HK/非香港/飞连/新增出口/域名分流 | eth{N} |
+| ER FastIP 4.0 | HK/非香港/飞连/新增出口/域名分流/单出口(无备线) | eth{N} |
 | ER FastIP 5.0 | HK/非香港/IPSec/飞连/新增出口/域名分流 | eth{N} |
 | USG FastIP | HK/非香港/飞连/新增出口 | GE0/0/{N} |
 | Epoch MPLS | 国内/海外/IPSec | eth{N} |

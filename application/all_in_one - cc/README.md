@@ -8,11 +8,15 @@ cd web && python app.py
 
 浏览器打开 `http://localhost:5003`（由 portal 反向代理统一入口 `http://localhost:5000/app/all_in_one/` 暴露）。
 
+## 最近更新告示栏
+
+顶栏右侧 📣 按钮展开最近更新列表（日期/标题/简介）。内容来自 `data/whatsnew/updates.json`，由 `index()` 服务端渲染。未读小红点由 `localStorage('whatsnew_lastSeen')` 控制，点开即标记已读；点 ✕ 或弹层外部收起。新增功能只需编辑该 JSON。
+
 ## 页签
 
 | 页签 | 功能 |
 |------|------|
-| **Epoch FastIP** | HK / 非HK / 飞连 / 新增出口 / 域名分流 |
+| **Epoch FastIP** | HK / 非HK / 飞连 / 新增出口 / 域名分流 / 单出口(无备线) |
 | **USG FastIP** | 非HK / HK / 飞连 / 新增出口 |
 | **Epoch MPLS** | 国内 / 海外 / IPSec |
 | **AR SD-WAN** | 单机 / 双机 · OPS 脚本 + Factory 配置 |

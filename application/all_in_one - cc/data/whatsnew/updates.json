@@ -1,0 +1,7 @@
+{
+  "updates": [
+    {"id":"2026-07-20-single-exit","date":"2026-07-20","title":"ER 新增单出口配置","desc":"ER 4.0 非香港出口支持单出口（无备线）配置，并修复 overseas_nat_block 残留"},
+    {"id":"2026-07-20-flink-parser","date":"2026-07-20","title":"修改 ER 飞连匹配格式","desc":"放宽飞连 parser 对预留 IP/CIDR 的识别"},
+    {"id":"2026-07-17-mpls-overseas","date":"2026-07-17","title":"修复 ER MPLS 海外 bug","desc":"海外主线 vtun_only 不再生成主 GRE tunnel，消除空行残废配置"}
+  ]
+}
