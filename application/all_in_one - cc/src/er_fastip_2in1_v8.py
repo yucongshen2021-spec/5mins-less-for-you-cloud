@@ -1735,6 +1735,16 @@ def build_epoch_hk_format_dict(raw: str):
     if not raw:
         return None, ("empty", None)
     d = parse_epoch_hk(raw)
+
+    # 检测数据头是否为 US 格式（贴错场景）
+    # US 数据头特征：有 海外出口ip / PE Docking，无 HKIP / CE LOIP
+    _has_us_marker = bool(
+        re.search(r'海外出口ip', raw, re.IGNORECASE)
+        and re.search(r'PE\s*Docking', raw, re.IGNORECASE)
+    )
+    if _has_us_marker:
+        return None, ("wrong_scenario", "数据头可能为非香港出口格式（US），请切换到「非香港出口」场景后重试")
+
     hn = hk_get_hostname()
     if not hn:
         hn = extract_lineid_hk(raw) or "（请填写Hostname）"
@@ -1953,6 +1963,14 @@ def build_epoch_us_format_dict(raw: str):
         bk_nat_ips = bk_nat_ips[:10]
 
     if not main_nat_ips:
+        # 检测数据头是否为 HK 格式（贴错场景）
+        # HK 数据头特征：有 HKIP / CE LOIP，无 海外出口ip / PE Docking
+        _has_hk_marker = bool(
+            re.search(r'HKIP', raw, re.IGNORECASE)
+            or re.search(r'CE\s*LOIP', raw, re.IGNORECASE)
+        )
+        if _has_hk_marker:
+            return None, ("wrong_scenario", "数据头可能为香港出口格式（HK），请切换到「HK 香港出口」场景后重试"), []
         return None, ("natmiss", ["主线海外出口ip"]), []
 
     # 单出口判断：备线无 nat_ip -> 单出口模式

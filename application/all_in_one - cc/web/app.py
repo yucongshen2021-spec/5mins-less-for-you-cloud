@@ -659,7 +659,10 @@ def _humanize_error(err, variant: str = "") -> str:
 
         if kind == "natmiss":
             items = "、".join(str(x) for x in payload) if isinstance(payload, list) else str(payload or "出口IP")
-            return f"数据头缺少必要的出口IP信息（{items}）。\n请检查：\n  1. 数据头是否包含完整的「海外出口ip」字段\n  2. 主线和备线数据是否都已填写"
+            return f"数据头缺少必要的出口IP信息（{items}）。\n请检查：\n  1. 数据头是否包含完整的「海外出口ip」字段\n  2. 主线和备线数据是否都已填写\n  3. 如果数据头是香港出口格式（含「对接IP」/「HKIP」），请切换到「HK 香港出口」场景"
+
+        if kind == "wrong_scenario":
+            return str(payload) if payload else "数据头格式与当前场景不匹配，请检查是否贴错了场景"
 
         if kind == "network":
             if isinstance(payload, list) and payload:
