@@ -1807,6 +1807,15 @@ def build_epoch5_hk_format_dict(hdr_text):
         return None, ("parse", "请输入业务数据（MAIN/BACKUP 数据头）")
     d = parse_epoch5_hk_headers(raw)
 
+    # 检测数据头是否为 US 格式（贴错场景）
+    # US 数据头特征：有 海外出口ip + PE Docking
+    _has_us_marker = bool(
+        re.search(r'海外出口ip', raw, re.IGNORECASE)
+        and re.search(r'PE\s*Docking', raw, re.IGNORECASE)
+    )
+    if _has_us_marker:
+        return None, ("parse", "数据头可能为非香港出口格式（US），请切换到「非香港出口」场景后重试")
+
     # ── 2. 读取网络参数（仅 4.0 兼容字段，从 globals() 读取）──
     wan_eth = str(g.get("DEFAULT_WAN_ETH", "0")).strip() or "0"
     lan_eth = str(g.get("DEFAULT_LAN_ETH", "5")).strip() or "5"
@@ -2053,6 +2062,15 @@ def build_epoch5_us_format_dict(hdr_text):
     if not raw:
         return None, ("parse", "请输入业务数据（LineID 数据头）")
     d = parse_epoch_us(raw)
+
+    # 检测数据头是否为 HK 格式（贴错场景）
+    # HK 数据头特征：有 HKIP / CE LOIP
+    _has_hk_marker = bool(
+        re.search(r'HKIP', raw, re.IGNORECASE)
+        or re.search(r'CE\s*LOIP', raw, re.IGNORECASE)
+    )
+    if _has_hk_marker:
+        return None, ("parse", "数据头可能为香港出口格式（HK），请切换到「HK 香港出口」场景后重试")
 
     # ── 2. 读取网络参数 ──
     wan_eth = str(g.get("DEFAULT_WAN_ETH", "0")).strip() or "0"

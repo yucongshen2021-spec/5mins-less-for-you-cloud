@@ -677,6 +677,12 @@ def _humanize_error(err, variant: str = "") -> str:
             info = ", ".join(str(x) for x in payload) if isinstance(payload, list) else str(payload or "")
             return f"隧道名称格式不符合要求（{info}）。\nHK 出口场景要求隧道名以 vtun 开头，请检查数据头中的 Tunnel 字段。"
 
+        if kind == "parse":
+            # parse 错误的 payload 通常已经是中文提示
+            if isinstance(payload, str) and payload:
+                return payload
+            return "数据格式异常，请检查输入数据是否完整。"
+
         # Unknown tuple kind
         return f"数据格式异常（{kind}），请检查输入数据是否完整。"
 
