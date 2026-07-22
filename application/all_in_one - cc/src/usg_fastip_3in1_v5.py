@@ -2009,6 +2009,17 @@ def _build_usg_format_dict_common(text, is_hk=False, bgp_version=None):
     if not d:
         return None, ("empty", [])
 
+    # 检测数据头是否贴错场景（HK/US 交叉）
+    # USG HK 数据头 PE 名字通常含 HK/hk（如 hkg1-fgpe3），US 数据头不含
+    _pe_names = re.findall(r'PE[：:]\s*(\S+)', text)
+    _has_hk_in_pe = any(re.search(r'[Hh][Kk]', pe) for pe in _pe_names)
+    if is_hk and not _has_hk_in_pe:
+        # HK 场景但 PE 名字不含 HK -> 可能贴了 US 数据头
+        return None, ("wrong_scenario", "数据头可能为非香港出口格式（US），PE 名称中未检测到 HK 标识，请确认或切换到「非香港出口」场景")
+    if not is_hk and _has_hk_in_pe:
+        # US 场景但 PE 名字含 HK -> 可能贴了 HK 数据头
+        return None, ("wrong_scenario", "数据头可能为香港出口格式（HK），PE 名称中检测到 HK 标识，请确认或切换到「HK 香港出口」场景")
+
     wan_dhcp = bool(g.get(_p + "DEFAULT_WAN_DHCP", False))
     lan_dhcp = bool(g.get(_p + "DEFAULT_LAN_DHCP", True))
     rr_enabled = bool(g.get(_p + "DEFAULT_GEN_RETURN_ROUTE", False))
