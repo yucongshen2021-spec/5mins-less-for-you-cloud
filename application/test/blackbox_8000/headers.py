@@ -203,6 +203,34 @@ TUNNEL:tun2305
 PE对接:10.255.111.128
 出口ip:172.16.14.118"""
 
+USG_HK = """主 IPSEC_PE: bja-ape1
+拨号IP：118.193.100.10
+loIP：10.18.5.13
+认证ID：608810A10
+预共享密钥：both-win
+
+LineID:608810A10
+PE： hkg1-fgpe3
+WANIP: 10.22.98.40/30
+TUNNEL: tun1040
+PE对接：10.255.110.48
+CE对接：10.18.5.13
+出口ip：103.91.158.227;
+
+备 IPSEC_PE: sha-apebk1
+拨号IP：101.226.24.131
+loIP：10.18.6.25
+认证ID：608810A11
+预共享密钥：both-win
+
+LineID:608810A11
+PE： hkj-fgpe1
+WANIP: 10.22.73.52/30
+TUNNEL: tun2040
+PE对接：10.255.111.40
+CE对接：10.18.6.25
+出口ip：103.91.158.227;"""
+
 # USG 飞连数据头：含账号 + FPE + 预留IP（与普通 US 不同）
 USG_FLINK = """LineID:609526A3
 PE:szd-upe3

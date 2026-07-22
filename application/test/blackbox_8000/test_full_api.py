@@ -242,7 +242,7 @@ GEN_CASES = [
      {"ER5_DS_DOMAINS_DEFAULT": "google.com\nyoutube.com"}, "output", 5, ["domain-list"]),
     # ── USG FastIP ──
     ("usg_fastip", "us", H.USG_US, {}, "output", 100, ["set firewall", "ip address"]),
-    ("usg_fastip", "hk", H.USG_US, {}, "output", 100, ["set firewall", "ip address"]),
+    ("usg_fastip", "hk", H.USG_HK, {}, "output", 100, ["set firewall", "ip address"]),
     ("usg_fastip", "flink", H.USG_FLINK, {}, "output", 20, ["interface Tunnel"]),
     ("usg_fastip", "new_exit", H.USG_NEW_EXIT, {}, "output", 10, ["interface Tunnel"]),
     # ── Epoch MPLS ──
