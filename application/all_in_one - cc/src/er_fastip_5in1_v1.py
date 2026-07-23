@@ -463,6 +463,20 @@ set system host-name '{hostname}'
 # SSH 端口
 set service ssh disable-host-validation
 set service ssh port '2707'
+# SSH 限制源IP（固定规则 + WAN/LAN CIDR）
+set service ssh acl permit '10.0.0.0/8'
+set service ssh acl permit '100.64.0.0/10'
+set service ssh acl permit '113.105.190.147/32'
+set service ssh acl permit '114.112.238.8/29'
+set service ssh acl permit '114.113.245.101/32'
+set service ssh acl permit '120.76.31.146/32'
+set service ssh acl permit '172.16.0.0/12'
+set service ssh acl permit '183.61.239.168/32'
+set service ssh acl permit '192.168.0.0/16'
+set service ssh acl permit '192.168.55.250/32'
+set service ssh acl permit '202.104.174.178/32'
+set service ssh acl permit '59.37.126.140/32'
+{ssh_acl_block}
 
 # 登录账户
 set system login user bothwin authentication plaintext-password 'Tfe28@w%'
@@ -507,6 +521,7 @@ set interfaces openvpn {main_tunnel} remote-address '{main_wanip_remote}'
 set interfaces openvpn {main_tunnel} remote-host '{main_docking}'
 set interfaces openvpn {main_tunnel} remote-port '{main_tunnel_port}'
 set interfaces openvpn {main_tunnel} shared-secret-key 'openvpn_secret'
+set interfaces openvpn {main_tunnel} ip adjust-mss 1300
 set protocols static route {main_docking}/32 next-hop '{wan_gw}'
 
 # 备 OpenVPN
@@ -523,6 +538,7 @@ set interfaces openvpn {bk_tunnel} remote-address '{bk_wanip_remote}'
 set interfaces openvpn {bk_tunnel} remote-host '{bk_docking}'
 set interfaces openvpn {bk_tunnel} remote-port '{bk_tunnel_port}'
 set interfaces openvpn {bk_tunnel} shared-secret-key 'openvpn_secret'
+set interfaces openvpn {bk_tunnel} ip adjust-mss 1300
 {static_route_bk_docking}
 
 # DNS 劫持配置
@@ -1880,6 +1896,18 @@ def build_epoch5_hk_format_dict(hdr_text):
     # DNS 劫持使用的接口（旁挂时用 WAN 口）
     d["dns_hijack_if"] = d["wan_if"] if bypass else d["lan_if"]
 
+    # ── 4b. 生成 {ssh_acl_block} -- WAN/LAN 网络号加入 SSH ACL ──
+    _ssh_acl_lines = []
+    for _cidr in [wan_cidr, lan_cidr if not bypass else ""]:
+        if not _cidr or "/" not in _cidr:
+            continue
+        try:
+            _net = ipaddress.ip_network(_cidr.strip(), strict=False)
+            _ssh_acl_lines.append(f"set service ssh acl permit '{_net}'")
+        except Exception:
+            pass
+    d["ssh_acl_block"] = "\n".join(_ssh_acl_lines)
+
     # PE 描述（用于 OpenVPN description）
     d["main_pe_desc"] = (
         (d.get("main_pe") or "") + " " + (d.get("main_tunnel") or "")
@@ -2158,12 +2186,17 @@ def build_epoch5_us_format_dict(hdr_text):
     # GRE tunnel 和 OpenVPN 接口改用各自的 ip adjust-mss 参数（已在模板里写死）
     d["fw_options_block"] = ""
 
-    # ── 6b. 生成 {ssh_acl_block} -- WAN/LAN CIDR 加入 SSH ACL ──
+    # ── 6b. 生成 {ssh_acl_block} -- WAN/LAN 网络号加入 SSH ACL ──
+    # 用网络号（如 192.168.1.0/24），不是 IP+掩码（如 192.168.1.10/24）
     ssh_acl_lines = []
-    if wan_cidr:
-        ssh_acl_lines.append(f"set service ssh acl permit '{wan_cidr}'")
-    if lan_cidr and not bypass:
-        ssh_acl_lines.append(f"set service ssh acl permit '{lan_cidr}'")
+    for _cidr in [wan_cidr, lan_cidr if not bypass else ""]:
+        if not _cidr or "/" not in _cidr:
+            continue
+        try:
+            _net = ipaddress.ip_network(_cidr.strip(), strict=False)
+            ssh_acl_lines.append(f"set service ssh acl permit '{_net}'")
+        except Exception:
+            pass
     d["ssh_acl_block"] = "\n".join(ssh_acl_lines)
 
     # ── 8. 生成 {extra_dum_main_block} / {extra_dum_bk_block} ──
