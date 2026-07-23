@@ -401,6 +401,15 @@ def _build_where(filters: dict) -> tuple:
 
 _GEN_FILTER = "function LIKE '生成·%'"
 
+# 列表查询只取看板表格需要的轻量列，排除三个大 TEXT 字段
+# (data_header / request_body / response_body) —— 完整内容由详情接口
+# get_record() 按需拉取。这把单次列表响应从 ~660KB 降到 ~15KB。
+_LIST_COLUMNS = (
+    "id, ts, ip, app_id, method, path, query, status, duration_ms, "
+    "req_size, resp_size, function, variant, user_agent, referer, "
+    "error, user_id, username"
+)
+
 def query_user_records(db_path: str, username: str,
                        page: int = 1, page_size: int = 20) -> list:
     """Return a page of generate records for a specific user, newest first."""
@@ -408,7 +417,7 @@ def query_user_records(db_path: str, username: str,
     conn = _connect_read(db_path)
     try:
         rows = conn.execute(
-            f"SELECT * FROM access_log WHERE username = ? AND {_GEN_FILTER} ORDER BY id DESC LIMIT ? OFFSET ?",
+            f"SELECT {_LIST_COLUMNS} FROM access_log WHERE username = ? AND {_GEN_FILTER} ORDER BY id DESC LIMIT ? OFFSET ?",
             [username, page_size, offset],
         ).fetchall()
         return [dict(r) for r in rows]
@@ -468,14 +477,19 @@ def query_user_summary(db_path: str, username: str) -> dict:
 
 def query_records(db_path: str, filters: dict,
                   page: int = 1, page_size: int = 50) -> list:
-    """Return a page of access_log rows as dicts, newest first."""
+    """Return a page of access_log rows as dicts, newest first.
+
+    Only the lightweight columns are selected (see _LIST_COLUMNS); the heavy
+    data_header / request_body / response_body are fetched on demand via
+    get_record() when a user opens a single record's detail.
+    """
     where, params = _build_where(filters)
     offset = max(0, (page - 1)) * page_size
 
     conn = _connect_read(db_path)
     try:
         rows = conn.execute(
-            f"SELECT * FROM access_log {where} ORDER BY id DESC LIMIT ? OFFSET ?",
+            f"SELECT {_LIST_COLUMNS} FROM access_log {where} ORDER BY id DESC LIMIT ? OFFSET ?",
             params + [page_size, offset],
         ).fetchall()
         return [dict(r) for r in rows]

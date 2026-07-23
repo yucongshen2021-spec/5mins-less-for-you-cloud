@@ -2093,7 +2093,7 @@ def build_epoch_us_format_dict(raw: str):
             "set track name backnatpe test 10 type 'ping'",
         ])
 
-        # 备线静态路由
+        # 备线静态路由（不含 BGP server 路由 -- 已在 us_bgp_routes 里）
         bk_route_lines = []
         if d.get("bk_acvpn_vtun_docking"):
             bk_route_lines.append(f"set protocols static route {d['bk_acvpn_vtun_docking']}/32 next-hop 1.1.1.1")
@@ -2101,9 +2101,6 @@ def build_epoch_us_format_dict(raw: str):
             bk_route_lines.append(f"set protocols static route {d['bk_us_pe_docking']}/32 next-hop {d.get('bk_acvpn_gre_pe_ip', '')}")
         if d.get("bk_acvpn_gre_remote"):
             bk_route_lines.append(f"set protocols static route {d['bk_acvpn_gre_remote']}/32 next-hop {d.get('bk_acvpn_vtun_remote', '')}")
-        for bgp in [d.get("bk_us_bgp1", ""), d.get("bk_us_bgp2", "")]:
-            if bgp:
-                bk_route_lines.append(f"set protocols static route {bgp}/32 next-hop {bk_peip} track backnatpe")
         # 192.168.55.250 backup + 192.168.237.86 backup
         if d.get("bk_acvpn_gre_pe_ip"):
             bk_route_lines.append(f"set protocols static route 192.168.55.250/32 next-hop {d['bk_acvpn_gre_pe_ip']} distance '5'")

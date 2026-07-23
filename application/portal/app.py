@@ -206,10 +206,17 @@ def health():
 
 # ── Proxy to sub-apps ────────────────────────────────────────────────────────
 _PORT_MAP = {a["id"]: a["port"] for a in APPS}
+# stats 看板由 supervisord 独立管理（端口 9000），不在 APPS 进程表里，
+# 这里单独加入反代映射，经 portal /app/stats/ 暴露并鉴权。
+_PORT_MAP["stats"] = 9000
 
 @app.route("/app/<app_id>/", defaults={"subpath": ""}, methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 @app.route("/app/<app_id>/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 def app_proxy(app_id: str, subpath: str):
+    # stats 看板含访问日志（用户 IP / 用户名），仅登录用户可经 portal 访问；
+    # 9000 端口已绑回 127.0.0.1，不再对公网直接暴露。
+    if app_id == "stats" and not session.get("user_id"):
+        return redirect("/login")
     return proxy_to(app_id, subpath, _PORT_MAP)
 
 

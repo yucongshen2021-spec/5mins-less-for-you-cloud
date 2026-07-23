@@ -265,7 +265,7 @@ function loadSummary(){
 
 function loadRecords(page){
   currentPage = page;
-  var qs = buildQuery({page:page,per_page:50});
+  var qs = buildQuery({page:page,per_page:20});
   $('loader').style.display = 'block';
   $('emptyMsg').style.display = 'none';
   fetch('/api/records?'+qs).then(function(r){return r.json()}).then(function(d){
@@ -463,9 +463,17 @@ function fmtSize(n){
 }
 
 // ── Init ──
+var _refreshTimer = null;
+var REFRESH_MS = 60000;  // 每 60s 自动刷新
+function startAutoRefresh(){ stopAutoRefresh(); _refreshTimer = setInterval(refresh, REFRESH_MS); }
+function stopAutoRefresh(){ if(_refreshTimer){ clearInterval(_refreshTimer); _refreshTimer = null; } }
 refresh();
-// Auto-refresh every 30s
-setInterval(refresh,30000);
+startAutoRefresh();
+// 标签页隐藏时暂停轮询（避免多标签页后台重复拉取），可见时恢复
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden){ stopAutoRefresh(); }
+  else { refresh(); startAutoRefresh(); }
+});
 </script>
 </body>
 </html>

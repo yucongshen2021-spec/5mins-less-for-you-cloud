@@ -5,6 +5,7 @@ Usage:
 """
 
 import csv
+import gzip
 import io
 import json
 import os
@@ -25,6 +26,37 @@ app = Flask(__name__)
 # ── Session config (for admin panel) ─────────────────────────────────────────
 app.secret_key = os.environ.get("STATS_SECRET_KEY", os.environ.get("SECRET_KEY", "stats-default-secret"))
 _ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "yucs123")
+
+
+# ── gzip 压缩响应，降低公网出站带宽 ──────────────────────────────────────────
+@app.after_request
+def _gzip_response(resp):
+    """对 JSON / text 响应做 gzip 压缩（仅当客户端接受且确实更小时）。
+
+    stats 看板的 /api/records 等响应经此压缩后体积大幅下降，缓解
+    公网出口带宽压力。小于 1KB 的响应不压缩。
+    """
+    if not (200 <= resp.status_code < 300):
+        return resp
+    if resp.headers.get("Content-Encoding"):
+        return resp
+    ctype = (resp.headers.get("Content-Type") or "").lower()
+    if not (ctype.startswith("application/json") or ctype.startswith("text/")):
+        return resp
+    if "gzip" not in (request.headers.get("Accept-Encoding") or "").lower():
+        return resp
+    data = resp.get_data()
+    if len(data) < 1024:
+        return resp
+    compressed = gzip.compress(data, compresslevel=6)
+    if len(compressed) >= len(data):
+        return resp
+    resp.set_data(compressed)
+    resp.headers["Content-Encoding"] = "gzip"
+    resp.headers["Content-Length"] = str(len(compressed))
+    resp.headers["Vary"] = "Accept-Encoding"
+    return resp
+
 
 # ── DB init ──────────────────────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@ services:
     container_name: fivemins-portal
     ports:
       - "5000:5000"
-      - "9000:9000"
+      - "127.0.0.1:9000:9000"   # stats 仅本机可达，公网通过 portal /app/stats/ 访问
     volumes:
       - portal-data:/app/application/all_in_one - cc/data
       - portal-logs:/app/application/portal/logs
