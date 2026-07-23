@@ -89,10 +89,9 @@ function $(id){return document.getElementById(id)}
 var USERNAME='{{ username }}';
 var currentPage=1;
 
-// 返回 5000 端口首页（动态获取 hostname + 5000 端口）
+// 返回 portal 首页（相对路径，适配反代任意端口/域名）
 function goBack(){
-  var host=location.hostname;
-  window.location.href='http://'+host+':5000/';
+  window.location.href='/';
 }
 
 function loadSummary(){

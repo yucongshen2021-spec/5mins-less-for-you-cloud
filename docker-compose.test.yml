@@ -15,7 +15,7 @@ services:
     container_name: fivemins-portal-test
     ports:
       - "8000:5000"       # 宿主机 8000 → 容器内 Portal 5000（测试入口）
-      - "8001:9000"       # 宿主机 8001 → 容器内 stats 9000（测试环境统计仪表盘）
+      - "127.0.0.1:8001:9000"  # stats 仅本机可达，公网通过 portal(8000) /app/stats/ 访问
     volumes:
       - portal-test-data:/app/application/all_in_one - cc/data
       - portal-test-logs:/app/application/portal/logs

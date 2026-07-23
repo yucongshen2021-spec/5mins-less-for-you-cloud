@@ -146,8 +146,8 @@
 <script>
 function $(id){return document.getElementById(id)}
 function toast(msg){var t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2000)}
-// 返回 5000 端口首页
-function goHome(){window.location.href='http://'+location.hostname+':5000/';}
+// 返回 portal 首页（相对路径，适配反代任意端口/域名）
+function goHome(){window.location.href='/';}
 
 {% if not logged_in %}
 async function doLogin(e){
