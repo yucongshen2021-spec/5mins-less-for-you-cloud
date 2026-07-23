@@ -456,6 +456,56 @@ t("HK不受影响-生成成功", r5.get("ok"))
 t("HK不受影响-无空outbound", "outbound-interface ''" not in r5.get("output", ""))
 
 
+# ═════════════════════════════════════════════════════════════
+# SECTION 13: ER5 SSH ACL 网络号 + OpenVPN adjust-mss 测试
+# ═════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("SECTION 13: ER5 SSH ACL + OpenVPN adjust-mss")
+print("=" * 60)
+
+_er5_net = {"wan_cidr": "192.168.1.10/24", "wan_gw": "192.168.1.1",
+            "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"}
+
+# 1. ER5 HK SSH ACL + OpenVPN
+r = c.post("/api/generate/epoch_fastip5", json={
+    "variant": "hk", "header_text": HDR["er5_hk_ipsec"] if "er5_hk_ipsec" in HDR else "MAIN\nlineid: 603642Ar3\n主PE： szd-natflr2\nWANIP: 10.40.25.188/30\nTUNNEL: vtun40826\nDocking：121.12.81.3\nCE LOIP: 10.20.186.235\nHKIP：10.60.241.250 --> 103.48.141.157\nBGPSERVER IP： 10.10.99.168,10.10.99.169\n\nBACKUP\nPE：szc-natbk10\nWANIP: 10.41.25.188/30\nTUNNEL: vtun50826\nDocking： 120.133.129.72\nCE LOIP: 10.20.186.235\nHKIP：10.60.241.250 --> 103.48.141.157\nBGPSERVER IP：10.10.99.198,10.10.99.199",
+    "network": _er5_net
+}).get_json()
+out_hk = r.get("output", "")
+t("ER5 HK-生成成功", r.get("ok"))
+t("ER5 HK-ssh acl wan网络号", "ssh acl permit '192.168.1.0/24'" in out_hk)
+t("ER5 HK-ssh acl lan网络号", "ssh acl permit '192.168.5.0/24'" in out_hk)
+t("ER5 HK-无IP+掩码在acl", "ssh acl permit '192.168.1.10/24'" not in out_hk)
+t("ER5 HK-有固定acl 10.0.0.0/8", "ssh acl permit '10.0.0.0/8'" in out_hk)
+t("ER5 HK-openvpn ip adjust-mss", "ip adjust-mss 1300" in out_hk)
+t("ER5 HK-无firewall options adjust", "set firewall options interface" not in out_hk or "adjust-mss" not in out_hk)
+
+# 2. ER5 US SSH ACL + OpenVPN
+r = c.post("/api/generate/epoch_fastip5", json={
+    "variant": "us", "header_text": HDR["er_us"],
+    "network": _er5_net
+}).get_json()
+out_us = r.get("output", "")
+t("ER5 US-生成成功", r.get("ok"))
+t("ER5 US-ssh acl wan网络号", "ssh acl permit '192.168.1.0/24'" in out_us)
+t("ER5 US-ssh acl lan网络号", "ssh acl permit '192.168.5.0/24'" in out_us)
+t("ER5 US-无IP+掩码在acl", "ssh acl permit '192.168.1.10/24'" not in out_us)
+t("ER5 US-有固定acl 10.0.0.0/8", "ssh acl permit '10.0.0.0/8'" in out_us)
+t("ER5 US-openvpn ip adjust-mss", "ip adjust-mss 1300" in out_us)
+t("ER5 US-tunnel ip adjust-mss", "tunnel tun1165 ip adjust-mss" in out_us if "tun1165" in out_us else True)
+t("ER5 US-无firewall options adjust", "set firewall options interface" not in out_us or "adjust-mss" not in out_us)
+
+# 3. ER5 US bypass 模式（LAN CIDR 不在 SSH ACL）
+r = c.post("/api/generate/epoch_fastip5", json={
+    "variant": "us", "header_text": HDR["er_us"],
+    "network": {**_er5_net, "bypass": True}
+}).get_json()
+out_bypass = r.get("output", "")
+t("ER5 US bypass-生成成功", r.get("ok"))
+t("ER5 US bypass-有wan acl", "ssh acl permit '192.168.1.0/24'" in out_bypass)
+t("ER5 US bypass-无lan acl", "ssh acl permit '192.168.5.0/24'" not in out_bypass)
+
+
 print(f"\n{'='*60}")
 print(f"  完整测试报告")
 print(f"{'='*60}")
