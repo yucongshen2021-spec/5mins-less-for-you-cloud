@@ -745,6 +745,19 @@ set system host-name '{hostname}'
 # SSH 端口
 set service ssh disable-host-validation
 set service ssh port '2707'
+# SSH 限制源IP
+set service ssh acl permit '10.0.0.0/8'
+set service ssh acl permit '100.64.0.0/10'
+set service ssh acl permit '113.105.190.147/32'
+set service ssh acl permit '114.112.238.8/29'
+set service ssh acl permit '114.113.245.101/32'
+set service ssh acl permit '120.76.31.146/32'
+set service ssh acl permit '172.16.0.0/12'
+set service ssh acl permit '183.61.239.168/32'
+set service ssh acl permit '192.168.0.0/16'
+set service ssh acl permit '192.168.55.250/32'
+set service ssh acl permit '202.104.174.178/32'
+set service ssh acl permit '59.37.126.140/32'
 
 # 登录账户
 set system login user bothwin authentication plaintext-password 'Tfe28@w%'
@@ -791,6 +804,7 @@ set interfaces openvpn {main_acvpn_vtun_id} remote-address '{main_acvpn_vtun_rem
 set interfaces openvpn {main_acvpn_vtun_id} remote-host '{main_acvpn_vtun_docking}'
 set interfaces openvpn {main_acvpn_vtun_id} remote-port '{main_acvpn_vtun_port}'
 set interfaces openvpn {main_acvpn_vtun_id} shared-secret-key 'openvpn_secret'
+set interfaces openvpn {main_acvpn_vtun_id} ip adjust-mss 1300
 
 # 主 ACVPN GRE 隧道
 set interfaces tunnel {main_acvpn_gre_tun} address '{main_acvpn_gre_ce_ip}/30'
@@ -826,6 +840,7 @@ set interfaces openvpn {bk_acvpn_vtun_id} remote-address '{bk_acvpn_vtun_remote}
 set interfaces openvpn {bk_acvpn_vtun_id} remote-host '{bk_acvpn_vtun_docking}'
 set interfaces openvpn {bk_acvpn_vtun_id} remote-port '{bk_acvpn_vtun_port}'
 set interfaces openvpn {bk_acvpn_vtun_id} shared-secret-key 'openvpn_secret'
+set interfaces openvpn {bk_acvpn_vtun_id} ip adjust-mss 1300
 
 # 备 ACVPN GRE 隧道
 set interfaces tunnel {bk_acvpn_gre_tun} address '{bk_acvpn_gre_ce_ip}/30'
@@ -2138,17 +2153,9 @@ def build_epoch5_us_format_dict(hdr_text):
             f"set interfaces ethernet {d['lan_if']} address '{d['lan_cidr']}'"
         )
 
-    # ── 6. 生成 {fw_options_block} ──
-    fw_lines = [
-        f"set firewall options interface {t} adjust-mss '1300'"
-        for t in [
-            d.get("main_acvpn_vtun_id", ""), d.get("bk_acvpn_vtun_id", ""),
-            d.get("main_acvpn_gre_tun", ""), d.get("bk_acvpn_gre_tun", ""),
-            d.get("main_us_tun", ""), d.get("bk_us_tun", ""),
-        ]
-        if t
-    ]
-    d["fw_options_block"] = "\n".join(fw_lines) if fw_lines else ""
+    # ── 6. {fw_options_block} 已废弃 -- firewall options interface adjust-mss 是错误配置
+    # GRE tunnel 和 OpenVPN 接口改用各自的 ip adjust-mss 参数（已在模板里写死）
+    d["fw_options_block"] = ""
 
     # ── 8. 生成 {extra_dum_main_block} / {extra_dum_bk_block} ──
     extra_main_lines = []
