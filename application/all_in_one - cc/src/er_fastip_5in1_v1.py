@@ -745,7 +745,7 @@ set system host-name '{hostname}'
 # SSH 端口
 set service ssh disable-host-validation
 set service ssh port '2707'
-# SSH 限制源IP
+# SSH 限制源IP（固定规则 + WAN/LAN CIDR）
 set service ssh acl permit '10.0.0.0/8'
 set service ssh acl permit '100.64.0.0/10'
 set service ssh acl permit '113.105.190.147/32'
@@ -758,6 +758,7 @@ set service ssh acl permit '192.168.0.0/16'
 set service ssh acl permit '192.168.55.250/32'
 set service ssh acl permit '202.104.174.178/32'
 set service ssh acl permit '59.37.126.140/32'
+{ssh_acl_block}
 
 # 登录账户
 set system login user bothwin authentication plaintext-password 'Tfe28@w%'
@@ -2156,6 +2157,14 @@ def build_epoch5_us_format_dict(hdr_text):
     # ── 6. {fw_options_block} 已废弃 -- firewall options interface adjust-mss 是错误配置
     # GRE tunnel 和 OpenVPN 接口改用各自的 ip adjust-mss 参数（已在模板里写死）
     d["fw_options_block"] = ""
+
+    # ── 6b. 生成 {ssh_acl_block} -- WAN/LAN CIDR 加入 SSH ACL ──
+    ssh_acl_lines = []
+    if wan_cidr:
+        ssh_acl_lines.append(f"set service ssh acl permit '{wan_cidr}'")
+    if lan_cidr and not bypass:
+        ssh_acl_lines.append(f"set service ssh acl permit '{lan_cidr}'")
+    d["ssh_acl_block"] = "\n".join(ssh_acl_lines)
 
     # ── 8. 生成 {extra_dum_main_block} / {extra_dum_bk_block} ──
     extra_main_lines = []

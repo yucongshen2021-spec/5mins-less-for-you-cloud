@@ -65,7 +65,7 @@ set system host-name '{hostname}'
 # SSH 端口
 set service ssh disable-host-validation
 set service ssh port '2707'
-# SSH 限制源IP
+# SSH 限制源IP（固定规则 + WAN/LAN CIDR）
 set service ssh acl permit '10.0.0.0/8'
 set service ssh acl permit '100.64.0.0/10'
 set service ssh acl permit '113.105.190.147/32'
@@ -78,6 +78,7 @@ set service ssh acl permit '192.168.0.0/16'
 set service ssh acl permit '192.168.55.250/32'
 set service ssh acl permit '202.104.174.178/32'
 set service ssh acl permit '59.37.126.140/32'
+{ssh_acl_block}
 
 # 登录账户
 set system login user bothwin authentication plaintext-password 'Tfe28@w%'
