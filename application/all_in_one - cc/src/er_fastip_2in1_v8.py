@@ -2056,7 +2056,7 @@ def build_epoch_us_format_dict(raw: str):
             f"set nat source rule 3050 translation address '{d['bk_us_nat_ip']}'"
         )
 
-        # RSVR2 route-map (4 communities x 4 lines each)
+        # RSVR2 route-map (4 communities, each with local-preference '50')
         rm2_lines = []
         for rule_num, desc, comm in [(100, "to_hk", "80"), (200, "to_ct", "81"),
                                       (300, "to_cnc", "82"), (400, "to_cn_other", "83")]:
@@ -2065,8 +2065,7 @@ def build_epoch_us_format_dict(raw: str):
             rm2_lines.append(f"set policy route-map bgp-from--RSVR2 rule {rule_num} match community community-list '{comm}'")
             nh = bk_peip if comm == "80" else "1.1.1.1"
             rm2_lines.append(f"set policy route-map bgp-from--RSVR2 rule {rule_num} set ip-next-hop '{nh}'")
-            if comm != "80":
-                rm2_lines.append(f"set policy route-map bgp-from--RSVR2 rule {rule_num} set local-preference '50'")
+            rm2_lines.append(f"set policy route-map bgp-from--RSVR2 rule {rule_num} set local-preference '50'")
         d["bk_route_map2_block"] = "\n".join(rm2_lines)
 
         # BGP neighbor + peer-group RSVR2
