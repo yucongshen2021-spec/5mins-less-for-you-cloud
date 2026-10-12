@@ -157,6 +157,10 @@ docker-compose up -d --build
 │   ├── AGENTS.md                      项目级工程守则（架构/运维/坑点，给 AI agent 看）
 │   ├── GLOBAL_RULES.md                跨项目全局规则层（优先级低于 AGENTS.md）
 │   ├── DESIGN.md                      UI 设计规范（以 all_in_one index.html :root 为真相来源）
+│   ├── HANDOVER.md                    交接手册（部署/运维/数据/发布/决策记录）
+│   ├── REBUILD_EXE.md                 桌面版 exe 重建指南（wine 工具链）
+│   ├── CLEANUP_PLAN.md / CLEANUP_REPORT.md   2026-10 系统清理整改：方案与结果
+│   ├── archive/MIGRATION_TO_LINUX.md  历史迁移蓝图（已归档，正文不改）
 │   └── 经历.md                        项目叙事与踩坑总结
 ├── log/                                变更日志（按日期）+ mistake.txt（跨日期踩坑记录）
 ├── port80-test/                        80 端口连通性测试页（独立容器：静态页 + /health + /ip）
@@ -213,4 +217,4 @@ curl http://localhost:5000/api/health  # {"ok":true,"status":"healthy"}
 
 ## License
 
-私有项目。未授权请勿外传。
+内部工具。GitHub 仓库（2026-10 起公开）：`yucongshen2021-spec/5mins-less-for-you-cloud`。

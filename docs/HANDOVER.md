@@ -98,7 +98,7 @@ python3 /opt/fivemins/tools/db_restore.py --file auth_20261012_0900.sqlite
 |---|---|
 | 状态 | `sudo docker ps`；健康 `curl localhost:5000/api/health` |
 | 看日志 | `sudo docker exec fivemins-portal tail -50 /app/application/portal/logs/portal.log`（另有 all_in_one/stats/usg_virus_test/fastip_report/supervisord .log） |
-| 重启单应用 | 容器内 `supervisorctl restart all_in_one`（socket 在 `/tmp/supervisord.sock`，需 `-c` 或默认配置） |
+| 重启服务 | 整体：`sudo docker restart fivemins-portal`；单应用：`sudo docker exec fivemins-portal kill <PID>`（autorestart 自动拉起）。PID 查询：`sudo docker exec fivemins-portal sh -c 'for p in /proc/[0-9]*; do c=$(tr "\0" " " < $p/cmdline 2>/dev/null); case "$c" in *wsgi*\|*app.py*) echo "${p#/proc/}: $c";; esac; done'`。注：容器内 supervisord 未开 unix socket，supervisorctl 不可用（有意的最小配置） |
 | 重建生产 | `cd /opt/fivemins && sudo docker-compose up -d --build` |
 | 重建测试 | `sudo docker-compose -f docker-compose.test.yml up -d --build` |
 | 改用户模板 | 走 5000「我来定模板」页面（推荐）；批量同步用 `docker cp` 到卷内 `editor_defaults/` |
@@ -165,6 +165,7 @@ PYTHONPATH=/tmp/no_pw TEST_MODE=1 NO_BROWSER=1 BLACKBOX_BASE=http://127.0.0.1:9 
 | 4 | ER FastIP 5.0 变体、AR SD-WAN 页签 | 前端**「测试中」禁用**（验收完成后再开放） |
 | 5 | 遗留保留物 | `src/all_in_one_v2.py` + `src/_templates.json`（桌面版聚合器及模板缓存，Web 端不加载）；`自动做测试报告 - cc/log/2099*`（test_report 测试运行目录）；`.wine64`/`.build_cache`（exe 重建工具链，勿删） |
 | 6 | 清理归档 | 11 个未用模板目录等已移入 `.archive/orphans-20261012/`（30 天冷静期，`MANIFEST.md` 有完整清单与还原说明）；备份包在 `.archive/backup-20261012/` |
+| 7 | 孤儿 Docker 卷（保留观察） | 3 个无容器挂载的旧卷：`fivemins-test_portal-test-data`（524K）、`fivemins-test_portal-test-logs`（68K）、`fivemins_report-logs`（4K）——旧命名时期的残留。确认无需求后可 `sudo docker volume rm <名>`；按零风险原则暂保留 |
 
 ## 十一、本次清理记录（2026-10-12）
 

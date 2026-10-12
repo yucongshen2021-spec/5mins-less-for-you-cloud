@@ -34,7 +34,7 @@ cd web && python app.py
 
 - **登录用户**可以编辑自己的模板（save/reset/preview 模板 + init-defaults）
 - **访客（未登录）**不可编辑，按钮置灰，显示"请登录后编辑专属脚本模板"提示横幅
-- 后端 5 个 API 路由有 `_require_login()` 403 拦截（检查 `X-User-Id` 非空）
+- 后端 9 个 API 路由有 `_require_login()` 403 拦截（检查 `X-User-Id` 非空）：examples / notes / template load·save·reset·preview / init-defaults ×3
 - 前端 `TEMPLATE_EDITABLE` 变量控制按钮状态，`IS_ADMIN` 标识 yucs 管理员
 - 保存模板时自动在 `.tpl` 顶部加注释：`# xxx专属yyy场景模板-yymmdd`
 

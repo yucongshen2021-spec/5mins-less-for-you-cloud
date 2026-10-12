@@ -1,7 +1,7 @@
 ---
 version: 1.0
 name: all_in_one 设计规范
-source_of_truth: "application/all_in_one - cc/web/templates/index.html:9-28（:root design tokens）"
+source_of_truth: "application/all_in_one - cc/web/templates/index.html:9-34（:root design tokens）"
 description: 网络设备配置生成 Web 工具的视觉规范。基色为暖奶油画布 (#f7f7f4) 承载暖近黑墨色 (#26251e)；单一品牌电压色为橙 (#f54e00)，仅用于主 CTA、品牌点、焦点态与 active 强调。Display 用衬线体 DM Serif Display（标题/面板名），body 用 DM Sans，所有代码/数据头/配置输出用 JetBrains Mono。卡片用 1px 发丝线分隔、无投影；8px 节奏 + 12px 卡片圆角；variant 选择用 pill，操作按钮用 8px 圆角。整体是"安静的开发者工具"气质，不是 IDE 暗色也不是营销站。
 
 colors:
@@ -212,7 +212,7 @@ components:
 
 ## Overview
 
-本规范以 `application/all_in_one - cc/web/templates/index.html` 的 `:root`（9–28 行）为**唯一真相来源**反向抽取。任何 UI 改动以该文件实际 token 为准；DESIGN.md 与代码冲突时，**修 DESIGN.md，不改代码**（除非有意做风格升级，需同步两边）。
+本规范以 `application/all_in_one - cc/web/templates/index.html` 的 `:root`（9–34 行）为**唯一真相来源**反向抽取。任何 UI 改动以该文件实际 token 为准；DESIGN.md 与代码冲突时，**修 DESIGN.md，不改代码**（除非有意做风格升级，需同步两边）。
 
 这是一个**网络设备配置生成工具**的界面，不是营销站、不是 IDE 暗色主题。气质是"安静的开发者工具"：
 
@@ -412,7 +412,7 @@ nav-bar 可横滚（不折叠 hamburger）。主内容 max-width 1440px。
 | `--bd` | guest-banner / tpl-admin-banner border | ✓ 已补：`#e6e5e0`（= `--hl`） |
 | `--primary` | guest-banner / tpl-admin-banner 登录链接色 | ✓ 已补：`#f54e00`（= `--p`） |
 
-已补齐到 `index.html:9-28` 的 `:root` 末尾「semantic aliases」段。全文件引用 33 个 `--var`、定义 33 个，无遗留未定义变量。
+已补齐到 `index.html:9-34` 的 `:root` 末尾「semantic aliases」段。全文件定义 33 个 `--var`、被引用 32 个（`--sp-xxs` 定义未用）；无未定义引用。
 
 ### 2. 警告按钮 `#e07b2a` 未进 token
 `.btn-w` 硬编码 `#e07b2a` / `#c06a1a`，不在 `:root`。建议要么进 token（`--warn` / `--warn-active`），要么新场景改用次按钮。
@@ -431,7 +431,7 @@ nav-bar 可横滚（不折叠 hamburger）。主内容 max-width 1440px。
 
 ## Iteration Guide
 
-1. 改 UI 前先读 `index.html:9-28` 的 `:root`，用现有 token。
+1. 改 UI 前先读 `index.html:9-34` 的 `:root`，用现有 token。
 2. 新组件的 active 态默认反相（ink 底 cv 字）。
 3. 输入/输出必等宽；label 必大写。
 4. 卡片 12px、按钮 8px、选择器 pill，不混用。
@@ -447,4 +447,5 @@ nav-bar 可横滚（不折叠 hamburger）。主内容 max-width 1440px。
 | 2026-07-20 | 1.1 | 「已知缺口 #1」已修复：在 `index.html:9-28` 的 `:root` 末尾补齐 5 个语义别名变量（`--primary/--bd/--sf-strong/--hl-strong/--f-zh`），全文件引用与定义均为 33 个、无遗留；DESIGN.md 同步标注为 ✓ 已补。 |
 | 2026-07-21 | 1.2 | 新增 `whatsnew-board` 组件文档（顶栏右侧 📣 告示栏 + popover + 未读点 + localStorage）；`top-bar` note 补右侧；Elevation 表加 Whatsnew 投影行；「已知缺口 #4」记录 whatsnew-popover 投影未进 token。 |
 | 2026-07-24 | 1.3 | 新增独立应用 `usg_virus_test`（USG 测病毒指引页，`application/usg_virus_test/`）：全量复用 all_in_one token（`--cv` 奶油底 / `--ink` 墨色 / `--p` 橙唯一 CTA / DM Serif Display + DM Sans + JetBrains Mono / 12px 卡片发丝线无投影），与主线视觉同源，未引入新色新字体，作为「统一方向」的首个合规新应用样本。 |
+| 2026-10-12 | 1.3.1 | 清理整改核对：行号引用校正 9-28 → **9-34**（`:root` 实际范围，含语义别名段）；引用计数校正为「定义 33 / 被引用 32（`--sp-xxs` 定义未用）」。 |
 | (原 alpha) | alpha | 原始版本（Cursor 营销站设计，与本项目实际 UI 不符，已废弃）。 |

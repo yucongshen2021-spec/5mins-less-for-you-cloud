@@ -150,7 +150,7 @@ git push origin main
 ```bash
 git clone https://github.com/yucongshen2021-spec/5mins-less-for-you-cloud.git
 cd 5mins-less-for-you-cloud
-docker compose up -d --build
+docker-compose up -d --build   # 本机为 Compose v2 独立二进制；插件形式环境等价 docker compose
 curl http://localhost:5000/api/health  # {"ok":true,"status":"healthy"}
 # 登录 yucs/yucs123，管理后台 9000/admin 密码 yucs123
 ```
