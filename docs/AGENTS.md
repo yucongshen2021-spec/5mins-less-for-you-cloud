@@ -135,13 +135,13 @@ Playwright 仅在需要回归一段固定交互序列（如级联下拉、模板
 ## Git Push 网络问题
 
 ```bash
-# GitHub IP 会漂移（2026-10-12 可用：20.27.177.113，见 /etc/hosts）。失效时重新探测：
-for ip in 20.27.177.113 140.82.112.3 140.82.113.3 140.82.114.3; do
+# GitHub IP 会漂移（2026-10-12 实测可用：20.205.243.166，已写入 /etc/hosts）。失效时重新探测：
+for ip in 20.205.243.166 140.82.114.3 140.82.114.4 20.27.177.113 140.82.112.3; do
   timeout 5 bash -c "echo > /dev/tcp/$ip/443" 2>/dev/null && echo "$ip OK" \
     && sudo sed -i '/github.com/d' /etc/hosts \
     && echo "$ip github.com" | sudo tee -a /etc/hosts && break
 done
-# 候选 IP 来源：curl -s https://api.github.com/meta | python3 -c "import json,sys; print(json.load(sys.stdin)['git'])"
+# 候选 IP 来源：curl -s "https://dns.alidns.com/resolve?name=github.com&type=A"
 git push origin main
 ```
 

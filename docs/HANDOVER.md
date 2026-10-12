@@ -149,7 +149,7 @@ PYTHONPATH=/tmp/no_pw TEST_MODE=1 NO_BROWSER=1 BLACKBOX_BASE=http://127.0.0.1:9 
 ## 九、GitHub 与网络
 
 - 仓库：`https://github.com/yucongshen2021-spec/5mins-less-for-you-cloud`（public）
-- **push 网络修复**：GitHub IP 会漂移。当前可用 IP 写在 `/etc/hosts`（2026-10-12 为 `20.27.177.113`）。
+- **push 网络修复**：GitHub IP 会漂移。当前可用 IP 写在 `/etc/hosts`（2026-10-12 实测：`20.205.243.166`；注意网页可达 ≠ git 端点可达，须以 `git ls-remote` 为准）。
   失效时探测并更新（命令见 `docs/AGENTS.md`「Git Push 网络问题」段）。
 - SSH 部署密钥：`~/.ssh/id_ed25519`（pubkey 备份在交接记录）——需在 GitHub 仓库 Settings → Deploy keys
   添加并勾选 write access 后方可 `git push git@github.com:...`。
