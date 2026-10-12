@@ -443,21 +443,36 @@ def _run_mock_worker(task_id: str, cfg: MockConfig, metrics: dict, run_dir: Path
         return
 
     try:
-        # ── 01-04 CE pings ──
-        ce_tasks = [
-            ("01_ce_main_small", "主线小包", cfg.main_ip, 64, "main", 1),
-            ("02_ce_main_large", "主线大包", cfg.main_ip, 1500, "main", 2),
-            ("03_ce_backup_small", "备线小包", cfg.backup_ip, 64, "backup", 3),
-            ("04_ce_backup_large", "备线大包", cfg.backup_ip, 1500, "backup", 4),
-        ]
+        # ── 01-04 CE 测试（ER 与 USG 命令/描述不同）──
+        if cfg.product_type == "usg":
+            # USG: 02=主线 tracert、03=备线 ping 1500、04=备线 tracert
+            ce_tasks = [
+                ("01_ce_main_small", "主线 ping 小包 64", cfg.main_ip, 64, "main", 1),
+                ("02_ce_main_large", "主线 tracert", cfg.main_ip, None, "main", 2),
+                ("03_ce_backup_small", "备线 ping 1500", cfg.backup_ip, 1500, "backup", 3),
+                ("04_ce_backup_large", "备线 tracert", cfg.backup_ip, None, "backup", 4),
+            ]
+        else:
+            ce_tasks = [
+                ("01_ce_main_small", "主线 ping 小包 64", cfg.main_ip, 64, "main", 1),
+                ("02_ce_main_large", "主线 ping 大包 1500", cfg.main_ip, 1500, "main", 2),
+                ("03_ce_backup_small", "备线 ping 小包 64", cfg.backup_ip, 64, "backup", 3),
+                ("04_ce_backup_large", "备线 ping 大包 1500", cfg.backup_ip, 1500, "backup", 4),
+            ]
         for tag, desc, target, size, mkey, seed in ce_tasks:
             if _mock_stop_flags.get(task_id):
                 q.put("[WARN] 任务已被中断\n"); q.put("__DONE__\n"); return
             m = metrics[mkey]
             q.put(f"\n>>> [{tag}] 模拟 {desc} — 延迟 {m['delay']}ms 抖动 {m['jitter']}ms 丢包 {m['loss']}%\n")
-            output = _gen_ping_output(target, 500, size, m["delay"], m["jitter"], m["loss"], seed)
-            (raw / f"{tag}.txt").write_text(output, encoding="utf-8")
-            render_terminal_png(shots / f"{tag}.png", f"[CE]$ ping -c 500 -s {size} {target}", output, FONT_PATH, tail_lines=20)
+            if size is None:
+                # tracert 项
+                output = _gen_tracert_output(target)
+                (raw / f"{tag}.txt").write_text(output, encoding="utf-8")
+                render_terminal_png(shots / f"{tag}.png", f"[CE]$ tracert -d {target}", output, FONT_PATH, tail_lines=20)
+            else:
+                output = _gen_ping_output(target, 500, size, m["delay"], m["jitter"], m["loss"], seed)
+                (raw / f"{tag}.txt").write_text(output, encoding="utf-8")
+                render_terminal_png(shots / f"{tag}.png", f"[CE]$ ping -c 500 -s {size} {target}", output, FONT_PATH, tail_lines=20)
             q.put(f"    完成 → {tag}.png\n")
 
         # ── 05 bandwidth — skip ──

@@ -149,6 +149,10 @@ def assert_ce_cmd_allowed(cfg: Config, cmd: str) -> None:
     )
     if ping_pat.match(c):
         return
+    # USG CE 允许 tracert（主线/备线路径追踪）
+    tracert_pat = re.compile(rf"^tracert -d ({IPV4_CORE})$")
+    if tracert_pat.match(c):
+        return
     raise RuntimeError(f"拒绝发送非白名单 CE 命令: {cmd!r}")
 
 
@@ -468,6 +472,19 @@ def fill_docx(
                             "备线PEWANIP", cfg.backup_ip
                         )
 
+    # 根据产品类型更新 01-04 CE 测试项描述（ER 与 USG 命令不同）
+    ce_desc_rows = {
+        # tag: (行号, ER 描述, USG 描述)
+        "01_ce_main_small": (5, "CE测试，主线 ping（小包64）", "CE测试，主线 ping（小包64）"),
+        "02_ce_main_large": (14, "CE测试，主线 ping（大包1500）", "CE测试，主线 tracert"),
+        "03_ce_backup_small": (23, "CE测试，备线 ping（小包64）", "CE测试，备线 ping（1500）"),
+        "04_ce_backup_large": (32, "CE测试，备线 ping（大包1500）", "CE测试，备线 tracert"),
+    }
+    is_usg = cfg.product_type == "usg"
+    for _tag, (ri, er_desc, usg_desc) in ce_desc_rows.items():
+        cell = t.rows[ri].cells[0]
+        cell.text = usg_desc if is_usg else er_desc
+
     # 截图
     blocks = [
         ("01_ce_main_small", [shots / "01_ce_main_small.png"], False),
@@ -584,20 +601,25 @@ def run_task_loop(
 def mock_runner_for_tag(tag: str, cfg: Config) -> Callable[[], tuple[str, int]]:
     def run() -> tuple[str, int]:
         if cfg.product_type == "usg":
-            if tag in ("01_ce_main_small", "03_ce_backup_small"):
-                ip = cfg.main_ip if tag == "01_ce_main_small" else cfg.backup_ip
-                return (
-                    f"PING {ip} (mock USG)\n500 packets transmitted, 500 received, 0% packet loss\n",
-                    0,
-                )
-            if tag == "02_ce_main_large":
+            # USG: 02/04 = tracert；03 = ping 1500
+            if tag == "01_ce_main_small":
                 return (
                     f"PING {cfg.main_ip} (mock USG)\n500 packets transmitted, 500 received, 0% packet loss\n",
                     0,
                 )
+            if tag == "02_ce_main_large":
+                return (
+                    f"Tracing route to {cfg.main_ip} (mock USG)\n1  2 ms  192.168.1.1\n2  5 ms  {cfg.main_ip}\n",
+                    0,
+                )
+            if tag == "03_ce_backup_small":
+                return (
+                    f"PING {cfg.backup_ip} (mock USG, size 1500)\n500 packets transmitted, 500 received, 0% packet loss\n",
+                    0,
+                )
             if tag == "04_ce_backup_large":
                 return (
-                    f"PING {cfg.backup_ip} (mock USG)\n500 packets transmitted, 500 received, 0% packet loss\n",
+                    f"Tracing route to {cfg.backup_ip} (mock USG)\n1  2 ms  192.168.1.1\n2  5 ms  {cfg.backup_ip}\n",
                     0,
                 )
         if tag.startswith("01") or tag.startswith("02"):
@@ -620,12 +642,13 @@ def build_ce_commands(cfg: Config) -> list[tuple[str, str]]:
             ("03_ce_backup_small", f"sudo ping -c 500 -i {i} -s 64 {cfg.backup_ip}"),
             ("04_ce_backup_large", f"sudo ping -c 500 -i {i} -s 1500 {cfg.backup_ip}"),
         ]
+    # USG: 02=主线 tracert、03=备线 ping 1500、04=备线 tracert（与 ER 不同）
     m = cfg.ce_ping_interval_m.strip()
     return [
         ("01_ce_main_small", f"ping -s 64 -c 500 -m {m} {cfg.main_ip}"),
-        ("02_ce_main_large", f"ping -s 1500 -c 500 -m {m} {cfg.main_ip}"),
-        ("03_ce_backup_small", f"ping -s 64 -c 500 -m {m} {cfg.backup_ip}"),
-        ("04_ce_backup_large", f"ping -s 1500 -c 500 -m {m} {cfg.backup_ip}"),
+        ("02_ce_main_large", f"tracert -d {cfg.main_ip}"),
+        ("03_ce_backup_small", f"ping -s 1500 -c 500 -m {m} {cfg.backup_ip}"),
+        ("04_ce_backup_large", f"tracert -d {cfg.backup_ip}"),
     ]
 
 
