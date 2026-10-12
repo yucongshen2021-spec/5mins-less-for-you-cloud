@@ -391,7 +391,9 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False, ns: dict = 
         if not is_usg:
             d["wan_addr"] = "dhcp"
             if wan_if:
-                d["wan_route_block"] = f"set protocols static route 1.1.1.1/32 dhcp-interface {wan_if}"
+                d["wan_route_block"] = (
+                    f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
+                    f"set protocols static route 1.1.1.1/32 dhcp-interface {wan_if}")
         else:
             d["DEFAULT_WAN_IP"] = "dhcp"
     else:
@@ -402,7 +404,7 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False, ns: dict = 
                 d["wan_addr"] = str(wan_cidr).strip()
             if wan_gw and wan_if:
                 d["wan_route_block"] = (
-                    f"set protocols static route 0.0.0.0/0 next-hop {wan_gw} distance '222'\n"
+                    f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
                     f"set protocols static route 1.1.1.1/32 next-hop {wan_gw}")
             elif not d.get("wan_route_block") or "dhcp-interface" in str(d.get("wan_route_block", "")):
                 d["wan_route_block"] = ""
@@ -426,22 +428,31 @@ def _patch_format_dict(d: dict, network: dict, is_usg: bool = False, ns: dict = 
             lan_cidr = (ns or {}).get("DEFAULT_LAN_CIDR") or d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
             d["lan_if_block"] = (f"set interfaces ethernet {lan_if} address '{lan_cidr}'\n"
                                  f"set interfaces ethernet {lan_if} description 'LAN'")
-            # Ensure dhcp_server_block is populated when LAN DHCP is ON
-            if network.get("lan_dhcp") and not d.get("dhcp_server_block"):
-                lan_cidr = (ns or {}).get("DEFAULT_LAN_CIDR") or d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
-                if "/" in str(lan_cidr):
-                    lan_ip = str(lan_cidr).split("/")[0]
-                    parts = lan_ip.split(".")
-                    if len(parts) == 4:
-                        prefix = str(lan_cidr).split("/")[1]
-                        d_start = f"{parts[0]}.{parts[1]}.{parts[2]}.10"
-                        d_stop = f"{parts[0]}.{parts[1]}.{parts[2]}.200"
-                        network_addr = f"{parts[0]}.{parts[1]}.{parts[2]}.0/{prefix}"
-                        d["dhcp_server_block"] = (
-                            f"set service dhcp-server shared-network-name LAN subnet {network_addr} default-router {lan_ip}\n"
-                            f"set service dhcp-server shared-network-name LAN subnet {network_addr} name-server {lan_ip}\n"
-                            f"set service dhcp-server shared-network-name LAN subnet {network_addr} range 0 start {d_start}\n"
-                            f"set service dhcp-server shared-network-name LAN subnet {network_addr} range 0 stop {d_stop}")
+            # Ensure dhcp_server_block is populated when LAN DHCP is ON, cleared when OFF
+            # network.get("lan_dhcp") = None means not set in form -> use builder/init-defaults value
+            lan_dhcp_form = network.get("lan_dhcp")
+            if lan_dhcp_form is None:
+                # Not in form: trust builder (which may read init-defaults DEFAULT_LAN_DHCP)
+                pass
+            elif lan_dhcp_form:
+                if not d.get("dhcp_server_block"):
+                    lan_cidr = (ns or {}).get("DEFAULT_LAN_CIDR") or d.get("DEFAULT_LAN_CIDR") or d.get("lan_cidr") or "192.168.5.1/24"
+                    if "/" in str(lan_cidr):
+                        lan_ip = str(lan_cidr).split("/")[0]
+                        parts = lan_ip.split(".")
+                        if len(parts) == 4:
+                            prefix = str(lan_cidr).split("/")[1]
+                            d_start = f"{parts[0]}.{parts[1]}.{parts[2]}.10"
+                            d_stop = f"{parts[0]}.{parts[1]}.{parts[2]}.200"
+                            network_addr = f"{parts[0]}.{parts[1]}.{parts[2]}.0/{prefix}"
+                            d["dhcp_server_block"] = (
+                                f"set service dhcp-server shared-network-name LAN subnet {network_addr} default-router {lan_ip}\n"
+                                f"set service dhcp-server shared-network-name LAN subnet {network_addr} name-server {lan_ip}\n"
+                                f"set service dhcp-server shared-network-name LAN subnet {network_addr} range 0 start {d_start}\n"
+                                f"set service dhcp-server shared-network-name LAN subnet {network_addr} range 0 stop {d_stop}")
+            else:
+                # LAN DHCP explicitly OFF: clear stale dhcp_server_block from builder
+                d["dhcp_server_block"] = ""
 
         # Always clear stale return_routes_block from builder, then recompute if RR is ON
         d["return_routes_block"] = ""

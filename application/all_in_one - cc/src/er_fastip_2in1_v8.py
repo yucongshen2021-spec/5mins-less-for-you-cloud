@@ -465,7 +465,7 @@ set protocols static route 192.168.237.86/32 next-hop {bk_wanip_remote} distance
 {return_routes_block}
 set system host-name '{hostname}'
 set service dns forwarding allow-from '0.0.0.0/0'
-set service dns forwarding cache-size '1001'
+set service dns forwarding cache-size '10000'
 set service dns forwarding dnssec 'off'
 set service dns forwarding domainlist CN file '/opt/cn.txt'
 set service dns forwarding domainlist CN recursion-desired
@@ -479,6 +479,7 @@ set service dns forwarding listen-address '0.0.0.0'
 set service dns forwarding name-server '8.8.8.8'
 set service dns forwarding name-server '8.8.4.4'
 set service dns forwarding source-address '0.0.0.0'
+set service dns forwarding recursion-desired
 {dhcp_server_block}"""
 
 # =====================================================================
@@ -496,15 +497,6 @@ TEMPLATE_EPOCH_US = """\
 #   WANIP:{main_us_wanip}  PE侧:{main_us_pe_ip}  CE侧:{main_us_gre_ce_ip}
 #   PE docking:{main_us_pe_docking}  NAT IP(FakeIP):{main_us_nat_ip_all}
 #   BGP: {main_us_bgp1}, {main_us_bgp2}
-# 备ACVPN GRE  {bk_acvpn_gre_tun}  PE:{bk_acvpn_gre_pe}
-#   WANIP:{bk_acvpn_gre_wanip}  PE侧:{bk_acvpn_gre_pe_ip}  CE侧:{bk_acvpn_gre_ce_ip}
-#   GRE remote:{bk_acvpn_gre_remote}
-# 备ACVPN vtun  {bk_acvpn_vtun_id}(port:{bk_acvpn_vtun_port})  PE:{bk_acvpn_vtun_pe}
-#   local:{bk_acvpn_vtun_local}  remote:{bk_acvpn_vtun_remote}  docking:{bk_acvpn_vtun_docking}
-# 备非香港出口  {bk_us_tun}  PE:{bk_us_pe}
-#   WANIP:{bk_us_wanip}  PE侧:{bk_us_pe_ip}  CE侧:{bk_us_gre_ce_ip}
-#   PE docking:{bk_us_pe_docking}  NAT IP(FakeIP):{bk_us_nat_ip_all}
-#   BGP: {bk_us_bgp1}, {bk_us_bgp2}
 {bk_header_block}
 # ───────────────────────────────────────────────────────
 # BGP更新源(主)：{main_us_nat_ip_all}  BGP更新源(备)：{bk_us_nat_ip_all}
@@ -563,6 +555,7 @@ set interfaces dummy dum100 address '{main_us_nat_ip}/32'
 set interfaces dummy dum100 description '{main_us_dum100_desc}'
 {extra_dum_main_block}
 {bk_dum_block}
+{extra_dum_bk_block}
 set interfaces openvpn {main_acvpn_vtun_id} description 'MAIN_{main_acvpn_vtun_pe}'
 set interfaces openvpn {main_acvpn_vtun_id} firewall local name 'WAN2LOCAL'
 set interfaces openvpn {main_acvpn_vtun_id} local-address {main_acvpn_vtun_local} subnet-mask '255.255.255.252'
@@ -680,7 +673,7 @@ set protocols static table 101 route 0.0.0.0/0 next-hop {main_us_pe_ip}
 {bk_pbr_block}
 set system host-name '{hostname}'
 set service dns forwarding allow-from '0.0.0.0/0'
-set service dns forwarding cache-size '1001'
+set service dns forwarding cache-size '10000'
 set service dns forwarding dnssec 'off'
 set service dns forwarding domainlist CN file '/opt/cn.txt'
 set service dns forwarding domainlist CN recursion-desired
@@ -694,6 +687,7 @@ set service dns forwarding listen-address '0.0.0.0'
 set service dns forwarding name-server '8.8.8.8'
 set service dns forwarding name-server '8.8.4.4'
 set service dns forwarding source-address '0.0.0.0'
+set service dns forwarding recursion-desired
 {dhcp_server_block}"""
 
 _ER_COVER_SKIP_HK = frozenset({
@@ -958,7 +952,8 @@ def build_wan_lan_blocks(wan_if, wan_dhcp, wan_ip_cidr, wan_gw,
                          lan_if, lan_dhcp, lan_ip_cidr, is_us=False, bypass=False):
     if wan_dhcp:
         wan_addr = "dhcp"
-        wan_route_block = f"set protocols static route 1.1.1.1/32 dhcp-interface {wan_if}"
+        wan_route_block = (f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
+                           f"set protocols static route 1.1.1.1/32 dhcp-interface {wan_if}")
     else:
         wan_addr = wan_ip_cidr if wan_ip_cidr else DEFAULT_WAN_CIDR
         gw = wan_gw if wan_gw else DEFAULT_WAN_GW
@@ -2287,6 +2282,7 @@ set interfaces tunnel {main_tun} description 'main-{main_pe}'
 set interfaces tunnel {main_tun} encapsulation 'gre'
 set interfaces tunnel {main_tun} firewall local name 'WAN2LOCAL'
 set interfaces tunnel {main_tun} mtu '1400'
+set firewall options interface {main_tun} adjust-mss '1300'
 set interfaces tunnel {main_tun} multicast 'disable'
 set interfaces tunnel {main_tun} parameters ip ttl '255'
 set interfaces tunnel {main_tun} remote '{main_pe_docking}'
@@ -2294,7 +2290,7 @@ set interfaces tunnel {main_tun} source-address '{main_ce_docking}'
 
 set protocols static route {main_pe_docking}/32 next-hop {ER_NE_MAIN_PE_NH_DEFAULT}
 {ER_NE_MAIN_DUM_BLOCK}
-	{ER_NE_BK_BLOCK}
+{ER_NE_BK_BLOCK}
 {ER_NE_NAT_HEADER_BLOCK}
 {ER_NE_NAT_BLOCK}
 {ER_NE_FNET_BLOCK}"""
@@ -3086,6 +3082,7 @@ def build_er_new_exit_config(parsed, init_cfg):
             f"set interfaces tunnel {item['tun']} encapsulation 'gre'",
             f"set interfaces tunnel {item['tun']} firewall local name 'WAN2LOCAL'",
             f"set interfaces tunnel {item['tun']} mtu '1400'",
+            f"set firewall options interface {item['tun']} adjust-mss '1300'",
             f"set interfaces tunnel {item['tun']} multicast 'disable'",
             f"set interfaces tunnel {item['tun']} parameters ip ttl '255'",
             f"set interfaces tunnel {item['tun']} remote '{item['pe_docking']}'",
@@ -3095,9 +3092,9 @@ def build_er_new_exit_config(parsed, init_cfg):
         ])
         dum_id = init_cfg[dum_start_key]
         for left_ip, right_ip in item["oversea_pairs"]:
-            lines.append(f"set interface dummy dum{dum_id} address   {left_ip}/32")
+            lines.append(f"set interfaces dummy dum{dum_id} address '{left_ip}/32'")
             lines.append(
-                f"set interface dummy dum{dum_id} description {prefix}-outip-{left_ip}-{right_ip}"
+                f"set interfaces dummy dum{dum_id} description {prefix}-outip-{left_ip}-{right_ip}"
             )
             dum_id += 1
         lines.append("")
@@ -3121,9 +3118,9 @@ def _build_er_new_exit_format_dict(parsed, init_cfg) -> dict:
         dum_id = int(init_cfg.get(start_key, 300))
         out = []
         for left_ip, right_ip in item.get("oversea_pairs", []):
-            out.append(f"set interface dummy dum{dum_id} address   {left_ip}/32")
+            out.append(f"set interfaces dummy dum{dum_id} address '{left_ip}/32'")
             out.append(
-                f"set interface dummy dum{dum_id} description {prefix}-outip-{left_ip}-{right_ip}"
+                f"set interfaces dummy dum{dum_id} description {prefix}-outip-{left_ip}-{right_ip}"
             )
             dum_id += 1
         return "\n".join(out)
@@ -3140,6 +3137,7 @@ def _build_er_new_exit_format_dict(parsed, init_cfg) -> dict:
             f"set interfaces tunnel {b['tun']} encapsulation 'gre'",
             f"set interfaces tunnel {b['tun']} firewall local name 'WAN2LOCAL'",
             f"set interfaces tunnel {b['tun']} mtu '1400'",
+            f"set firewall options interface {b['tun']} adjust-mss '1300'",
             f"set interfaces tunnel {b['tun']} multicast 'disable'",
             f"set interfaces tunnel {b['tun']} parameters ip ttl '255'",
             f"set interfaces tunnel {b['tun']} remote '{b['pe_docking']}'",

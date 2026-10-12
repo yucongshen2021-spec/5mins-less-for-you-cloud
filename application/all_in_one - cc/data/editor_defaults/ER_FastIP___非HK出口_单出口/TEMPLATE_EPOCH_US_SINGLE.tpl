@@ -9,15 +9,6 @@
 #   WANIP:{main_us_wanip}  PE侧:{main_us_pe_ip}  CE侧:{main_us_gre_ce_ip}
 #   PE docking:{main_us_pe_docking}  NAT IP(FakeIP):{main_us_nat_ip_all}
 #   BGP: {main_us_bgp1}, {main_us_bgp2}
-# 备ACVPN GRE  {bk_acvpn_gre_tun}  PE:{bk_acvpn_gre_pe}
-#   WANIP:{bk_acvpn_gre_wanip}  PE侧:{bk_acvpn_gre_pe_ip}  CE侧:{bk_acvpn_gre_ce_ip}
-#   GRE remote:{bk_acvpn_gre_remote}
-# 备ACVPN vtun  {bk_acvpn_vtun_id}(port:{bk_acvpn_vtun_port})  PE:{bk_acvpn_vtun_pe}
-#   local:{bk_acvpn_vtun_local}  remote:{bk_acvpn_vtun_remote}  docking:{bk_acvpn_vtun_docking}
-# 备非香港出口  {bk_us_tun}  PE:{bk_us_pe}
-#   WANIP:{bk_us_wanip}  PE侧:{bk_us_pe_ip}  CE侧:{bk_us_gre_ce_ip}
-#   PE docking:{bk_us_pe_docking}  NAT IP(FakeIP):{bk_us_nat_ip_all}
-#   BGP: {bk_us_bgp1}, {bk_us_bgp2}
 {bk_header_block}
 # ───────────────────────────────────────────────────────
 # BGP更新源(主)：{main_us_nat_ip_all}  BGP更新源(备)：{bk_us_nat_ip_all}

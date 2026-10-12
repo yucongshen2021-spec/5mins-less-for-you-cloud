@@ -77,8 +77,8 @@ def test_wan_dhcp_mode():
     assert data["ok"], data.get("error", "")
     output = data["output"]
     assert "eth0 address 'dhcp'" in output
-    # 默认路由不应生成
-    assert "0.0.0.0/0 next-hop 1.1.1.1 distance '222'" not in output
+    # DHCP 模式也生成默认路由
+    assert "0.0.0.0/0 next-hop 1.1.1.1 distance '222'" in output
 
 
 def test_bypass_mode():

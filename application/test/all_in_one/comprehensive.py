@@ -510,6 +510,91 @@ t("ER5 US bypass-有wan acl", "ssh acl permit '192.168.1.0/24'" in out_bypass)
 t("ER5 US bypass-无lan acl", "ssh acl permit '192.168.5.0/24'" not in out_bypass)
 
 
+# SECTION 14: DNS cache-size + 默认路由 distance 222 测试
+print("SECTION 14: DNS cache 10000 + 默认路由 distance 222")
+
+# ER4 HK
+r = c.post("/api/generate/epoch_fastip", json={
+    "variant": "hk", "header_text": HDR["er_hk"],
+    "network": {"hostname": "TEST", "wan_cidr": "192.168.1.10/24", "wan_gw": "192.168.1.1",
+                "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"}
+}).get_json()
+out_hk4 = r.get("output", "")
+t("ER4 HK-cache-size 10000", "cache-size '10000'" in out_hk4)
+t("ER4 HK-无cache-size 1001", "cache-size '1001'" not in out_hk4)
+t("ER4 HK-默认路由 distance 222", "0.0.0.0/0 next-hop" in out_hk4 and "distance '222'" in out_hk4)
+t("ER4 HK-无distance 220", "distance '220'" not in out_hk4)
+
+# ER4 US
+r = c.post("/api/generate/epoch_fastip", json={
+    "variant": "us", "header_text": HDR["er_us"],
+    "network": {"hostname": "TEST", "wan_cidr": "192.168.1.10/24", "wan_gw": "192.168.1.1",
+                "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"}
+}).get_json()
+out_us4 = r.get("output", "")
+t("ER4 US-cache-size 10000", "cache-size '10000'" in out_us4)
+t("ER4 US-默认路由 distance 222", "0.0.0.0/0 next-hop" in out_us4 and "distance '222'" in out_us4)
+
+# ER4 US 单出口
+r = c.post("/api/generate/epoch_fastip", json={
+    "variant": "us_single", "header_text": HDR["er_us_single"],
+    "network": {"hostname": "TEST", "wan_cidr": "192.168.1.10/24", "wan_gw": "192.168.1.1",
+                "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"}
+}).get_json()
+out_single4 = r.get("output", "")
+t("ER4 单出口-cache-size 10000", "cache-size '10000'" in out_single4)
+t("ER4 单出口-默认路由 distance 222", "0.0.0.0/0 next-hop" in out_single4 and "distance '222'" in out_single4)
+
+# ER5 HK
+r = c.post("/api/generate/epoch_fastip5", json={
+    "variant": "hk", "header_text": HDR["er5_hk_ipsec"],
+    "network": _er5_net
+}).get_json()
+out_hk5 = r.get("output", "")
+t("ER5 HK-cache-size 10000", "cache-size '10000'" in out_hk5)
+t("ER5 HK-默认路由 distance 222", "0.0.0.0/0 next-hop 1.1.1.1 distance '222'" in out_hk5)
+t("ER5 HK-无distance 220", "distance '220'" not in out_hk5)
+
+# ER5 US
+r = c.post("/api/generate/epoch_fastip5", json={
+    "variant": "us", "header_text": HDR["er_us"],
+    "network": _er5_net
+}).get_json()
+out_us5 = r.get("output", "")
+t("ER5 US-cache-size 10000", "cache-size '10000'" in out_us5)
+t("ER5 US-默认路由 distance 222", "0.0.0.0/0 next-hop 1.1.1.1 distance '222'" in out_us5)
+
+# ER5 HK IPSec
+r = c.post("/api/generate/epoch_fastip5", json={
+    "variant": "hk_ipsec", "header_text": HDR["er5_hk_ipsec"],
+    "network": _er5_net
+}).get_json()
+out_hk5_ips = r.get("output", "")
+t("ER5 HK IPSec-cache-size 10000", "cache-size '10000'" in out_hk5_ips)
+t("ER5 HK IPSec-无cache-size 10001", "cache-size '10001'" not in out_hk5_ips)
+t("ER5 HK IPSec-无cache-size 20000", "cache-size '20000'" not in out_hk5_ips)
+t("ER5 HK IPSec-默认路由 distance 222", "0.0.0.0/0 next-hop 1.1.1.1 distance '222'" in out_hk5_ips)
+
+# ER4 WAN DHCP 模式也应有默认路由
+r = c.post("/api/generate/epoch_fastip", json={
+    "variant": "hk", "header_text": HDR["er_hk"],
+    "network": {"hostname": "TEST", "wan_dhcp": True,
+                "lan_cidr": "192.168.5.1/24", "inner_nets": "10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16"}
+}).get_json()
+out_dhcp4 = r.get("output", "")
+t("ER4 DHCP-默认路由 distance 222", "0.0.0.0/0 next-hop 1.1.1.1 distance '222'" in out_dhcp4)
+t("ER4 DHCP-有dhcp-interface", "dhcp-interface" in out_dhcp4)
+
+# ER5 WAN DHCP 模式也应有默认路由
+r = c.post("/api/generate/epoch_fastip5", json={
+    "variant": "hk", "header_text": HDR["er5_hk_ipsec"],
+    "network": {**_er5_net, "wan_dhcp": True}
+}).get_json()
+out_dhcp5 = r.get("output", "")
+t("ER5 DHCP-默认路由 distance 222", "0.0.0.0/0 next-hop 1.1.1.1 distance '222'" in out_dhcp5)
+t("ER5 DHCP-无WAN DHCP模式提示", "WAN DHCP 模式 - 不生成默认静态路由" not in out_dhcp5)
+
+
 print(f"\n{'='*60}")
 print(f"  完整测试报告")
 print(f"{'='*60}")

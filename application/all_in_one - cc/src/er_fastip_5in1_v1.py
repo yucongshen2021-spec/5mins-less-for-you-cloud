@@ -685,6 +685,7 @@ set service dns forwarding domain-list HK recursion-desired
 set service dns forwarding listen-address '0.0.0.0'
 set service dns forwarding name-server 8.8.4.4
 set service dns forwarding name-server 8.8.8.8
+set service dns forwarding recursion-desired
 
 # DHCP 服务
 {dhcp_block}"""
@@ -1040,6 +1041,7 @@ set service dns forwarding domain-list HK recursion-desired
 set service dns forwarding listen-address '0.0.0.0'
 set service dns forwarding name-server 8.8.4.4
 set service dns forwarding name-server 8.8.8.8
+set service dns forwarding recursion-desired
 
 # DHCP 服务
 {dhcp_block}"""
@@ -1925,15 +1927,10 @@ def build_epoch5_hk_format_dict(hdr_text):
     )
 
     # ── 7. 生成 {default_route_block} ──
-    if wan_dhcp:
-        d["default_route_block"] = (
-            "# WAN DHCP 模式 — 不生成默认静态路由"
-        )
-    else:
-        d["default_route_block"] = (
-            f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '220'\n"
-            f"set protocols static route 1.1.1.1/32 next-hop '{wan_gw}'"
-        )
+    d["default_route_block"] = (
+        f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
+        f"set protocols static route 1.1.1.1/32 next-hop '{wan_gw}'"
+    )
 
     # ── 8. 生成 {pki_block} ──
     if _EPOCH5_PKI_SECRET_KEY:
@@ -2250,15 +2247,10 @@ def build_epoch5_us_format_dict(hdr_text):
     d["us_bgp_routes"] = "\n".join(bgp_lines)
 
     # ── 11. 生成 {default_route_block} ──
-    if wan_dhcp:
-        d["default_route_block"] = (
-            "# WAN DHCP 模式 — 不生成默认静态路由"
-        )
-    else:
-        d["default_route_block"] = (
-            f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '220'\n"
-            f"set protocols static route 1.1.1.1/32 next-hop '{wan_gw}'"
-        )
+    d["default_route_block"] = (
+        f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
+        f"set protocols static route 1.1.1.1/32 next-hop '{wan_gw}'"
+    )
 
     # ── 12. 生成 {pki_block} ──
     if _EPOCH5_PKI_SECRET_KEY:
@@ -2933,7 +2925,7 @@ TEMPLATE_EPOCH5_HK_IPSEC = (
     "{pbr_tables_block}\n"
     "\n"
     "set service dns forwarding allow-from '0.0.0.0/0'\n"
-    "set service dns forwarding cache-size '10001'\n"
+    "set service dns forwarding cache-size '10000'\n"
     "set service dns forwarding dnssec 'off'\n"
     "set service dns forwarding domain-list CN file '/opt/cn.txt'\n"
     "set service dns forwarding domain-list CN name-server '114.114.114.114'\n"
@@ -3265,7 +3257,7 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "# ── PBR 分表默认路由 ──\n"
     "{pbr_tables_block}\n"
     "set service dns forwarding allow-from '0.0.0.0/0'\n"
-    "set service dns forwarding cache-size '20000'\n"
+    "set service dns forwarding cache-size '10000'\n"
     "set service dns forwarding dnssec 'off'\n"
     "set service dns forwarding domain-list CN file '/config/user-data/cn.txt'\n"
     "set service dns forwarding domain-list CN name-server 223.5.5.5\n"
@@ -3278,6 +3270,7 @@ TEMPLATE_EPOCH5_US_IPSEC = (
     "set service dns forwarding listen-address '0.0.0.0'\n"
     "set service dns forwarding name-server 8.8.4.4\n"
     "set service dns forwarding name-server 8.8.8.8\n"
+    "set service dns forwarding recursion-desired\n"
     "set service file-sync task 1 local '/config/user-data/cn.txt'\n"
     "set service file-sync task 1 remote 'http://183.56.161.82:1909/f32x/domainlist/cn_domainlist.last'\n"
     "set service file-sync task 2 local '/config/user-data/oversea.txt'\n"
@@ -3468,14 +3461,11 @@ def build_epoch5_us_ipsec_format_dict(hdr_text: str):
         for net in inner_nets
     )
 
-    # ── 默认路由（受 WAN DHCP 影响）──
-    if wan_dhcp:
-        default_route_block = "# WAN DHCP 模式 — 不生成默认静态路由"
-    else:
-        default_route_block = (
-            f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '220'\n"
-            f"set protocols static route 1.1.1.1/32 next-hop {wan_gw}"
-        )
+    # ── 默认路由 ──
+    default_route_block = (
+        f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
+        f"set protocols static route 1.1.1.1/32 next-hop {wan_gw}"
+    )
 
     # ── IPSec 上游路由（拨号、docking、CE loopback）──
     ipsec_route_lines = [
@@ -3868,14 +3858,11 @@ def build_epoch5_hk_ipsec_format_dict(hdr_text: str):
         for net in inner_nets
     )
 
-    # ── 默认路由（受 WAN DHCP 影响）──
-    if wan_dhcp:
-        default_route_block = "# WAN DHCP 模式 - 不生成默认静态路由"
-    else:
-        default_route_block = (
-            f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
-            f"set protocols static route 1.1.1.1/32 next-hop {wan_gw}"
-        )
+    # ── 默认路由 ──
+    default_route_block = (
+        f"set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'\n"
+        f"set protocols static route 1.1.1.1/32 next-hop {wan_gw}"
+    )
 
     # ── IPSec 上游路由（拨号 IP / PE 对接，均走 1.1.1.1）──
     ipsec_route_lines = [

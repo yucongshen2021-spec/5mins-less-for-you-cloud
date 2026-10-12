@@ -5151,16 +5151,16 @@ class VisualEditorTab:
                     bk_dum = bk_dum_start
                     main_block = []
                     for left_ip, right_ip in mn_pairs:
-                        main_block.append(f"set interface dummy dum{mn_dum} address   {left_ip}/32")
-                        main_block.append(f"set interface dummy dum{mn_dum} description main-outip-{left_ip}-{right_ip}")
+                        main_block.append(f"set interfaces dummy dum{mn_dum} address '{left_ip}/32'")
+                        main_block.append(f"set interfaces dummy dum{mn_dum} description main-outip-{left_ip}-{right_ip}")
                         mn_dum += 1
                     # 备线完整块
                     bk_full_block = ""
                     if has_bk:
                         bk_dum_lines = []
                         for left_ip, right_ip in bk_pairs:
-                            bk_dum_lines.append(f"set interface dummy dum{bk_dum} address   {left_ip}/32")
-                            bk_dum_lines.append(f"set interface dummy dum{bk_dum} description backup-outip-{left_ip}-{right_ip}")
+                            bk_dum_lines.append(f"set interfaces dummy dum{bk_dum} address '{left_ip}/32'")
+                            bk_dum_lines.append(f"set interfaces dummy dum{bk_dum} description backup-outip-{left_ip}-{right_ip}")
                             bk_dum += 1
                         bk_full_block = (
                             f"set interfaces tunnel {bk.get('tun', '')} address '{bk.get('tun_addr', '')}'\n"
@@ -5168,6 +5168,7 @@ class VisualEditorTab:
                             f"set interfaces tunnel {bk.get('tun', '')} encapsulation 'gre'\n"
                             f"set interfaces tunnel {bk.get('tun', '')} firewall local name 'WAN2LOCAL'\n"
                             f"set interfaces tunnel {bk.get('tun', '')} mtu '1400'\n"
+                            f"set firewall options interface {bk.get('tun', '')} adjust-mss '1300'\n"
                             f"set interfaces tunnel {bk.get('tun', '')} multicast 'disable'\n"
                             f"set interfaces tunnel {bk.get('tun', '')} parameters ip ttl '255'\n"
                             f"set interfaces tunnel {bk.get('tun', '')} remote '{bk.get('pe_docking', '')}'\n"

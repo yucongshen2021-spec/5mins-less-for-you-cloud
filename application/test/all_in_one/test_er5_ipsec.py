@@ -396,7 +396,7 @@ class TestIPSecRouteSections:
         """默认路由 0.0.0.0/0 走 1.1.1.1（黑洞触发）；1.1.1.1/32 才指向真实 wan_gw。"""
         output, _ = _generate("ipsec", FULL_IPSEC_HDR,
                               DEFAULT_WAN_GW="111.111.115.1")
-        assert "set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '220'" in output
+        assert "set protocols static route 0.0.0.0/0 next-hop 1.1.1.1 distance '222'" in output
         assert "set protocols static route 1.1.1.1/32 next-hop 111.111.115.1" in output
 
 

@@ -69,6 +69,8 @@ body{font-family:var(--f-body);background:var(--cv);color:var(--ink);line-height
 .nav-tab{padding:6px 18px;border-radius:var(--rs);font-size:12px;font-weight:500;color:var(--mu);cursor:pointer;border:none;background:transparent;white-space:nowrap;font-family:var(--f-body);flex-shrink:0;transition:all .15s}
 .nav-tab:hover{color:var(--ink);background:var(--hls)}
 .nav-tab.active{color:var(--ink);background:var(--sf);border:1px solid var(--hl)}
+.nav-tab:disabled,.variant-pill:disabled{opacity:.45;cursor:not-allowed;color:var(--mu);background:var(--hls);pointer-events:none}
+.badge-testing{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:var(--rp);font-size:10px;font-weight:600;color:#fff;background:var(--er);vertical-align:middle;line-height:1.4}
 
 /* ═══════════════════════════════════════════════════ layout ═══════════════════════════════════════════════════ */
 .main-content{max-width:1440px;margin:0 auto;padding:var(--sp-xl) 28px var(--sp-xxl)}
@@ -233,12 +235,12 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <button class="nav-tab active" data-panel="epoch-fastip">Epoch FastIP</button>
 <button class="nav-tab" data-panel="usg-fastip">USG FastIP</button>
 <button class="nav-tab" data-panel="epoch-mpls">Epoch MPLS</button>
-<button class="nav-tab" data-panel="ar-sdwan">AR SD-WAN</button>
+<button class="nav-tab" data-panel="ar-sdwan" disabled title="测试中">AR SD-WAN<span class="badge-testing">测试中</span></button>
 <button class="nav-tab" data-panel="ar-traditional">AR 传统组网</button>
 <button class="nav-tab" data-panel="templates">我来定模板</button>
 <button class="nav-tab" data-panel="thanks">感谢</button>
 </div></nav>
-<div id="guest-banner" style="display:none;padding:6px 16px;background:rgba(245,78,0,0.08);border-bottom:1px solid var(--bd);font-size:12px;color:var(--mu);text-align:center">您正在以访客模式浏览，<a href="../../login" style="color:var(--primary);font-weight:600">登录</a>后可编辑专属脚本模板</div>
+<div id="guest-banner" style="display:none;padding:6px 16px;background:rgba(245,78,0,0.08);border-bottom:1px solid var(--bd);font-size:12px;color:var(--mu);text-align:center">您正在以访客模式浏览，<a href="../../login" target="_top" style="color:var(--primary);font-weight:600">登录</a>后可编辑专属脚本模板</div>
 <main class="main-content">
 
 <!-- ═══ Epoch FastIP ═══ -->
@@ -247,7 +249,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <div class="version-bar">
 <span class="version-bar-label">Version</span>
 <button class="variant-pill active" id="er-ver-4" onclick="switchERVersion('4')">4.0</button>
-<button class="variant-pill" id="er-ver-5" onclick="switchERVersion('5')">5.0</button>
+<button class="variant-pill" id="er-ver-5" disabled title="测试中">5.0<span class="badge-testing">测试中</span></button>
 </div>
 <div class="variant-bar" data-tool="epoch-fastip">
 <button class="variant-pill active" data-variant="hk">HK 香港出口</button><button class="variant-pill" data-variant="us">非香港出口</button><button class="variant-pill" data-variant="us_single">单出口</button><button class="variant-pill" data-variant="flink">ER 飞连</button><button class="variant-pill" data-variant="new_exit">ER 新增出口</button><button class="variant-pill" data-variant="domain_split">ER 域名分流</button>
@@ -499,7 +501,7 @@ input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 <!-- ═══ 我来定模板 ═══ -->
 <section class="tool-panel" id="panel-templates">
 <div class="panel-header"><h1 class="panel-title">我来定模板</h1><p class="panel-subtitle">可视化编辑：数据头 · 变量映射 · 生成模板 · 预览效果</p></div>
-<div id="tpl-admin-banner" style="{% if template_editable %}display:none;{% else %}display:block;{% endif %}margin-bottom:12px;padding:10px 14px;border-radius:8px;background:var(--cvs);border:1px solid var(--bd);font-size:13px;color:var(--mu);line-height:1.6">🔒 安全起见，请先<a href="../../login" style="color:var(--primary);font-weight:600">登录</a>使用完整功能。</div>
+<div id="tpl-admin-banner" style="{% if template_editable %}display:none;{% else %}display:block;{% endif %}margin-bottom:12px;padding:10px 14px;border-radius:8px;background:var(--cvs);border:1px solid var(--bd);font-size:13px;color:var(--mu);line-height:1.6">🔒 安全起见，请先<a href="../../login" target="_top" style="color:var(--primary);font-weight:600">登录</a>使用完整功能。</div>
 <div class="tpl-scene-bar" id="tpl-scene-bar">
   <span class="cascade-label">已选场景</span>
   <span class="tpl-trigger-wrap">
@@ -545,6 +547,8 @@ all_in_one<span style="margin:0 6px;color:#4a4038">·</span>Config Generator<spa
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════ all_in_one web ═══════════════════════════════════════════════════════════════════ */
+/* iframe 内点「登录」：postMessage 让 portal 父窗口顶层跳转（target=_top 会被 sandbox 拦截） */
+document.addEventListener('click',function(e){var a=e.target&&e.target.closest?e.target.closest('a[href$="/login"]'):null;if(a&&window.self!==window.top){e.preventDefault();window.parent.postMessage({type:'nav-top',url:'/login'},window.location.origin);}});
 const TEMPLATE_EDITABLE = {{ template_editable|tojson }};
 const IS_ADMIN = {{ is_admin|tojson }};
 const USERNAME = {{ username|tojson }};
