@@ -96,3 +96,6 @@ db_backup/
 # ---- 应用发布包（含 exe 二进制；由本地打包后放置，不进 git）----
 application/fastip_report/data/*.zip
 application/usg_virus_test/data/*.zip
+
+# ---- 清理归档（本机保留 30 天冷静期：备份 / 归档资源，不进 git / 镜像）----
+.archive/

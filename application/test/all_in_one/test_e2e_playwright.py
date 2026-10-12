@@ -19,7 +19,10 @@ import _bootstrap  # noqa: F401
 from _bootstrap import APP_DIR, WEB_DIR
 PROJ = APP_DIR
 
-from playwright.sync_api import sync_playwright, TimeoutError as PwTimeout
+import pytest as _pytest  # noqa: E402
+_pw = _pytest.importorskip("playwright.sync_api", reason="需要 playwright（Windows E2E 脚本；CI/无浏览器环境自动跳过）", exc_type=ImportError)
+sync_playwright = _pw.sync_playwright
+PwTimeout = _pw.TimeoutError
 
 PYTHON = r"C:\Users\123\AppData\Local\Programs\Python\Python313\python.exe"
 PORT = 5003

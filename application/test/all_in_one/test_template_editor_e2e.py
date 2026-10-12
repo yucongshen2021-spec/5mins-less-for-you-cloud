@@ -24,6 +24,23 @@ import _bootstrap  # noqa: F401
 BASE = "http://127.0.0.1:5003"
 
 
+def _port_open(port: int) -> bool:
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(0.5)
+    try:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+    finally:
+        s.close()
+
+
+@pytest.fixture(autouse=True)
+def _require_live_5003():
+    """本文件打 5003 独立实例（容器内端口，宿主默认不可达）；未运行时整组跳过。"""
+    if not _port_open(5003):
+        pytest.skip("5003 all_in_one 实例未运行，跳过模板编辑器 E2E")
+
+
 def _api_post(path, body):
     req = urllib.request.Request(
         f"{BASE}{path}",

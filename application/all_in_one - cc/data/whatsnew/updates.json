@@ -1,5 +1,9 @@
 {
   "updates": [
+    {"id":"2026-08-24-tabs","date":"2026-08-24","title":"页签调整","desc":"ER 5.0 与 AR SD-WAN 入口暂置「测试中」，完成验收后再开放"},
+    {"id":"2026-08-10-er-quality","date":"2026-08-10","title":"ER 配置质量更新","desc":"DNS cache 扩容至 10000、统一 recursion-desired、DHCP 场景补充默认路由、新增出口隧道补 MSS 1300"},
+    {"id":"2026-07-27-fastip-report","date":"2026-07-27","title":"新增「FASTIP 测试报告」应用","desc":"桌面版测试报告工具下载与使用指引（侧栏新入口）"},
+    {"id":"2026-07-24-usg-virus","date":"2026-07-24","title":"新增「USG 测病毒」指引","desc":"一键测 USG 安全功能：工具说明 + 域名清单 + 一键下载 ZIP"},
     {"id":"2026-07-20-wrong-scenario","date":"2026-07-20","title":"数据头贴错场景检测","desc":"ER/USG 的 HK/US 场景自动检测数据头是否贴错，提示用户切换正确场景"},
     {"id":"2026-07-20-single-exit","date":"2026-07-20","title":"ER 新增单出口配置","desc":"ER 4.0 非香港出口支持单出口（无备线）配置，并修复 overseas_nat_block 残留"},
     {"id":"2026-07-20-flink-parser","date":"2026-07-20","title":"修改 ER 飞连匹配格式","desc":"放宽飞连 parser 对预留 IP/CIDR 的识别"},

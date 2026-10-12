@@ -21,6 +21,12 @@ logs/
 application/portal/logs/
 application/自动做测试报告 - cc/log/
 
+# Big local dirs (never needed in image; keep build context small)
+.wine64/
+.build_cache/
+db_backup/
+.archive/
+
 # User data (Volume-mounted)
 application/all_in_one - cc/data/editor_workspace/
 user_init_placeholders.json

@@ -29,9 +29,12 @@
 | Portal | 5000 | 统一入口，反向代理，登录鉴权，分权后台入口 |
 | all_in_one | 5003 | gunicorn 16 worker，配置生成 |
 | usg_virus_test | 5005 | USG 测病毒操作指引页（说明+域名清单+一键下载 ZIP），纯展示 |
+| fastip_report | 5006 | FASTIP 测试报告指引页 + 桌面版（Windows exe）下载 |
 | stats | 9000 | 统计看板 + 管理后台 + 用户个人数据看板 |
+| port80-test | 80 | 连通性测试页（独立容器，与业务完全隔离） |
 
 测试环境：8000→5000、8001→9000。其余子应用（域名抓取/测试报告/配置梳理）已停用。
+前端状态：ER FastIP 5.0 变体入口与 AR SD-WAN 页签已禁用（显示「测试中」）。
 
 ## 技术栈
 
@@ -103,16 +106,18 @@
 ```bash
 sudo docker-compose -f docker-compose.test.yml up -d --build
 sleep 12
+
+# 黑箱测试（从 application/test 运行；需 8000 容器，容器不在时自动跳过）
 cd application/test
+YUCS_PASSWORD=yucs123 python -m pytest blackbox_8000/ -q           # 86 个（含 28 项多用户并发）
 
-# 黑箱测试
-YUCS_PASSWORD=yucs123 python -m pytest blackbox_8000/ -q           # 86 个
+# 单元/回归（从仓库根运行；pytest.ini 的忽略路径按仓库根解析）
+cd ../..
+python -m pytest application/test/all_in_one -q                    # 147 个（浏览器用例自动跳过）
 
-# 单元测试
-python -m pytest all_in_one/test_apis.py test_generation.py -q
-
-# 综合测试
-cd all_in_one && python3 comprehensive.py                          # 185 个
+# 综合测试（容器内 in-process；镜像不含 test 目录，需先 docker cp 进去）
+sudo docker cp "/opt/fivemins/application/test" fivemins-portal-test:/app/application/test
+sudo docker exec fivemins-portal-test sh -c 'cd "/app/application/test/all_in_one" && python3 comprehensive.py'   # 280 个
 ```
 
 ## 端到端测试定义（项目级细化全局 Rule 8）
@@ -130,9 +135,13 @@ Playwright 仅在需要回归一段固定交互序列（如级联下拉、模板
 ## Git Push 网络问题
 
 ```bash
-for ip in 140.82.112.3 140.82.113.3 140.82.114.3; do
-  timeout 5 bash -c "echo > /dev/tcp/$ip/443" 2>/dev/null && echo "$ip OK" && echo "$ip github.com" | sudo tee -a /etc/hosts && break
+# GitHub IP 会漂移（2026-10-12 可用：20.27.177.113，见 /etc/hosts）。失效时重新探测：
+for ip in 20.27.177.113 140.82.112.3 140.82.113.3 140.82.114.3; do
+  timeout 5 bash -c "echo > /dev/tcp/$ip/443" 2>/dev/null && echo "$ip OK" \
+    && sudo sed -i '/github.com/d' /etc/hosts \
+    && echo "$ip github.com" | sudo tee -a /etc/hosts && break
 done
+# 候选 IP 来源：curl -s https://api.github.com/meta | python3 -c "import json,sys; print(json.load(sys.stdin)['git'])"
 git push origin main
 ```
 

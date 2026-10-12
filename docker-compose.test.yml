@@ -1,13 +1,14 @@
 # 测试环境 compose —— 独立容器，与正式 (docker-compose.yml) 完全隔离
 #
 # 用途：所有改动先在 8000 端口测试，通过后再重建正式 5000 容器。
-# 容器内部端口：5000 Portal / 9000 stats，子应用 5001-5004 由 supervisord 按需拉起。
+# 容器内部端口：5000 Portal / 9000 stats；子应用 5003/5005/5006 由 supervisord 拉起
+# （5001 域名抓取 / 5002 测试报告 / 5004 配置梳理已停用，见 docker/supervisord.conf 注释）。
 # 仅通过宿主机端口映射区分：8000 → 容器 5000，8001 → 容器 9000。
 #
-# 启动：  sudo docker compose -f docker-compose.test.yml up -d --build
-# 停止：  sudo docker compose -f docker-compose.test.yml down
-# 日志：  sudo docker compose -f docker-compose.test.yml logs -f
-# 重建：  sudo docker compose -f docker-compose.test.yml up -d --build
+# 启动：  sudo docker-compose -f docker-compose.test.yml up -d --build
+# 停止：  sudo docker-compose -f docker-compose.test.yml down
+# 日志：  sudo docker-compose -f docker-compose.test.yml logs -f
+# 重建：  sudo docker-compose -f docker-compose.test.yml up -d --build
 
 services:
   portal-test:

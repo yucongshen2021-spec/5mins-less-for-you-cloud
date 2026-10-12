@@ -8,11 +8,13 @@
 ```bash
 git clone https://github.com/yucongshen2021-spec/5mins-less-for-you-cloud.git
 cd 5mins-less-for-you-cloud
-docker compose up -d --build
+docker-compose up -d --build
 
 # 配置生成: http://localhost:5000
 # 统计后台: http://localhost:9000
 ```
+
+> 本服务器为 Compose v2 独立二进制（`docker-compose`）；若你的环境是 compose 插件形式，等价命令为 `docker compose`，下同。
 
 管理员 `yucs` / `yucs123`（首次部署自动创建）。
 
@@ -23,7 +25,9 @@ docker compose up -d --build
 | **Portal** | 5000 | 统一入口，反向代理，登录鉴权，分权后台入口 |
 | **配置生成（all_in_one）** | 5003 | gunicorn 16 worker 多进程并发 |
 | **USG 测病毒（usg_virus_test）** | 5005 | 操作指引页：工具说明 + 域名清单 + 一键下载 ZIP |
+| **FASTIP 测试报告（fastip_report）** | 5006 | 操作指引页 + 桌面版（Windows exe）下载 |
 | **stats 看板** | 9000 | 统计仪表盘 + 用户管理后台 + 用户个人数据看板 |
+| 80 端口连通性测试页 | 80 | 独立容器，仅连通性测试，与业务完全隔离（不在 compose 内） |
 
 域名抓取（5001）、测试报告（5002）、配置梳理（5004）已停用（代码保留）。
 
@@ -62,16 +66,18 @@ docker compose up -d --build
 
 管理后台（`/admin`）独立密码登录（`ADMIN_PASSWORD`），可列出/删除用户、重置密码，yucs 不可删。操作写入审计日志。
 
-## 配置生成（5 工具 × 29 场景）
+## 配置生成（5 工具 × 31 场景）
 
 | 工具 | 变体 | 接口格式 |
 |------|------|---------|
-| ER FastIP 4.0 | HK/非香港/飞连/新增出口/域名分流/单出口(无备线) | eth{N} |
-| ER FastIP 5.0 | HK/非香港/IPSec/飞连/新增出口/域名分流 | eth{N} |
-| USG FastIP | HK/非香港/飞连/新增出口 | GE0/0/{N} |
-| Epoch MPLS | 国内/海外/IPSec | eth{N} |
-| AR SD-WAN | 单机/双机 × OPS/Factory | — |
-| AR 传统组网 | 双线 | — |
+| ER FastIP 4.0 | HK / HK·IPSec / 非香港 / 非香港·IPSec / 单出口(无备线) / 飞连 / 新增出口 / 域名分流（8） | eth{N} |
+| ER FastIP 5.0 | HK / HK·IPSec / 非香港 / 非香港·IPSec / 飞连 / 新增出口 / 域名分流（7） | eth{N} |
+| USG FastIP | HK / 非香港 / 飞连 / 新增出口（4） | GE0/0/{N} |
+| Epoch MPLS | 国内 / 海外 / IPSec（3） | eth{N} |
+| AR SD-WAN | 单机单WAN / 单机双WAN / 双机主 / 双机备 × OPS/Factory（8） | — |
+| AR 传统组网 | 双线（1） | — |
+
+> 注：ER FastIP 5.0 变体入口与 AR SD-WAN 页签当前置为「测试中」（禁用），验收完成后再开放。
 
 ### 参数同步
 
@@ -88,7 +94,7 @@ docker compose up -d --build
 
 ## 模板编辑器（我来定模板）
 
-- 级联菜单 29 场景，可多选 chip 切换
+- 级联菜单 31 场景，可多选 chip 切换
 - 数据头/变量映射/生成模板三个文本框
 - 初始化默认参数（保存后影响 generate 输出）
 - 保存自动加专属注释 `# xxx专属yyy场景模板-yymmdd`，重复保存不累积
@@ -111,7 +117,7 @@ docker compose up -d --build
 ├── Dockerfile                          Debian + Python3 + tzdata + 中文字体
 ├── docker-compose.yml                  正式版（5000+9000）
 ├── docker-compose.test.yml             测试版（8000+8001）
-├── docker/supervisord.conf             进程管理（portal + all_in_one + usg_virus_test + stats）
+├── docker/supervisord.conf             进程管理（portal + all_in_one + usg_virus_test + fastip_report + stats；停用应用以注释保留）
 ├── application/
 │   ├── portal/                         Portal 入口 :5000
 │   │   ├── app.py                      登录/注册/重置密码/session/自动访客
@@ -126,11 +132,14 @@ docker compose up -d --build
 │   │   │   ├── tkinter_stub.py         tkinter 替代
 │   │   │   └── templates/index.html    前端 SPA（7 页签）
 │   │   ├── src/                        业务模块源码（6 个生成器）
-│   │   ├── data/                       运行时数据（per-user workspace）
-│   │   └── editor_defaults/            出厂模板
+│   │   └── data/                       运行时数据（editor_defaults/ 出厂模板 + per-user workspace）
 │   ├── usg_virus_test/                 USG 测病毒指引页 :5005
 │   │   ├── app.py                      Flask（单路由返回指引页）
 │   │   └── templates/index.html        指引页（说明+域名清单+一键下载 ZIP）
+│   ├── fastip_report/                  FASTIP 测试报告指引页 :5006
+│   │   ├── app.py                      Flask（指引页 + 下载统计）
+│   │   ├── templates/index.html        指引页
+│   │   └── data/                       桌面包 ZIP（构建产物，不进 git）
 │   ├── common/
 │   │   ├── auth_db.py                  用户认证 DB（SQLite，created_at UTC+8 转换）
 │   │   └── stats_db.py                 访问日志 DB（SQLite，per-user 查询）
@@ -143,26 +152,33 @@ docker compose up -d --build
 │   │       └── guest_login.html        访客登录提示
 │   └── test/                           测试套件
 │       ├── blackbox_8000/              黑箱测试（86 个）
-│       └── all_in_one/                 单元测试 + comprehensive.py（185 个）
+│       └── all_in_one/                 单元测试 + comprehensive.py（280 个）
 ├── docs/
 │   ├── AGENTS.md                      项目级工程守则（架构/运维/坑点，给 AI agent 看）
 │   ├── GLOBAL_RULES.md                跨项目全局规则层（优先级低于 AGENTS.md）
 │   ├── DESIGN.md                      UI 设计规范（以 all_in_one index.html :root 为真相来源）
 │   └── 经历.md                        项目叙事与踩坑总结
 ├── log/                                变更日志（按日期）+ mistake.txt（跨日期踩坑记录）
+├── port80-test/                        80 端口连通性测试页（独立容器：静态页 + /health + /ip）
+├── HISTORY.md                          上线全纪录（2026-06-16 至今，技术+架构）
 └── test_features.md                    完整功能测试清单
 ```
 
 ## 测试
 
 ```bash
-# 黑箱测试（需测试容器）
-sudo docker compose -f docker-compose.test.yml up -d --build
+# 黑箱测试（需测试容器；从 application/test 运行）
+sudo docker-compose -f docker-compose.test.yml up -d --build
 sleep 12
 cd application/test
-YUCS_PASSWORD=yucs123 python -m pytest blackbox_8000/ -q           # 86 个
-python -m pytest all_in_one/test_apis.py test_generation.py -q     # 单元测试
-cd all_in_one && python3 comprehensive.py                          # 185 个综合测试
+YUCS_PASSWORD=yucs123 python -m pytest blackbox_8000/ -q           # 86 个（含 28 项多用户并发）
+
+# 单元/回归（从仓库根运行；浏览器用例自动跳过）
+cd ../..
+python -m pytest application/test/all_in_one -q                    # 147 个
+
+# 综合测试（容器内 in-process）
+sudo docker exec fivemins-portal-test sh -c 'cd "/app/application/test/all_in_one" && python3 comprehensive.py'   # 280 个
 ```
 
 ## 部署到新服务器
@@ -170,7 +186,7 @@ cd all_in_one && python3 comprehensive.py                          # 185 个综�
 ```bash
 git clone https://github.com/yucongshen2021-spec/5mins-less-for-you-cloud.git
 cd 5mins-less-for-you-cloud
-docker compose up -d --build
+docker-compose up -d --build
 curl http://localhost:5000/api/health  # {"ok":true,"status":"healthy"}
 ```
 
@@ -178,12 +194,12 @@ curl http://localhost:5000/api/health  # {"ok":true,"status":"healthy"}
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `SECRET_KEY` | 随机 | Portal session 密钥 |
-| `STATS_SECRET_KEY` | 同 SECRET_KEY | Stats session 密钥 |
+| `SECRET_KEY` | compose 中已显式设置 | Portal session 密钥（代码优先级：env → `logs/.secret_key` 持久化文件 → 随机生成并落盘） |
+| `STATS_SECRET_KEY` | 未设置 | Stats session 密钥；未设置时回退 `SECRET_KEY`，再回退内置默认值 |
 | `ADMIN_PASSWORD` | yucs123 | 管理员密码 + stats 后台密码 |
 | `GUNICORN_WORKERS` | 16 | gunicorn worker 数（4G 内存建议 8） |
 | `TZ` | Asia/Shanghai | 容器时区 |
-| `PORTAL_LABEL` | DEMO | 门户标签 |
+| `PORTAL_LABEL` | DEMO | 门户标签（设为「内测版本」时徽标显示「内测」） |
 
 ## 开发须知
 

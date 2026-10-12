@@ -73,17 +73,15 @@ class TestAuth:
         assert not d.get("ok")
 
     def test_protected_page_without_login(self):
-        """未登录访问首页应 302。"""
-        st, d, headers = get("/")
-        # 302 redirect 可能被 urllib 跟随或返回 302
-        # 直接用 HTTP 检查
+        """未登录访问首页 → 访客模式（200 HTML + 自动访客 session），不报 5xx。"""
         req = urllib.request.Request(f"{BASE}/")
         try:
-            urllib.request.urlopen(req, timeout=5)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                assert resp.status == 200, f"访客首页应 200，实际 {resp.status}"
+                ctype = resp.headers.get("Content-Type", "").lower()
+                assert "html" in ctype, f"访客首页应为 HTML，实际 {ctype}"
         except urllib.error.HTTPError as e:
-            assert e.code in (302, 303, 401), f"Expected redirect, got {e.code}"
-        except Exception:
-            pass  # 302 可能被跟随，也 ok
+            assert e.code in (302, 303, 401), f"Expected visitor page or redirect, got {e.code}"
 
     def test_health_unprotected(self):
         """健康检查不需要登录。"""

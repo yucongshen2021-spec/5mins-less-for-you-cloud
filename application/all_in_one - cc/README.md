@@ -16,11 +16,13 @@ cd web && python app.py
 
 | 页签 | 功能 |
 |------|------|
-| **Epoch FastIP** | HK / 非HK / 飞连 / 新增出口 / 域名分流 / 单出口(无备线) |
-| **USG FastIP** | 非HK / HK / 飞连 / 新增出口 |
-| **Epoch MPLS** | 国内 / 海外 / IPSec |
-| **AR SD-WAN** | 单机 / 双机 · OPS 脚本 + Factory 配置 |
-| **我来定模板** | 29 场景可视化模板编辑（登录用户可编辑，访客只读） |
+| **Epoch FastIP** | ER 4.0：HK / HK·IPSec / 非香港 / 非香港·IPSec / 单出口(无备线) / 飞连 / 新增出口 / 域名分流（8 变体）；ER 5.0 切换入口当前「测试中」 |
+| **USG FastIP** | HK / 非香港 / 飞连 / 新增出口（4 变体） |
+| **Epoch MPLS** | 国内 / 海外 / IPSec（3 变体） |
+| **AR SD-WAN** | 单机 / 双机 · OPS + Factory（8 变体）——页签当前「测试中」禁用 |
+| **AR 传统组网** | 双线 |
+| **我来定模板** | 31 场景可视化模板编辑（登录用户可编辑，访客只读） |
+| **感谢** | 致谢页 |
 
 ## 操作
 
@@ -46,6 +48,9 @@ cd web && python app.py
 
 ```bash
 cd application/test
-python -m pytest blackbox_8000/test_full_api.py -q          # 58 API 测试
-python -m pytest all_in_one/test_apis.py test_generation.py -q  # 单元测试
+python -m pytest blackbox_8000/ -q                              # 86 项黑箱（含 28 项多用户并发，需 8000 容器）
+# 单元/回归（从仓库根运行）：147 项，17 项浏览器用例自动跳过
+cd ../.. && python -m pytest application/test/all_in_one -q
+# 综合测试（容器内 in-process）：280 项
+sudo docker exec fivemins-portal-test sh -c 'cd "/app/application/test/all_in_one" && python3 comprehensive.py'
 ```

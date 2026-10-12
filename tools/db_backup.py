@@ -170,7 +170,8 @@ def cleanup_old_backups():
         if not f.is_file():
             continue
         # 清理残留的 WAL/SHM 文件（所有，不看时间）
-        if f.suffix in ("-wal", "-shm"):
+        # 注意：Path("x.sqlite-wal").suffix 是 ".sqlite-wal"，必须用 endswith 判断
+        if f.name.endswith(("-wal", "-shm")):
             f.unlink()
             continue
         if not f.name.endswith(".sqlite"):

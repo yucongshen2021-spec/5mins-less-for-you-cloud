@@ -71,3 +71,20 @@ def page(page, flask_server):
     page.goto(flask_server, wait_until="domcontentloaded", timeout=15000)
     page.wait_for_timeout(1000)
     return page
+
+
+def pytest_collection_modifyitems(config, items):
+    """无 pytest-playwright（如 CI / 本机未装）时，自动跳过需要浏览器的用例。
+
+    - 仅影响请求 `page` fixture 或带 `playwright` marker 的用例；
+    - 其余测试（in-process test_client 类）不受任何影响。
+    """
+    try:
+        import pytest_playwright  # noqa: F401
+        return
+    except ImportError:
+        pass
+    skip = pytest.mark.skip(reason="需要 pytest-playwright + 浏览器（当前环境未安装，自动跳过）")
+    for item in items:
+        if "page" in item.fixturenames or "playwright" in item.keywords:
+            item.add_marker(skip)

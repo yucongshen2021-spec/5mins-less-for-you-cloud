@@ -77,9 +77,9 @@ _ALL_APPS = [
     },
 ]
 
-# Demo version shows only all_in_one (配置生成).
-# domain_capture (域名抓取) 依赖 playwright + 本地 Chromium，当前镜像未安装，
-# 暂时隐藏；test_report 和 config_analyzer 也隐藏。
+# 当前对外展示 3 个应用：配置生成 / USG 测病毒 / FASTIP 测试报告。
+# 以下应用隐藏：domain_capture (域名抓取) 依赖 playwright + 本地 Chromium，当前镜像未安装；
+# test_report（测试报告/5002）与 config_analyzer（配置梳理/5004）为旧版停用。
 _HIDDEN_IDS = {"test_report", "config_analyzer", "domain_capture"}
 APPS = [a for a in _ALL_APPS if a["id"] not in _HIDDEN_IDS]
 
