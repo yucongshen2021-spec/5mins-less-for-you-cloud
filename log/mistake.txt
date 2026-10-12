@@ -912,6 +912,41 @@ fallback 到带时间戳的新目录名，绝不因 stale 目录而放弃整跑�
 
 ---
 
+## 64. iframe sandbox 顶层导航 token 想当然，curl 看不出拦截
+
+**现象**: 子应用（跑在 portal iframe 内）访客点「登录」没任何反应。先后两版都错：
+  ① 第一版给登录链接加 `target="_top"` 却没给 iframe sandbox 加顶层导航权限，
+     浏览器静默拦截，点击无反应；② 补了 `allow-top-navigation-to-valid-origins`
+     以为修好，实则当前 Chromium 报 `invalid sandbox flag`（不识别该 token），
+     整个 sandbox 解析失败、导航仍被拦——但 `curl` 抓 HTML 看 token 字符串"在"，
+     误判已修复，直到用 Playwright 真点才暴露。
+
+**根因**:
+  1. sandbox 顶层导航各 token（`allow-top-navigation` / `-by-user-activation` /
+     `-to-valid-origins`）浏览器支持不一，凭记忆选 token 不可靠。
+  2. `curl` 只能验证 HTML 文本里有没有 token，**无法**验证浏览器是否识别、是否真放行；
+     sandbox 拦截是运行时行为，只有真实浏览器点击才看得见（console 会报
+     `Unsafe attempt to initiate navigation ... not set`）。
+
+**修复**:
+  1. sandbox 改用 `allow-top-navigation-by-user-activation`（有效、需用户手势、兼容好）。
+  2. 双保险：portal 加 `message` 监听，子应用点登录/返回时 `postMessage({type:'nav-top',url})`
+     由父窗口（非 sandbox）代为顶层跳转，不依赖 sandbox token 也能工作。
+  3. 用 Playwright 无头 Chromium 端到端实测（访客点登录→顶层 /login 无嵌套→登录→回 portal
+     →域名可见可下载），8000/5000 全绿才算完成。
+
+**避免**:
+  1. 涉及 iframe sandbox / 顶层导航 / 弹窗等**浏览器运行时安全策略**的改动，
+     必须真实浏览器验证，curl 一律不算数。
+  2. sandbox token 别凭记忆，改完立刻用浏览器点一遍 + 看 console 报错。
+  3. 跨框架跳转优先用「postMessage 让父窗口跳」这种不依赖 sandbox token 的稳态方案，
+     target=_top / window.top.location 仅作兜底。
+  4. 本机 Playwright 验证命令（已装 chromium-headless-shell + 依赖）：
+     `python3 /tmp/e2e.py`（需 sudo HOME=/home/ubuntu 装依赖：
+     `sudo HOME=/home/ubuntu python3 -m playwright install-deps chromium`）。
+
+---
+
 ## 2026-07-03 本次会话新增坑点
 
 ### 坑1: editor_defaults tpl 与源码不同步

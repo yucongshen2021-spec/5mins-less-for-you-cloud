@@ -22,6 +22,7 @@ docker compose up -d --build
 |------|------|------|
 | **Portal** | 5000 | 统一入口，反向代理，登录鉴权，分权后台入口 |
 | **配置生成（all_in_one）** | 5003 | gunicorn 16 worker 多进程并发 |
+| **USG 测病毒（usg_virus_test）** | 5005 | 操作指引页：工具说明 + 域名清单 + 一键下载 ZIP |
 | **stats 看板** | 9000 | 统计仪表盘 + 用户管理后台 + 用户个人数据看板 |
 
 域名抓取（5001）、测试报告（5002）、配置梳理（5004）已停用（代码保留）。
@@ -110,7 +111,7 @@ docker compose up -d --build
 ├── Dockerfile                          Debian + Python3 + tzdata + 中文字体
 ├── docker-compose.yml                  正式版（5000+9000）
 ├── docker-compose.test.yml             测试版（8000+8001）
-├── docker/supervisord.conf             进程管理（portal + all_in_one + stats）
+├── docker/supervisord.conf             进程管理（portal + all_in_one + usg_virus_test + stats）
 ├── application/
 │   ├── portal/                         Portal 入口 :5000
 │   │   ├── app.py                      登录/注册/重置密码/session/自动访客
@@ -127,6 +128,9 @@ docker compose up -d --build
 │   │   ├── src/                        业务模块源码（6 个生成器）
 │   │   ├── data/                       运行时数据（per-user workspace）
 │   │   └── editor_defaults/            出厂模板
+│   ├── usg_virus_test/                 USG 测病毒指引页 :5005
+│   │   ├── app.py                      Flask（单路由返回指引页）
+│   │   └── templates/index.html        指引页（说明+域名清单+一键下载 ZIP）
 │   ├── common/
 │   │   ├── auth_db.py                  用户认证 DB（SQLite，created_at UTC+8 转换）
 │   │   └── stats_db.py                 访问日志 DB（SQLite，per-user 查询）

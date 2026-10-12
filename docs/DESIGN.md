@@ -446,4 +446,5 @@ nav-bar 可横滚（不折叠 hamburger）。主内容 max-width 1440px。
 | 2026-07-20 | 1.0 | 以 `all_in_one - cc/web/templates/index.html:9-28` 为真相来源反向重写：字体改 DM Serif Display/DM Sans/JetBrains Mono（原 CursorGothic 不适用）；组件清单替换为项目实际组件（top-bar/nav-tab/variant-pill/card/field/btn/toast/cascade-dropdown 等）；移除营销组件（hero-band/pricing/testimonial）与 timeline pastel 5 色；如实记录 5 个未定义变量与三套 UI 差异为「已知缺口」。 |
 | 2026-07-20 | 1.1 | 「已知缺口 #1」已修复：在 `index.html:9-28` 的 `:root` 末尾补齐 5 个语义别名变量（`--primary/--bd/--sf-strong/--hl-strong/--f-zh`），全文件引用与定义均为 33 个、无遗留；DESIGN.md 同步标注为 ✓ 已补。 |
 | 2026-07-21 | 1.2 | 新增 `whatsnew-board` 组件文档（顶栏右侧 📣 告示栏 + popover + 未读点 + localStorage）；`top-bar` note 补右侧；Elevation 表加 Whatsnew 投影行；「已知缺口 #4」记录 whatsnew-popover 投影未进 token。 |
+| 2026-07-24 | 1.3 | 新增独立应用 `usg_virus_test`（USG 测病毒指引页，`application/usg_virus_test/`）：全量复用 all_in_one token（`--cv` 奶油底 / `--ink` 墨色 / `--p` 橙唯一 CTA / DM Serif Display + DM Sans + JetBrains Mono / 12px 卡片发丝线无投影），与主线视觉同源，未引入新色新字体，作为「统一方向」的首个合规新应用样本。 |
 | (原 alpha) | alpha | 原始版本（Cursor 营销站设计，与本项目实际 UI 不符，已废弃）。 |

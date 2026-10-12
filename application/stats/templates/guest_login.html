@@ -21,13 +21,16 @@
   <div class="icon">🔒</div>
   <h1>请登录后查看</h1>
   <p>登录后可查看您的生成记录、使用统计等数据<br>访客模式下无法查看个人数据</p>
-  <a href="/" class="btn btn-primary">前往登录</a>
+  <a href="../../login" id="loginBtn" class="btn btn-primary">前往登录</a>
 </div>
 <script>
-// 检测 portal 端口（5000），如果当前在 9000 则跳转到 5000 登录
-var host = location.hostname;
-var portalUrl = 'http://' + host + ':5000/login';
-document.querySelector('.btn').href = portalUrl;
+// iframe 内点「登录」：postMessage 让 portal 父窗口顶层跳转（target=_top 会被 sandbox 拦截）
+document.getElementById('loginBtn').addEventListener('click', function(e){
+  if (window.self !== window.top) {
+    e.preventDefault();
+    window.parent.postMessage({type:'nav-top', url:'/login'}, window.location.origin);
+  }
+});
 </script>
 </body>
 </html>

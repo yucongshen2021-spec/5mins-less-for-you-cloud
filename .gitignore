@@ -89,3 +89,10 @@ user_activity/
 data/users/test*
 data/users/ctest*
 db_backup/
+
+# ---- Wine / Windows 构建工具链（本机持久化，靠本地 PyInstaller 重新打包）----
+.wine64/
+
+# ---- 应用发布包（含 exe 二进制；由本地打包后放置，不进 git）----
+application/fastip_report/data/*.zip
+application/usg_virus_test/data/*.zip

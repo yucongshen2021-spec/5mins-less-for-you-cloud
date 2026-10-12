@@ -91,7 +91,12 @@ var currentPage=1;
 
 // 返回 portal 首页（相对路径，适配反代任意端口/域名）
 function goBack(){
-  window.location.href='/';
+  // 经 portal iframe 访问时 postMessage 让父窗口顶层跳转（window.top.location 会被 sandbox 拦截）
+  if (window.self !== window.top) {
+    window.parent.postMessage({type:'nav-top', url:'/'}, window.location.origin);
+  } else {
+    window.location.href='/';
+  }
 }
 
 function loadSummary(){

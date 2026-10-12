@@ -147,7 +147,7 @@
 function $(id){return document.getElementById(id)}
 function toast(msg){var t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2000)}
 // 返回 portal 首页（相对路径，适配反代任意端口/域名）
-function goHome(){window.location.href='/';}
+function goHome(){if(window.self!==window.top){window.parent.postMessage({type:'nav-top',url:'/'},window.location.origin);}else{window.location.href='/';}}
 
 {% if not logged_in %}
 async function doLogin(e){

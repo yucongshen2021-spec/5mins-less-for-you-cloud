@@ -204,6 +204,18 @@ def derive_function(app_id: str, method: str, subpath: str,
         if method == "GET" and not sp:
             return "打开·配置梳理"
 
+    if app_id == "usg_virus_test":
+        if method == "GET" and sp == "api/download":
+            return "下载·USG测病毒工具"
+        if method == "GET" and not sp:
+            return "打开·USG测病毒"
+
+    if app_id == "fastip_report":
+        if method == "GET" and sp == "api/download":
+            return "下载·FASTIP测试报告"
+        if method == "GET" and not sp:
+            return "打开·FASTIP测试报告"
+
     # Fallback
     short = sp[:50] if sp else "(root)"
     return f"{app_id}:{method} {short}"
@@ -389,9 +401,9 @@ def _build_where(filters: dict) -> tuple:
         where_clauses.append("ts <= ?")
         params.append(filters["end"])
     if filters.get("q"):
-        where_clauses.append("(path LIKE ? OR data_header LIKE ? OR response_body LIKE ?)")
+        where_clauses.append("(username LIKE ? OR path LIKE ? OR data_header LIKE ? OR response_body LIKE ?)")
         q = f"%{filters['q']}%"
-        params.extend([q, q, q])
+        params.extend([q, q, q, q])
 
     where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
     return where, params

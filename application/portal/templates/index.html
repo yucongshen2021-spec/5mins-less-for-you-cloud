@@ -269,6 +269,8 @@
       <li><strong>测试报告</strong> — 连接客户设备自动执行测试，生成 Word 格式的 FASTIP 测试报告。</li>
       <li><strong>域名抓取</strong> — 输入网站地址，自动抓取所有请求域名，展示 DNS CNAME 链路和 CDN 归属（支持国内外几十家 CDN 识别）。</li>
       <li><strong>配置梳理</strong> — 粘贴 VyOS 或华为防火墙配置文本，自动解析并画出拓扑图。主线/备线/未知线路分车道显示，隧道类型自动配色，SNAT 网段和默认路由一目了然。</li>
+      <li><strong>USG 测病毒</strong> — 操作指引页面：展示 USG 一键测病毒工具的使用说明、测试域名清单和下载链接，供工程师在 Windows 电脑上运行 exe 验证防火墙安全功能。</li>
+      <li><strong>FASTIP 测试报告</strong> — 展示 FASTIP 自动测试报告桌面版工具的能力说明、8 项测试清单与下载入口，下载即统计。</li>
     </ul>
   </div>
 </div>
@@ -301,7 +303,7 @@
       </div>
       <iframe id="iframe_first" class="visible"
         src="{{ apps[0].url }}"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals allow-top-navigation-by-user-activation"
         style="position:absolute;top:0;left:0;width:100%;height:100%;border:none">
       </iframe>
       <div id="framePool"></div>
@@ -314,6 +316,17 @@
 
 <script>
 (function() {
+  // ── iframe 内子应用请求顶层导航（如「登录」）──
+  // 子应用跑在 sandbox iframe 内，target=_top / window.top.location 会被拦截；
+  // 改由子应用 postMessage 上来，父窗口（非 sandbox）代为跳转，避免套娃也绕开限制。
+  window.addEventListener('message', function(e) {
+    if (e.origin !== window.location.origin) return;  // 仅接受同源消息
+    var d = e.data || {};
+    if (d && d.type === 'nav-top' && typeof d.url === 'string' && d.url.charAt(0) === '/') {
+      window.location.href = d.url;
+    }
+  });
+
   var items = document.querySelectorAll('.nav-item');
   var pool = document.getElementById('framePool');
   var placeholder = document.getElementById('placeholder');
@@ -369,7 +382,7 @@
     // Create iframe on first visit
     if (!frames[id]) {
       var ifr = document.createElement('iframe');
-      ifr.sandbox = 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals';
+      ifr.sandbox = 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals allow-top-navigation-by-user-activation';
       ifr.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;border:none';
       ifr.src = url;
       ifr.addEventListener('load', function() {

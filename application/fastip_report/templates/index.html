@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FASTIP 自动测试报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════ design tokens（DESIGN.md，以 all_in_one :root 为真相源） ═══════════════ */
+:root{
+  --p:#f54e00;--pa:#d04200;
+  --ink:#26251e;--body:#5a5852;--mu:#807d72;--mu-soft:#a09c92;
+  --cv:#f7f7f4;--cvs:#fafaf7;--sf:#ffffff;
+  --hl:#e6e5e0;--hls:#efeee8;--hls2:#cfcdc4;
+  --ok:#1f8a65;--er:#cf2d56;
+  --rs:6px;--rm:8px;--rl:12px;--rp:9999px;
+  --f-display:'DM Serif Display',Georgia,'Times New Roman',serif;
+  --f-body:'DM Sans',system-ui,-apple-system,'Microsoft YaHei','PingFang SC',sans-serif;
+  --f-code:'JetBrains Mono','Fira Code',monospace;
+  --f-zh:'DM Sans','PingFang SC','Microsoft YaHei',sans-serif;
+  --sp-xxs:4px;--sp-xs:8px;--sp-sm:12px;--sp-md:16px;--sp-lg:24px;--sp-xl:32px;--sp-xxl:48px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--f-body);background:var(--cv);color:var(--body);font-size:14px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+::selection{background:rgba(245,78,0,.16);color:var(--ink)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--hls2);border-radius:3px}
+
+/* ═══════════════ ambient ═══════════════ */
+.bg-dots{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(rgba(38,37,30,.05) 1px,transparent 1.5px);background-size:24px 24px;
+  -webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+.bg-orb{position:fixed;z-index:0;pointer-events:none;width:560px;height:560px;border-radius:50%;
+  background:radial-gradient(circle,rgba(245,78,0,.055),transparent 65%);top:-200px;right:-140px;
+  animation:orbFloat 14s ease-in-out infinite alternate}
+@keyframes orbFloat{from{transform:translate(0,0)}to{transform:translate(-46px,40px)}}
+
+.wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:0 28px var(--sp-xxl)}
+
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blip{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1.15)}}
+
+/* ═══════════════ console strip ═══════════════ */
+.console{display:flex;align-items:center;gap:12px;padding:13px 0 12px;border-bottom:1px solid var(--hls);
+  font-family:var(--f-code);font-size:10px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--mu-soft);animation:rise .55s ease both}
+.console .badge{font-family:var(--f-body);font-weight:600;font-size:10px;letter-spacing:.14em;color:var(--sf);
+  background:var(--ink);padding:3px 9px 2px;border-radius:var(--rs)}
+.console .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:blip 2.4s ease-in-out infinite}
+.console .sep{flex:1}
+.console time{color:var(--mu)}
+
+/* ═══════════════ masthead ═══════════════ */
+.masthead{display:grid;grid-template-columns:1fr 262px;gap:44px;align-items:start;padding:var(--sp-xl) 0 44px}
+.kicker{display:flex;align-items:center;gap:10px;font-family:var(--f-code);font-size:11px;font-weight:500;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--p);margin-bottom:var(--sp-md);animation:rise .55s .06s ease both}
+.kicker::before{content:'';width:24px;height:2px;background:var(--p)}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(37px,5.2vw,57px);line-height:1.16;
+  letter-spacing:-0.3px;color:var(--ink);animation:rise .6s .12s ease both}
+h1 .mark{font-style:italic;color:var(--p);background:linear-gradient(transparent 66%,rgba(245,78,0,.15) 66%)}
+.lede{margin-top:20px;max-width:540px;font-size:15px;line-height:1.85;color:var(--body);animation:rise .6s .2s ease both}
+.lede b{color:var(--ink);font-weight:600}
+.lede code{font-family:var(--f-code);font-size:12.5px;color:var(--ink);background:var(--hls);
+  padding:1px 6px;border-radius:var(--rs)}
+.pills{display:flex;flex-wrap:wrap;gap:var(--sp-xs);margin-top:var(--sp-lg);animation:rise .6s .28s ease both}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:6px 16px;border-radius:var(--rp);font-size:12px;
+  font-weight:500;color:var(--mu);border:1px solid var(--hl);background:var(--sf);white-space:nowrap;transition:all .18s}
+.pill i{width:5px;height:5px;border-radius:50%;background:var(--ok);flex-shrink:0}
+.pill:hover{border-color:var(--hls2);color:var(--ink);transform:translateY(-1px)}
+.cta-row{display:flex;align-items:center;gap:var(--sp-md);margin-top:var(--sp-xl);flex-wrap:wrap;animation:rise .6s .36s ease both}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 20px;border-radius:var(--rm);
+  font-size:13px;font-weight:500;cursor:pointer;border:none;font-family:var(--f-body);height:40px;
+  text-decoration:none;transition:all .18s}
+.btn-p{background:var(--p);color:#fff}
+.btn-p:hover{background:var(--pa)}
+.btn-p svg{transition:transform .18s}
+.btn-p:hover svg{transform:translateX(3px)}
+.btn-s{background:var(--sf);color:var(--ink);border:1px solid var(--hls2)}
+.btn-s:hover{background:var(--cvs)}
+.cta-hint{font-size:12px;color:var(--mu-soft)}
+
+/* ── scope module ── */
+.scope{position:relative;background:var(--sf);border:1px solid var(--hl);border-radius:var(--rl);
+  padding:16px 16px 14px;animation:rise .6s .3s ease both}
+.scope-hd{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-code);font-size:9.5px;
+  font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--mu-soft);margin-bottom:12px}
+.scope-hd em{font-style:normal;color:var(--ok);display:inline-flex;align-items:center;gap:6px}
+.scope-hd em::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--ok);animation:blip 2s ease-in-out infinite}
+.rings{position:relative;aspect-ratio:1;border-radius:50%;border:1px solid var(--hl);
+  background:radial-gradient(circle,rgba(245,78,0,.03),transparent 72%)}
+.rings::before{content:'';position:absolute;inset:24%;border-radius:50%;border:1px solid var(--hls)}
+.rings::after{content:'';position:absolute;inset:47%;border-radius:50%;border:1px solid var(--hls)}
+.cross{position:absolute;background:var(--hls)}
+.cross.h{left:0;right:0;top:50%;height:1px}
+.cross.v{top:0;bottom:0;left:50%;width:1px}
+.sweep{position:absolute;inset:0;border-radius:50%;overflow:hidden;
+  background:conic-gradient(from 0deg,rgba(245,78,0,.15),transparent 25%);animation:spin 5s linear infinite}
+.rdot{position:absolute;width:6px;height:6px;margin:-3px;border-radius:50%;background:var(--p);
+  animation:blip 3s ease-in-out infinite}
+.rdot.o{background:var(--ok)}.rdot.m{background:var(--mu-soft)}
+.scope-ft{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-code);font-size:9.5px;
+  font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--mu-soft);margin-top:12px}
+.scope-ft b{color:var(--p);font-weight:600}
+.scope-ft span:last-child b{color:var(--ok)}
+
+/* ═══════════════ stats strip ═══════════════ */
+.strip{display:grid;grid-template-columns:repeat(4,1fr);background:var(--sf);border:1px solid var(--hl);
+  border-radius:var(--rl);overflow:hidden;margin-bottom:56px;animation:rise .6s .42s ease both}
+.cell{padding:18px 22px 16px;position:relative;transition:background .22s}
+.cell+.cell{border-left:1px solid var(--hls)}
+.cell:hover{background:var(--cvs)}
+.cell::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--p);
+  opacity:0;transition:opacity .22s}
+.cell:hover::after{opacity:1}
+.cell b{display:block;font-family:var(--f-display);font-weight:400;font-size:32px;line-height:1.15;color:var(--ink)}
+.cell b .u{font-family:var(--f-code);font-size:13px;color:var(--mu-soft);margin-left:3px}
+.cell span{font-family:var(--f-code);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--mu)}
+
+/* ═══════════════ sections ═══════════════ */
+section{margin-bottom:56px}
+.sec-hd{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--hl);padding-bottom:var(--sp-sm);margin-bottom:var(--sp-lg)}
+.sec-idx{font-family:var(--f-code);font-size:12px;font-weight:600;color:var(--p);letter-spacing:.06em}
+.sec-hd h2{font-family:var(--f-display);font-weight:400;font-size:23px;letter-spacing:-0.3px;color:var(--ink)}
+.sec-en{margin-left:auto;font-family:var(--f-code);font-size:9.5px;font-weight:600;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--mu-soft)}
+
+/* ── timeline ── */
+.tl{list-style:none;position:relative}
+.tl::before{content:'';position:absolute;left:19px;top:14px;bottom:14px;width:0;border-left:1px dashed var(--hls2)}
+.tl li{display:grid;grid-template-columns:40px 1fr;gap:0 var(--sp-md);position:relative;padding:15px 16px 15px 0;
+  border-radius:var(--rm);transition:background .22s}
+.tl li:hover{background:rgba(255,255,255,.85)}
+.tl-no{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--sf);
+  border:1px solid var(--hl);border-radius:var(--rp);font-family:var(--f-code);font-size:12px;font-weight:600;
+  color:var(--mu);position:relative;z-index:1;transition:all .22s}
+.tl li:hover .tl-no{background:var(--ink);color:var(--cv);border-color:var(--ink)}
+.tl li:last-child .tl-no{background:var(--ink);color:var(--cv);border-color:var(--ink)}
+.tl-body strong{display:block;font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.tl-body p{font-size:13px;color:var(--body);max-width:620px}
+.tl-body code{font-family:var(--f-code);font-size:12px;color:var(--ink);background:var(--hls);
+  padding:1px 6px;border-radius:var(--rs)}
+.tl-tag{display:inline-block;margin-left:10px;font-family:var(--f-code);font-size:9.5px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ok);border:1px solid rgba(31,138,101,.3);
+  background:rgba(31,138,101,.07);padding:2px 8px 1px;border-radius:var(--rp);vertical-align:2px}
+
+/* ── test items table ── */
+.items{background:var(--sf);border:1px solid var(--hl);border-radius:var(--rl);overflow:hidden}
+.items-hd{padding:11px 20px;border-bottom:1px solid var(--hl);background:var(--cvs);
+  font-family:var(--f-code);font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--mu)}
+.items table{width:100%;border-collapse:collapse;font-size:12.5px}
+.items th{text-align:left;padding:9px 20px;color:var(--mu);font-weight:600;
+  border-bottom:1px solid var(--hl);font-family:var(--f-code);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.items td{padding:9px 20px;border-bottom:1px solid var(--hls);color:var(--body)}
+.items tr:last-child td{border-bottom:none}
+.items tr:hover td{background:var(--cvs)}
+.items .no{font-family:var(--f-code);color:var(--mu-soft);width:36px}
+.items .tag{font-family:var(--f-code);color:var(--ink);font-size:11.5px}
+.items .loc{font-family:var(--f-code);font-size:11px;color:var(--mu)}
+.items .loc.ce{color:var(--p)}.items .loc.pc{color:var(--ok)}.items .loc.man{color:var(--mu-soft)}
+
+/* ── get ── */
+.get-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:var(--sp-lg)}
+.get-card{background:var(--sf);border:1px solid var(--hl);border-radius:var(--rl);padding:24px 26px;
+  transition:border-color .22s,transform .22s;position:relative;overflow:hidden}
+.get-card:hover{border-color:var(--hls2);transform:translateY(-2px)}
+.get-card h3{font-family:var(--f-display);font-weight:400;font-size:19px;letter-spacing:-0.2px;color:var(--ink);margin-bottom:6px}
+.get-card p{font-size:13px;color:var(--body);margin-bottom:var(--sp-md);line-height:1.75}
+.file-list{list-style:none}
+.file-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 2px;
+  border-bottom:1px dashed var(--hls);font-size:12.5px}
+.file-list li:last-child{border-bottom:none}
+.file-list code{font-family:var(--f-code);font-size:12px;color:var(--ink)}
+.file-list span{color:var(--mu);font-size:12px;text-align:right}
+
+/* ── footer ── */
+footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;border-top:1px solid var(--hls);
+  padding-top:var(--sp-md);font-family:var(--f-code);font-size:10px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--mu-soft)}
+footer b{color:var(--mu);font-weight:600}
+
+/* ── toast ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:var(--cv);padding:12px 24px;
+  border-radius:var(--rm);font-size:13px;font-weight:500;opacity:0;transform:translateY(8px);transition:all .2s;
+  pointer-events:none;z-index:1000;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+.toast.show{opacity:1;transform:translateY(0)}
+
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .55s ease,transform .55s ease}
+.reveal.in{opacity:1;transform:none}
+
+@media(max-width:880px){
+  .masthead{grid-template-columns:1fr;padding:28px 0 36px}
+  .strip{grid-template-columns:1fr 1fr}
+  .cell:nth-child(3){border-left:none}
+  .cell:nth-child(n+3){border-top:1px solid var(--hls)}
+  .get-grid{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-dots"></div>
+<div class="bg-orb"></div>
+
+<div class="wrap">
+
+  <div class="console">
+    <span class="badge">FASTIP</span>
+    <span>Auto Test Report</span>
+    <span class="sep"></span>
+    <time id="clock">--:--:--</time>
+    <span class="dot"></span>
+    <span>Ready</span>
+  </div>
+
+  <!-- ═══ masthead ═══ -->
+  <header class="masthead">
+    <div>
+      <p class="kicker">SD-WAN 线路测试 · 客户报告自动化</p>
+      <h1>自动测 SD-WAN 线路<br>一键<em class="mark">生成客户测试报告</em></h1>
+      <p class="lede">连 SSH 到 CE 跑白名单 <code>ping</code>/<code>tracert</code>，本机并行探测本地与加速站点，
+        把<b>真实回显</b>渲染成终端风格截图填进 Word 模板。双击 exe，填参数，出报告。</p>
+      <div class="pills">
+        <span class="pill"><i></i>真实数据截图</span>
+        <span class="pill"><i></i>CE 白名单探测</span>
+        <span class="pill"><i></i>本机 4 项并行</span>
+        <span class="pill"><i></i>断点续跑</span>
+        <span class="pill"><i></i>Windows 双击即用</span>
+      </div>
+      <div class="cta-row">
+        {% if is_logged_in %}
+        <a class="btn btn-p" href="api/download" download>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13h11"/></svg>
+          下载桌面版工具包
+        </a>
+        <a class="btn btn-s" href="https://github.com/yucongshen2021-spec/fastip-auto-test-report" target="_blank">查看源码仓库</a>
+        <span class="cta-hint">ZIP 约 34 MB · 解压后双击 <code>report_gui.exe</code> 即用</span>
+        {% else %}
+        <a class="btn btn-p" href="../../login">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2H3.5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M10.5 5 13.5 8l-3 3M13.5 8H6"/></svg>
+          登录后下载
+        </a>
+        <span class="cta-hint">工具包下载需登录后查看</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="scope" aria-hidden="true">
+      <div class="scope-hd"><span>Probe</span><em>Running</em></div>
+      <div class="rings">
+        <div class="cross h"></div><div class="cross v"></div>
+        <div class="sweep"></div>
+        <i class="rdot" style="top:29%;left:61%"></i>
+        <i class="rdot m" style="top:57%;left:34%"></i>
+        <i class="rdot o" style="top:69%;left:65%"></i>
+        <i class="rdot" style="top:43%;left:48%"></i>
+      </div>
+      <div class="scope-ft"><span>Items <b>8</b></span><span>Engine <b>Ready</b></span></div>
+    </div>
+  </header>
+
+  <!-- ═══ stats ═══ -->
+  <div class="strip">
+    <div class="cell"><b data-count="8">0</b><span>测试项</span></div>
+    <div class="cell"><b data-count="2">0</b><span>产品模式</span></div>
+    <div class="cell"><b data-count="4">0</b><span>并行本机项</span></div>
+    <div class="cell"><b>1<em class="u" style="font-style:normal"> 键</em></b><span>生成报告</span></div>
+  </div>
+
+  <!-- ═══ 01 验证流程 ═══ -->
+  <section class="reveal">
+    <div class="sec-hd">
+      <span class="sec-idx">01</span><h2>使用流程</h2><span class="sec-en">Workflow</span>
+    </div>
+    <ol class="tl">
+      <li>
+        <span class="tl-no">01</span>
+        <div class="tl-body"><strong>放工具</strong>
+          <p>解压 ZIP 到现场 Windows 电脑任意目录（<code>report_gui.exe</code> 与 <code>script/</code>、<code>src/</code> 同级）。</p></div>
+      </li>
+      <li>
+        <span class="tl-no">02</span>
+        <div class="tl-body"><strong>填参数</strong>
+          <p>客户信息、CID、CE SSH 凭据、主线/备线对端 IP、本地与加速站点。</p></div>
+      </li>
+      <li>
+        <span class="tl-no">03</span>
+        <div class="tl-body"><strong>执行探测</strong>
+          <p>CE SSH 跑白名单 ping/tracert（实时流式回显），本机 4 项并行探测。</p></div>
+      </li>
+      <li>
+        <span class="tl-no">04</span>
+        <div class="tl-body"><strong>生成报告</strong><span class="tl-tag">验证点</span>
+          <p>真实回显渲染成终端截图填进 Word 模板，一键生成 <code>FASTIP-测试报告_*.docx</code>。</p></div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ═══ 02 测试项清单 ═══ -->
+  <section class="reveal">
+    <div class="sec-hd">
+      <span class="sec-idx">02</span><h2>测试项清单</h2><span class="sec-en">Test Items</span>
+    </div>
+    <div class="items">
+      <div class="items-hd">共 8 项 · 6 自动 + 2 人工补图</div>
+      <table>
+        <thead><tr><th>#</th><th>测试内容</th><th>执行位置</th></tr></thead>
+        <tbody>
+          <tr><td class="no">01</td><td><span class="tag">ce_main_small</span> 主线 ping（小包 64）</td><td class="loc ce">CE SSH</td></tr>
+          <tr><td class="no">02</td><td><span class="tag">ce_main_large</span> 主线 ping（大包 1500）/ USG 为主线 tracert</td><td class="loc ce">CE SSH</td></tr>
+          <tr><td class="no">03</td><td><span class="tag">ce_backup_small</span> 备线 ping（小包 64）/ USG 为备线 ping（1500）</td><td class="loc ce">CE SSH</td></tr>
+          <tr><td class="no">04</td><td><span class="tag">ce_backup_large</span> 备线 ping（大包 1500）/ USG 为备线 tracert</td><td class="loc ce">CE SSH</td></tr>
+          <tr><td class="no">05</td><td><span class="tag">speedtest</span> 测速（人工补图，可缺省）</td><td class="loc man">人工</td></tr>
+          <tr><td class="no">06</td><td><span class="tag">local</span> 本地站点 ping + tracert</td><td class="loc pc">本机 CMD</td></tr>
+          <tr><td class="no">07</td><td><span class="tag">accel</span> 加速站点 ping + tracert</td><td class="loc pc">本机 CMD</td></tr>
+          <tr><td class="no">08</td><td><span class="tag">failover</span> 主备切换（人工补图，可缺省）</td><td class="loc man">人工</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ 03 获取工具 ═══ -->
+  <section class="reveal">
+    <div class="sec-hd">
+      <span class="sec-idx">03</span><h2>获取工具</h2><span class="sec-en">Download</span>
+    </div>
+    <div class="get-grid">
+      <div class="get-card">
+        <h3>下载工具包</h3>
+        {% if is_logged_in %}
+        <p>ZIP 约 34 MB，含 GUI exe、引擎 exe、Word 模板与说明。解压后双击 <code>report_gui.exe</code> 即用，无需装 Python。</p>
+        <a class="btn btn-p" href="api/download" download>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13h11"/></svg>
+          下载工具包 ZIP
+        </a>
+        <p style="margin-top:14px;margin-bottom:0;font-size:12px">
+          <a href="https://github.com/yucongshen2021-spec/fastip-auto-test-report" target="_blank" style="color:var(--mu);text-decoration:underline;text-underline-offset:3px">查看 GitHub 源码仓库 →</a>
+        </p>
+        {% else %}
+        <p>工具包下载链接需登录后查看。登录即可获取约 34 MB 的 ZIP，解压后双击 <code>report_gui.exe</code> 即用，无需安装 Python。</p>
+        <a class="btn btn-s" href="../../login">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2H3.5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M10.5 5 13.5 8l-3 3M13.5 8H6"/></svg>
+          登录后下载
+        </a>
+        {% endif %}
+      </div>
+      <div class="get-card">
+        <h3>包内文件</h3>
+        <ul class="file-list">
+          <li><code>report_gui.exe</code><span>双击运行的图形界面</span></li>
+          <li><code>src/make_report.exe</code><span>命令行引擎（GUI 自动调用）</span></li>
+          <li><code>script/FASTIP-测试报告.docx</code><span>Word 报告模板</span></li>
+          <li><code>使用说明.md</code><span>详细使用文档</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>FASTIP Auto Test Report <b>· v1.0</b></span>
+    <span>对 CE 只读探测 · <b>不下发配置</b></span>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── iframe 内点「登录」：postMessage 让 portal 父窗口顶层跳转 ── */
+document.addEventListener('click', function(e) {
+  var a = e.target && e.target.closest ? e.target.closest('a[href$="/login"]') : null;
+  if (a && window.self !== window.top) {
+    e.preventDefault();
+    window.parent.postMessage({type:'nav-top', url:'/login'}, window.location.origin);
+  }
+});
+
+/* ── clock ── */
+function pad(n){return ('0'+n).slice(-2)}
+function tick(){var d=new Date();
+  document.getElementById('clock').textContent=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())}
+tick();setInterval(tick,1000);
+
+/* ── count-up ── */
+function countUp(el){var target=+el.getAttribute('data-count');if(!target)return;
+  var t0=performance.now(),dur=800;
+  function step(t){var p=Math.min(1,(t-t0)/dur),v=Math.round((1-Math.pow(1-p,3))*target);
+    el.childNodes[0].nodeValue=v;if(p<1)requestAnimationFrame(step)}
+  requestAnimationFrame(step);}
+setTimeout(function(){document.querySelectorAll('[data-count]').forEach(countUp)},350);
+
+/* ── scroll reveal ── */
+if('IntersectionObserver' in window){
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){
+    if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+}else{document.querySelectorAll('.reveal').forEach(function(el){el.classList.add('in')})}
+</script>
+</body>
+</html>

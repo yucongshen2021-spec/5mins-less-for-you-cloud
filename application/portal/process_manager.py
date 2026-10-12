@@ -59,6 +59,22 @@ _ALL_APPS = [
         "port": _BASE + 4,
         "url": "/app/config_analyzer/",
     },
+    {
+        "id": "usg_virus_test",
+        "name": "USG 测病毒",
+        "cwd": os.path.join(BASE, "application", "usg_virus_test"),
+        "cmd": [PYTHON, "app.py", str(_BASE + 5)],
+        "port": _BASE + 5,
+        "url": "/app/usg_virus_test/",
+    },
+    {
+        "id": "fastip_report",
+        "name": "FASTIP 测试报告",
+        "cwd": os.path.join(BASE, "application", "fastip_report"),
+        "cmd": [PYTHON, "app.py", str(_BASE + 6)],
+        "port": _BASE + 6,
+        "url": "/app/fastip_report/",
+    },
 ]
 
 # Demo version shows only all_in_one (配置生成).
