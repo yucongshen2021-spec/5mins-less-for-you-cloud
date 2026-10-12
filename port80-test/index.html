@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>连通性测试 · 80 端口</title>
+<style>
+  :root {
+    --p: #f54e00;
+    --ink: #26251e;
+    --body: #5a5852;
+    --mu: #807d72;
+    --hl: #e6e5e0;
+    --cv: #f7f7f4;
+    --sf: #fff;
+    --ok: #1f8a65;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--cv);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: var(--sf);
+    border: 1px solid var(--hl);
+    border-radius: 12px;
+    padding: 48px 56px;
+    max-width: 520px;
+    width: 100%;
+    text-align: center;
+  }
+  .dot {
+    width: 12px; height: 12px;
+    background: var(--ok);
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .35; }
+  }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ok);
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-size: 26px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+  }
+  p.desc {
+    font-size: 14px;
+    color: var(--body);
+    line-height: 1.7;
+    margin-bottom: 28px;
+  }
+  .info {
+    background: var(--cv);
+    border: 1px solid var(--hl);
+    border-radius: 8px;
+    padding: 16px 20px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--body);
+  }
+  .info .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+  }
+  .info .k { color: var(--mu); }
+  .info .v { font-family: "SFMono-Regular", Consolas, monospace; color: var(--ink); }
+  .footer {
+    margin-top: 28px;
+    font-size: 12px;
+    color: var(--mu);
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="status"><span class="dot"></span>服务正常</div>
+    <h1>连通性测试页面</h1>
+    <p class="desc">
+      此页面用于验证 80 端口的网络连通性。<br>
+      如果你能看到此页面，说明网络链路正常。
+    </p>
+    <div class="info">
+      <div class="row"><span class="k">测试端口</span><span class="v">80 / HTTP</span></div>
+      <div class="row"><span class="k">页面类型</span><span class="v">静态页面</span></div>
+      <div class="row"><span class="k">当前时间</span><span class="v" id="ts">—</span></div>
+      <div class="row"><span class="k">你的 IP</span><span class="v" id="ip">—</span></div>
+    </div>
+    <div class="footer">仅用于连通性验证，不承载任何业务功能</div>
+  </div>
+  <script>
+    document.getElementById('ts').textContent = new Date().toLocaleString('zh-CN');
+    // 显示客户端 IP（通过 host 字段；生产可见真实客户端 IP）
+    var ipEl = document.getElementById('ip');
+    fetch('/ip', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.text() : Promise.reject(); })
+      .then(function (t) { ipEl.textContent = (t || '').trim() || '未知'; })
+      .catch(function () { ipEl.textContent = '未知'; });
+  </script>
+</body>
+</html>
