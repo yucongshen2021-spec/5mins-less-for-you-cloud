@@ -128,7 +128,7 @@ def _filter_headers(headers: dict) -> dict:
     return {
         k: v for k, v in headers.items()
         if k.lower() not in _HOP_HEADERS
-        and k.lower() not in ("host", "content-length", "content-encoding")
+        and k.lower() not in ("host", "content-length", "content-encoding", "set-cookie")
     }
 
 
