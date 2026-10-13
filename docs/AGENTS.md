@@ -135,8 +135,9 @@ Playwright 仅在需要回归一段固定交互序列（如级联下拉、模板
 ## Git Push 网络问题
 
 ```bash
-# GitHub IP 会漂移（2026-10-12 实测可用：20.205.243.166，已写入 /etc/hosts）。失效时重新探测：
-for ip in 20.205.243.166 140.82.114.3 140.82.114.4 20.27.177.113 140.82.112.3; do
+# GitHub IP 会漂移（同日不同时段先后实测到多个可用 IP，如 140.82.114.x / 20.205.243.166）。
+# 失效时逐一探测并更新 hosts（网页可达 ≠ git 端点可达，以本探测为准）：
+for ip in 140.82.114.3 140.82.114.4 20.205.243.166 20.27.177.113 140.82.112.3; do
   timeout 5 bash -c "echo > /dev/tcp/$ip/443" 2>/dev/null && echo "$ip OK" \
     && sudo sed -i '/github.com/d' /etc/hosts \
     && echo "$ip github.com" | sudo tee -a /etc/hosts && break
