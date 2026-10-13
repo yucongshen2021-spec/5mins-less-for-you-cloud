@@ -33,19 +33,17 @@ jobs:
           python -m pip install flask pytest psutil dnspython python-docx Pillow paramiko
 
       - name: Show test inventory
-        working-directory: application/test
         env:
           TEST_MODE: "1"
           NO_BROWSER: "1"
         run: |
           python --version
-          python -m pytest --collect-only -q --deselect all_in_one/test_e2e_playwright.py
+          python -m pytest --collect-only -q application/test
 
       - name: Run pytest
-        working-directory: application/test
         env:
           TEST_MODE: "1"
           NO_BROWSER: "1"
           PYTHONIOENCODING: utf-8
         run: |
-          python -m pytest -q --deselect all_in_one/test_e2e_playwright.py
+          python -m pytest -q application/test
