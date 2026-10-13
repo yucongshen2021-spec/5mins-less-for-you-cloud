@@ -11,7 +11,7 @@
 |---|---|
 | 文档一致性 | README / AGENTS / all_in_one README / test_features / whatsnew / MIGRATION 全部核对修正（29→31 场景、185→280 测试、服务表补 5006/80、Git push IP、docker-compose 命令形、禁用页签状态等 14 项） |
 | 配置与代码 | supervisord/compose/process_manager 过期注释修正；db_backup 清理 bug 修复；RELEASE_INFO → 2.0.0；BY YUC 徽标上线 |
-| CI | 修复 GitHub Actions 历史 58/58 全红（根因双点：CI 无 playwright + `--ignore` 路径失效）；本地 CI 等价模拟 **184 passed / 116 skipped / 0 failed / 0 error** |
+| CI | 修复 GitHub Actions 历史 58/58 全红（根因双点：CI 无 playwright + `--ignore` 路径失效）；本地模拟 **184 passed / 116 skipped / 0 failed**；**GitHub 实跑 success（run 38333456696，历史首次绿）** |
 | 归档 | 11 个未用模板目录、8 个历史方案、2 张旧截图、56 个备份残留、2 个首页杂项、1 个陈旧镜像（760M→归档 tar）|
 | 新增文档 | `docs/HANDOVER.md`（交接手册）、`docs/REBUILD_EXE.md`、`port80-test/README.md`、`docs/CLEANUP_PLAN.md`、本报告 |
 | 冻结备份 | `.archive/backup-20261012/`（git bundle 4.4M + 工作区 tar 46M/2136 项，均已验证可解包） |

@@ -161,7 +161,7 @@
 - **2026-09**：平稳运行（141 次生成记录），无重大变更
 - **2026-10-09**：新增 **80 端口连通性测试页**（独立 Docker 容器，与正式环境完全隔离；仅静态页 + /health + /ip，用于网络连通性验证）
 - **2026-10-12**：GitHub 仓库转为公开（yucongshen2021-spec/5mins-less-for-you-cloud）；本地提交整理入库；Git push 网络问题再次修复（GitHub IP 漂移 → 重新探测更新 /etc/hosts）；SSH 部署密钥生成（免 token 推送通道）
-- **2026-10-12 · 系统级清理整改（交接版）**：全面校正文档/配置/表述（场景口径 29→31、测试口径 185→280、服务表补 5006 与 80 端口）；修复 db_backup 的 `-wal/-shm` 清理 bug（`Path.suffix` 永不命中，存量 56 个残留已清除）；**发现并修复 GitHub Actions 自上线以来 58 次运行全部失败**（根因：CI 无 playwright 致收集阶段崩溃 + `--ignore` 路径依赖仓库根未写明）——为浏览器/容器依赖用例补齐自动跳过守卫，本地 CI 等价模拟 184 passed / 116 skipped / 0 failed；11 个未用模板目录、8 个历史方案等移入 `.archive/`（三重验证 + MANIFEST）；「BY YUC」徽标与 Web 版本号 2.0.0 上线；新增 `docs/HANDOVER.md` 交接手册
+- **2026-10-12 · 系统级清理整改（交接版）**：全面校正文档/配置/表述（场景口径 29→31、测试口径 185→280、服务表补 5006 与 80 端口）；修复 db_backup 的 `-wal/-shm` 清理 bug（`Path.suffix` 永不命中，存量 56 个残留已清除）；**发现并修复 GitHub Actions 自上线以来 58 次运行全部失败**（根因：CI 无 playwright 致收集阶段崩溃 + `--ignore` 路径依赖仓库根未写明）——为浏览器/容器依赖用例补齐自动跳过守卫，本地 CI 等价模拟 184 passed / 116 skipped / 0 failed；**当日推送后在 GitHub 实跑成功（run 38333456696）——仓库历史首次绿色**；11 个未用模板目录、8 个历史方案等移入 `.archive/`（三重验证 + MANIFEST）；「BY YUC」徽标与 Web 版本号 2.0.0 上线；新增 `docs/HANDOVER.md` 交接手册
 
 ---
 

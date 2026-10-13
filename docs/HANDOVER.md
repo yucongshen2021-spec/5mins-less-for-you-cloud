@@ -135,10 +135,15 @@ curl localhost:5000/api/health   # {"ok":true,"status":"healthy"}
 | pytest all_in_one | 147（+17 浏览器用例自动跳过） | 仓库根 | `pytest application/test/all_in_one -q` |
 
 **CI（GitHub Actions）**：2026-10-12 修复（历史 58 次运行全部失败——根因：CI 无 playwright 且 `--ignore` 路径失效导致收集崩溃）。修复内容：
-① workflow 改为**从仓库根**运行 `pytest application/test`（使 pytest.ini 忽略路径生效）；
+① workflow「从仓库根运行」优化版已备好（因 GitHub token 缺 `workflow` 权限暂未推送；备份于 `.archive/workflow-pending-20261012/test.yml.final`，日后补权限时作为一个新提交带上即可；旧版 workflow 实测同样全绿）；
 ② 需要浏览器的用例在缺失依赖时**自动跳过**（conftest hook + importorskip）；
 ③ blackbox/portal 用例在 8000 容器未运行时自动跳过。
-本地模拟 CI 命令：
+
+### GitHub 实跑记录
+
+- **2026-10-12**：push 后 workflow 立即执行，**success**（run `38333456696`）——本仓库历史 58 连败后的**第一次绿色**。
+
+本地复现 CI 环境（自检用）：
 
 ```bash
 mkdir -p /tmp/no_pw/playwright && echo 'raise ModuleNotFoundError("no playwright")' > /tmp/no_pw/playwright/__init__.py
